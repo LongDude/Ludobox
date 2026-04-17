@@ -1,13 +1,10 @@
 <script lang="ts" setup>
 import { computed } from 'vue'
-import { storeToRefs } from 'pinia'
 import { useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/authStore'
 import { useSettingStore } from '@/stores/settingStore'
-import { useToastStore } from '@/stores/toastStore'
 import { useI18n } from '@/i18n'
 import ToastCenter from '@/components/ToastCenter.vue'
-import { copyToClipboard } from '@/utils/copyToClipboard'
 const authStore = useAuthStore()
 const router = useRouter()
 function RedirecttoProfile() {
@@ -19,14 +16,6 @@ function RedirecttoAuth() {
 
 const useSetting = useSettingStore()
 const { t } = useI18n()
-const toastStore = useToastStore()
-
-const props = defineProps<{
-  showUpload?: boolean
-  showMenu?: boolean
-}>()
-
-const showUpload = computed(() => props.showUpload ?? true)
 // const showMenu = computed(() => props.showMenu ?? true)
 const avatarUrl = computed(() => authStore.User?.photo || '')
 const avatarLetter = computed(() => {
