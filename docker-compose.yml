@@ -1,0 +1,21 @@
+services:
+  haproxy:
+    image: haproxy:2.9-alpine  
+    container_name: haproxy_rooms
+    restart: unless-stopped
+    ports:
+      - "443:443"               # HTTPS порт
+      - "80:80"                 # опционально, можно перенаправлять на HTTPS
+      - "8404:8404"
+    volumes:
+      - ./services/haproxy/haproxy.cfg:/usr/local/etc/haproxy/haproxy.cfg:ro
+      - ./services/haproxy/certs:/etc/haproxy/certs:ro   # сертификаты
+      - ./services/haproxy/jwt_pubkey.pem:/etc/haproxy/jwt_pubkey.pem:ro
+    networks:
+      - rooms_network
+
+
+networks:
+  rooms_network: 
+    driver: bridge
+    internal: true
