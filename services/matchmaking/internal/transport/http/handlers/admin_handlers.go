@@ -15,9 +15,9 @@ import (
 // @Accept json
 // @Produce json
 // @Success 200 {object} presenters.TestResponse
-// @Failure 401 {object}
-// @Failure 403 {object}
-// @Failure 500 {object}
+// @Failure 401 {object} presenters.ErrorResponse
+// @Failure 403 {object} presenters.ErrorResponse
+// @Failure 500 {object} presenters.ErrorResponse
 // @Router /ping [get]
 func PingPong(ctx *gin.Context, a *app.App) {
 	ctx.JSON(http.StatusOK, presenters.TestResponse{
