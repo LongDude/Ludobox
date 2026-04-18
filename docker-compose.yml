@@ -1,21 +1,264 @@
 services:
   haproxy:
-    image: haproxy:2.9-alpine  
+    image: haproxy:2.9-alpine
     container_name: haproxy_rooms
     restart: unless-stopped
+    env_file:
+      - ./services/sso/.env
+    environment:
+      SSO_VALIDATE_HOST: sso-core
+      SSO_VALIDATE_PORT: "8080"
+    depends_on:
+      sso-core:
+        condition: service_started
+      game-server-core:
+        condition: service_started
+      matchmaking-core:
+        condition: service_started
+      user-service-core:
+        condition: service_started
     ports:
-      - "443:443"               # HTTPS порт
-      - "80:80"                 # опционально, можно перенаправлять на HTTPS
+      - "80:80"
       - "8404:8404"
     volumes:
       - ./services/haproxy/haproxy.cfg:/usr/local/etc/haproxy/haproxy.cfg:ro
-      - ./services/haproxy/certs:/etc/haproxy/certs:ro   # сертификаты
-      - ./services/haproxy/jwt_pubkey.pem:/etc/haproxy/jwt_pubkey.pem:ro
+      - ./services/haproxy/auth_validate.lua:/usr/local/etc/haproxy/auth_validate.lua:ro
     networks:
       - rooms_network
 
+  sso-postgres:
+    image: postgres:17
+    container_name: sso_postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: password
+      POSTGRES_DB: db
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "postgres"]
+      interval: 5s
+      retries: 10
+    volumes:
+      - sso_postgres_data:/var/lib/postgresql/data
+    networks:
+      - rooms_network
+
+  sso-redis:
+    image: redis:8-alpine
+    container_name: sso_redis
+    restart: unless-stopped
+    env_file:
+      - ./services/sso/.env
+    command:
+      - sh
+      - -c
+      - redis-server --appendonly yes --requirepass "$$REDIS_PASSWORD"
+    volumes:
+      - sso_redis_data:/data
+    networks:
+      - rooms_network
+
+  sso-migrator:
+    container_name: sso_migrator
+    build:
+      context: ./services/sso
+      dockerfile: ./tools/migrator/dockerfile
+    env_file:
+      - ./services/sso/.env
+    environment:
+      DB_HOST: sso-postgres
+    depends_on:
+      sso-postgres:
+        condition: service_healthy
+    networks:
+      - rooms_network
+
+  sso-core:
+    container_name: sso_core
+    build:
+      context: ./services/sso
+      dockerfile: ./dockerfile
+    restart: unless-stopped
+    env_file:
+      - ./services/sso/.env
+    environment:
+      DB_HOST: sso-postgres
+      REDIS_HOST: sso-redis
+      REDIS_DB: "0"
+      PUBLIC_URL: http://localhost
+      SWAGGER_BASE_PATH: /api
+      ACCESS_TOKEN_TTL: 15m
+      REFRESH_TOKEN_TTL: 7d
+      COOKIE_MAX_AGE: 7d
+      COOKIE_SECURE: "false"
+      COOKIE_SAME_SITE: Lax
+    depends_on:
+      sso-postgres:
+        condition: service_healthy
+      sso-redis:
+        condition: service_started
+      sso-migrator:
+        condition: service_completed_successfully
+    networks:
+      - rooms_network
+
+  shared-postgres:
+    image: postgres:17
+    container_name: rooms_shared_postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: password
+      POSTGRES_DB: db
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "postgres"]
+      interval: 5s
+      retries: 10
+    volumes:
+      - shared_postgres_data:/var/lib/postgresql/data
+    networks:
+      - rooms_network
+
+  game-redis:
+    image: redis:8-alpine
+    container_name: game_redis
+    restart: unless-stopped
+    env_file:
+      - ./services/game_server/.env
+    command:
+      - sh
+      - -c
+      - redis-server --appendonly yes --requirepass "$$REDIS_PASSWORD"
+    volumes:
+      - game_redis_data:/data
+    networks:
+      - rooms_network
+
+  matchmaking-redis:
+    image: redis:8-alpine
+    container_name: matchmaking_redis
+    restart: unless-stopped
+    env_file:
+      - ./services/matchmaking/.env
+    command:
+      - sh
+      - -c
+      - redis-server --appendonly yes --requirepass "$$REDIS_PASSWORD"
+    volumes:
+      - matchmaking_redis_data:/data
+    networks:
+      - rooms_network
+
+  user-redis:
+    image: redis:8-alpine
+    container_name: user_redis
+    restart: unless-stopped
+    env_file:
+      - ./services/user_service/.env
+    command:
+      - sh
+      - -c
+      - redis-server --appendonly yes --requirepass "$$REDIS_PASSWORD"
+    volumes:
+      - user_redis_data:/data
+    networks:
+      - rooms_network
+
+  shared-migrator:
+    container_name: rooms_shared_migrator
+    build:
+      context: .
+      dockerfile: ./tools/migrator/dockerfile
+    env_file:
+      - ./services/game_server/.env
+    environment:
+      DB_HOST: shared-postgres
+    depends_on:
+      shared-postgres:
+        condition: service_healthy
+    networks:
+      - rooms_network
+
+  game-server-core:
+    container_name: game_server_core
+    build:
+      context: ./services/game_server
+      dockerfile: ./dockerfile
+    restart: unless-stopped
+    env_file:
+      - ./services/game_server/.env
+    environment:
+      DB_HOST: shared-postgres
+      REDIS_HOST: game-redis
+      REDIS_DB: "0"
+      PUBLIC_URL: http://localhost
+      SWAGGER_BASE_PATH: /api/game
+    depends_on:
+      shared-postgres:
+        condition: service_healthy
+      game-redis:
+        condition: service_started
+      shared-migrator:
+        condition: service_completed_successfully
+    networks:
+      - rooms_network
+
+  matchmaking-core:
+    container_name: matchmaking_core
+    build:
+      context: ./services/matchmaking
+      dockerfile: ./dockerfile
+    restart: unless-stopped
+    env_file:
+      - ./services/matchmaking/.env
+    environment:
+      DB_HOST: shared-postgres
+      REDIS_HOST: matchmaking-redis
+      REDIS_DB: "0"
+      PUBLIC_URL: http://localhost
+      SWAGGER_BASE_PATH: /api/matchmaking
+    depends_on:
+      shared-postgres:
+        condition: service_healthy
+      matchmaking-redis:
+        condition: service_started
+      shared-migrator:
+        condition: service_completed_successfully
+    networks:
+      - rooms_network
+
+  user-service-core:
+    container_name: user_service_core
+    build:
+      context: ./services/user_service
+      dockerfile: ./dockerfile
+    restart: unless-stopped
+    env_file:
+      - ./services/user_service/.env
+    environment:
+      DB_HOST: shared-postgres
+      REDIS_HOST: user-redis
+      REDIS_DB: "0"
+      PUBLIC_URL: http://localhost
+      SWAGGER_BASE_PATH: /api/users
+    depends_on:
+      shared-postgres:
+        condition: service_healthy
+      user-redis:
+        condition: service_started
+      shared-migrator:
+        condition: service_completed_successfully
+    networks:
+      - rooms_network
+
+volumes:
+  sso_postgres_data:
+  sso_redis_data:
+  shared_postgres_data:
+  game_redis_data:
+  matchmaking_redis_data:
+  user_redis_data:
 
 networks:
-  rooms_network: 
+  rooms_network:
     driver: bridge
-    internal: true

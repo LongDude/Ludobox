@@ -36,8 +36,6 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
-      migrator:
-        condition: service_completed_successfully
       redis:
         condition: service_started
     networks:
@@ -99,25 +97,6 @@ services:
     command: redis-server --appendonly yes
     networks:
       - storage_network
-
-
-  migrator:
-    container_name: LudaBox_Matchmaking_migrator
-    build:
-      context: .
-      dockerfile: ./tools/migrator/dockerfile
-    environment:
-      - DB_USER=${DB_USER}
-      - DB_PASSWORD=${DB_PASSWORD}
-      - DB_NAME=${DB_NAME}
-      - DB_PORT=${DB_PORT}
-      - DB_HOST=${DB_HOST}
-    depends_on:
-      postgres:
-        condition: service_healthy
-    networks:
-      - storage_network
-    
 volumes:
   postgres_data:
   redis_data:

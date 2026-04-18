@@ -18,6 +18,7 @@ type Config struct {
 	EmailConfig         EmailConfig
 	Domain              string   `env:"DOMAIN" env-default:"localhost"`
 	PublicURL           string   `env:"PUBLIC_URL"`
+	SwaggerBasePath     string   `env:"SWAGGER_BASE_PATH" env-default:"/api"`
 	AllowedCORSOrigins  []string `env:"ALLOWED_CORS_ORIGINS" env-separator:","`
 	AllowedRedirectURLs []string `env:"ALLOWED_REDIRECT_URLS" env-separator:","`
 	DefaultAdminEmails  []string `env:"DEFAULT_ADMIN_EMAILS" env-separator:","`

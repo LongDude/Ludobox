@@ -49,8 +49,8 @@ func NewHTTPServer(conf *config.Config, a *app.App) *Server {
 		return nil
 	}
 
-	// Update swagger docs host/schemes dynamically from env
-	docs.SwaggerInfo.BasePath = "/api"
+	// Keep Swagger aligned with the public gateway prefix for "Try it out".
+	docs.SwaggerInfo.BasePath = conf.SwaggerBasePath
 	if conf.PublicURL != "" {
 		if u, err := url.Parse(conf.PublicURL); err == nil {
 			docs.SwaggerInfo.Host = u.Host
