@@ -1,1 +1,1 @@
-# LudaBox Matchmaking
+# LudaBox Matchmaking Server

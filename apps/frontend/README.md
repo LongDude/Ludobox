@@ -1,6 +1,6 @@
-﻿# ALib Frontend
+﻿# LudaBox Frontend
 
-Фронтенд веб‑приложения на Vue 3 для интеллектуального поиска и управления публикациями со входом через SSO, ролями (USER/AUTHOR, MODERATOR, ADMIN), кабинетом автора и очередью модерации. Проект собран на Vite и TypeScript, использует Pinia, Vue Router и Axios.
+Фронтенд веб‑приложения для проведения лотерей построенный на микросервисной архитектуре на Vue 3 со входом через SSO, ролями (USER, ADMIN). Проект собран на Vite и TypeScript, использует Pinia, Vue Router и Axios. 
 
 ## Стек
 
@@ -73,11 +73,11 @@ Nginx раздаёт статику на http://localhost (порт 80).
 - `src/stores/` — Pinia‑хранилища (auth/chat/paper/settings/toast).
 - `src/api/` — слой API на Axios:
   - `src/api/base/useBaseApi.ts` — клиент для SSO с перехватом 401 → refresh.
-  - `src/api/base/useAlibApi.ts` — клиент для ALib API.
+  - `src/api/base/useAlibApi.ts` — клиент для LudaBox API.
   - `src/api/useSSOApi.ts` — методы SSO.
-  - `src/api/useAlibApi.ts` — методы чатов, author submissions и moderation.
+  - `src/api/useAlibApi.ts` — методы LudaBox API.
 - `src/views/` — страницы приложения.
-- `src/components/` — UI‑компоненты (панели, чат, тосты, диалоги).
+- `src/components/` — UI‑компоненты (панели, тосты, диалоги).
 - `src/i18n.ts` — простая i18n (en/ru).
 - `src/assets/theme.css` — тема и CSS‑переменные.
 
@@ -89,7 +89,6 @@ Nginx раздаёт статику на http://localhost (порт 80).
 VITE_API_BASE_URL=http://localhost:5173
 VITE_FRONTEND_BASE_URL=http://localhost:5173
 VITE_SSO_CLIENT_ID_URL=https://domain/api
-VITE_ALIB_API_URL=http://domain/api
 ```
 
 Назначение:
@@ -107,16 +106,6 @@ VITE_ALIB_API_URL=http://domain/api
 
 ## Submission workflow
 
-- Авторские страницы работают через `/api/submissions`:
-  - создание и обновление черновиков;
-  - отправка на модерацию;
-  - просмотр статусов `draft | pending | approved | rejected`;
-  - удаление только `draft` и `rejected`.
-- Модераторская панель работает через `/api/moderation/submissions`:
-  - загрузка очереди;
-  - редактирование staged-данных;
-  - комментарий модератора;
-  - `approve` / `reject`.
 - Источник ролей на клиенте — SSO `/auth/authenticate`.
 
 ## Лицензия

@@ -1,1 +1,1 @@
-# LudaBox Worker
+# LudaBox Game Server
