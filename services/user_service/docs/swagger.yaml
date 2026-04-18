@@ -12,6 +12,39 @@ definitions:
     required:
     - pong
     type: object
+  presenters.UserBalanceUpdateRequest:
+    properties:
+      delta:
+        example: -250
+        type: integer
+    type: object
+  presenters.UserCreateRequest:
+    properties:
+      balance:
+        example: 5000
+        type: integer
+      nickname:
+        example: ludobox_vip
+        type: string
+    type: object
+  presenters.UserResponse:
+    properties:
+      balance:
+        example: 1000
+        type: integer
+      nickname:
+        example: user_42
+        type: string
+      user_id:
+        example: 42
+        type: integer
+    type: object
+  presenters.UserUpdateRequest:
+    properties:
+      nickname:
+        example: ludobox_vip_2
+        type: string
+    type: object
 host: localhost:8080
 info:
   contact: {}
@@ -61,4 +94,217 @@ paths:
       summary: ping pong
       tags:
       - Test
+  /user:
+    delete:
+      consumes:
+      - application/json
+      description: Deletes the current user record from user_service.
+      parameters:
+      - description: Authenticated user id
+        in: header
+        name: X-Authenticated-User
+        required: true
+        type: string
+      - description: Authorization Token
+        in: header
+        name: Authorization
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "204":
+          description: No Content
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/presenters.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/presenters.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/presenters.ErrorResponse'
+      summary: Delete current user
+      tags:
+      - User
+    get:
+      consumes:
+      - application/json
+      description: Returns the current user profile. If the user is absent in user_service,
+        it is created automatically with nickname user_{id} and zero balance.
+      parameters:
+      - description: Authenticated user id
+        in: header
+        name: X-Authenticated-User
+        required: true
+        type: string
+      - description: Authorization Token
+        in: header
+        name: Authorization
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/presenters.UserResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/presenters.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/presenters.ErrorResponse'
+      summary: Get current user
+      tags:
+      - User
+    post:
+      consumes:
+      - application/json
+      description: Creates the current user. If a request body is provided, nickname
+        and initial balance are applied after creation.
+      parameters:
+      - description: Authenticated user id
+        in: header
+        name: X-Authenticated-User
+        required: true
+        type: string
+      - description: Authorization Token
+        in: header
+        name: Authorization
+        required: true
+        type: string
+      - description: Optional create payload
+        in: body
+        name: request
+        schema:
+          $ref: '#/definitions/presenters.UserCreateRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/presenters.UserResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/presenters.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/presenters.ErrorResponse'
+        "409":
+          description: Conflict
+          schema:
+            $ref: '#/definitions/presenters.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/presenters.ErrorResponse'
+      summary: Create current user
+      tags:
+      - User
+    put:
+      consumes:
+      - application/json
+      description: Updates the current user nickname.
+      parameters:
+      - description: Authenticated user id
+        in: header
+        name: X-Authenticated-User
+        required: true
+        type: string
+      - description: Authorization Token
+        in: header
+        name: Authorization
+        required: true
+        type: string
+      - description: Nickname update payload
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/presenters.UserUpdateRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/presenters.UserResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/presenters.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/presenters.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/presenters.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/presenters.ErrorResponse'
+      summary: Update current user
+      tags:
+      - User
+  /user/balance:
+    put:
+      consumes:
+      - application/json
+      description: Applies a relative delta to the current user balance. Use positive
+        values to credit and negative values to debit.
+      parameters:
+      - description: Authenticated user id
+        in: header
+        name: X-Authenticated-User
+        required: true
+        type: string
+      - description: Authorization Token
+        in: header
+        name: Authorization
+        required: true
+        type: string
+      - description: Balance delta payload
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/presenters.UserBalanceUpdateRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/presenters.UserResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/presenters.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/presenters.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/presenters.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/presenters.ErrorResponse'
+      summary: Update current user balance
+      tags:
+      - User
 swagger: "2.0"

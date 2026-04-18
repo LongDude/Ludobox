@@ -9,6 +9,7 @@ import (
 var (
 	ErrorUserNotFound     = errors.New("user not found")
 	ErrorUserAlreadyExist = errors.New("user already exist")
+	ErrorNegativeBalance  = errors.New("balance cannot be negative")
 )
 
 type UserRepository interface {

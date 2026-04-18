@@ -10,6 +10,11 @@ import (
 func MainRouter(r *gin.RouterGroup, a *app.App) {
 	r.GET("/healthz", func(ctx *gin.Context) { handlers.Healthz(ctx, a) })
 	r.GET("/ping", func(ctx *gin.Context) { handlers.PingPong(ctx, a) })
+	r.GET("/user", func(ctx *gin.Context) { handlers.GetUserByID(ctx, a) })
+	r.POST("/user", func(ctx *gin.Context) { handlers.CreateUserByID(ctx, a) })
+	r.PUT("/user", func(ctx *gin.Context) { handlers.UpdateUserByID(ctx, a) })
+	r.DELETE("/user", func(ctx *gin.Context) { handlers.DeleteUserByID(ctx, a) })
+	r.PUT("/user/balance", func(ctx *gin.Context) { handlers.UpdateUserBalanceByID(ctx, a) })
 }
 func AdminRouter(r *gin.RouterGroup, a *app.App) {
 	// admin := r.Group("", middlewares.AdminOnly(a))
