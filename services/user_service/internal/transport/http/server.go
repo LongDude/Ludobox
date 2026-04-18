@@ -86,8 +86,8 @@ func NewHTTPServer(conf *config.Config, a *app.App) *Server {
 		}
 	}
 	// Register routes
-	AdminRouter(s.app.Group("/api/auth"), a)
-	MainRouter(s.app.Group("/api/auth"), a)
+	AdminRouter(s.app.Group("/api/admin"), a)
+	MainRouter(s.app.Group("/api"), a)
 	return &s
 }
 

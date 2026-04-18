@@ -87,7 +87,7 @@ var SwaggerInfo = &swag.Spec{
 	BasePath:         "/api",
 	Schemes:          []string{},
 	Title:            "LudaBox API",
-	Description:      "LudaBox UserService",
+	Description:      "LudaBox GameServer",
 	InfoInstanceName: "swagger",
 	SwaggerTemplate:  docTemplate,
 	LeftDelim:        "{{",

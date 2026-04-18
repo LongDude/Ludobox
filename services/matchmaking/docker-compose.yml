@@ -1,6 +1,6 @@
 services:
   core:
-    container_name: LudaBox_UserService
+    container_name: LudaBox_Matchmaking
     build:
       context: .
       dockerfile: ./dockerfile
@@ -42,9 +42,10 @@ services:
         condition: service_started
     networks:
       - storage_network
+      - core_network
 
   nginx:
-    container_name: SSO_nginx
+    container_name: LudaBox_Matchmaking_nginx
     build:
       context: ./nginx
     environment:
@@ -59,17 +60,19 @@ services:
     depends_on:
       core:
         condition: service_started
+    networks:
+      - core_network
 
   certbot:
     image: certbot/certbot:latest
-    container_name: SSO_certbot
+    container_name: LudaBox_Matchmaking_certbot
     volumes:
       - ./certbot/conf:/etc/letsencrypt
       - ./certbot/www:/var/www/certbot
         
   
   postgres:
-    container_name: SSO_db
+    container_name: LudaBox_Matchmaking_db
     image: postgres:17
     environment:
       - POSTGRES_USER=${DB_USER}
@@ -88,7 +91,7 @@ services:
   
   redis:
     image: redis:8-alpine
-    container_name: SSO_redis
+    container_name: LudaBox_Matchmaking_redis
     # ports:
     #   - "${REDIS_PORT}:${REDIS_PORT}"
     volumes:
@@ -99,7 +102,7 @@ services:
 
 
   migrator:
-    container_name: SSO_migrator
+    container_name: LudaBox_Matchmaking_migrator
     build:
       context: .
       dockerfile: ./tools/migrator/dockerfile
@@ -115,13 +118,12 @@ services:
     networks:
       - storage_network
     
-
 volumes:
   postgres_data:
   redis_data:
 
-# Before start create a network with command
-# docker network create grpc_network
 networks:
   storage_network:
+    driver: bridge
+  core_network:
     driver: bridge

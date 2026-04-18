@@ -15,7 +15,7 @@ definitions:
 host: localhost:8080
 info:
   contact: {}
-  description: LudaBox UserService
+  description: LudaBox Matchmaking
   title: LudaBox API
   version: "1.0"
 paths:

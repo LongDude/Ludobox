@@ -2,6 +2,9 @@ package main
 
 import (
 	"context"
+	"os"
+	"os/signal"
+	"syscall"
 	"time"
 	"user_service/internal/app"
 	"user_service/internal/config"
@@ -14,7 +17,7 @@ import (
 
 // @title LudaBox API
 // @version 1.0
-// @description LudaBox UserService
+// @description LudaBox Matchmaking
 // @host localhost:8080
 // @BasePath /api
 func main() {
@@ -57,6 +60,11 @@ func main() {
 			logger.Fatalf("Failed to start HTTP server: %v", err)
 		}
 	}()
+	//Wait for interrupt signal to shutdown server
+	quit := make(chan os.Signal, 1)
+	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
+	<-quit
+	logger.Info("Shutdown HTTP Server ...")
 
 	// ! Graceful shutdown
 	err = server.Stop(ctx)
