@@ -9,24 +9,24 @@ import (
 )
 
 type App struct {
-	Config       *config.Config
-	AdminService service.AdminService
-	Logger       *logrus.Logger
+	Config      *config.Config
+	UserService service.UserService
+	Logger      *logrus.Logger
 }
 
 func NewApp(
 	cfg *config.Config,
-	AdminRepository repository.AdminRepository,
+	UserRepository repository.UserRepository,
 	Logger *logrus.Logger,
 ) *App {
 	baseURL := cfg.PublicURL
 	if baseURL == "" {
 		baseURL = "http://" + cfg.Domain + ":" + cfg.HttpServerConfig.Port
 	}
-	AdminService := service.NewAdminService(AdminRepository, Logger)
+	UserService := service.NewUserService(UserRepository, Logger)
 	return &App{
-		Config:       cfg,
-		AdminService: AdminService,
-		Logger:       Logger,
+		Config:      cfg,
+		UserService: UserService,
+		Logger:      Logger,
 	}
 }

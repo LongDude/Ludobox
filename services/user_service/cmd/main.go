@@ -48,9 +48,9 @@ func main() {
 	// }
 
 	// SessionRepo := redis.NewSessionRepository(redisClient)
-	AdminRepo := postgres.NewAdminRepository(pgPool)
+	UserRepo := postgres.NewUserRepository(pgPool)
 
-	usecase := app.NewApp(cfg, AdminRepo, logger)
+	usecase := app.NewApp(cfg, UserRepo, logger)
 	// ! Init REST
 	server := http.NewHTTPServer(cfg, usecase)
 	logger.Info("Start HTTP server")
