@@ -2,21 +2,24 @@ package config
 
 import (
 	"github.com/ilyakaznacheev/cleanenv"
+	"user_service/internal/types"
 )
 
 type Config struct {
 	PostgresConfig      PostgresConfig
 	RedisConfig         RedisConfig
 	HttpServerConfig    HTTPServerConfig
-	Domain              string   `env:"DOMAIN" env-default:"localhost"`
-	PublicURL           string   `env:"PUBLIC_URL"`
-	SwaggerBasePath     string   `env:"SWAGGER_BASE_PATH" env-default:"/api"`
-	AllowedCORSOrigins  []string `env:"ALLOWED_CORS_ORIGINS" env-separator:","`
-	AllowedRedirectURLs []string `env:"ALLOWED_REDIRECT_URLS" env-separator:","`
-	DefaultAdminEmails  []string `env:"DEFAULT_ADMIN_EMAILS" env-separator:","`
-	SwaggerEnabled      bool     `env:"SWAGGER_ENABLED" env-default:"true"`
-	SwaggerUser         string   `env:"SWAGGER_USER"`
-	SwaggerPassword     string   `env:"SWAGGER_PASSWORD"`
+	InstanceID          string               `env:"INSTANCE_ID" env-default:"game-server"`
+	HeartbeatInterval   types.CustomDuration `env:"GAME_SERVER_HEARTBEAT_INTERVAL" env-default:"5s"`
+	Domain              string               `env:"DOMAIN" env-default:"localhost"`
+	PublicURL           string               `env:"PUBLIC_URL"`
+	SwaggerBasePath     string               `env:"SWAGGER_BASE_PATH" env-default:"/api"`
+	AllowedCORSOrigins  []string             `env:"ALLOWED_CORS_ORIGINS" env-separator:","`
+	AllowedRedirectURLs []string             `env:"ALLOWED_REDIRECT_URLS" env-separator:","`
+	DefaultAdminEmails  []string             `env:"DEFAULT_ADMIN_EMAILS" env-separator:","`
+	SwaggerEnabled      bool                 `env:"SWAGGER_ENABLED" env-default:"true"`
+	SwaggerUser         string               `env:"SWAGGER_USER"`
+	SwaggerPassword     string               `env:"SWAGGER_PASSWORD"`
 }
 
 type PostgresConfig struct {

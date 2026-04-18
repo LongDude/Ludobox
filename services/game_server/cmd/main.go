@@ -4,10 +4,12 @@ import (
 	"context"
 	"os"
 	"os/signal"
+	"sync"
 	"syscall"
 	"time"
 	"user_service/internal/app"
 	"user_service/internal/config"
+	"user_service/internal/repository"
 	"user_service/internal/repository/postgres"
 	"user_service/internal/transport/http"
 	"user_service/internal/validation"
@@ -48,9 +50,48 @@ func main() {
 	// }
 
 	// SessionRepo := redis.NewSessionRepository(redisClient)
-	AdminRepo := postgres.NewAdminRepository(pgPool)
 
-	usecase := app.NewApp(cfg, AdminRepo, logger)
+	// ! Init HeartBeat
+	InternalRepo := postgres.NewInternalRepository(pgPool)
+	registration, err := InternalRepo.RegisterGameServer(ctx, repository.GameServerRegistrationParams{
+		InstanceKey: cfg.InstanceID,
+		RedisHost:   cfg.RedisConfig.Host,
+	})
+	if err != nil {
+		logger.Fatalf("Failed to register game server instance with error: %v", err)
+		return
+	}
+	logger.WithFields(map[string]interface{}{
+		"server_id":    registration.ServerID,
+		"instance_key": registration.InstanceKey,
+		"redis_host":   registration.RedisHost,
+	}).Info("Registered game server instance")
+
+	heartbeatCtx, heartbeatCancel := context.WithCancel(context.Background())
+	var heartbeatWG sync.WaitGroup
+	heartbeatWG.Add(1)
+	go func() {
+		defer heartbeatWG.Done()
+
+		ticker := time.NewTicker(cfg.HeartbeatInterval.Duration())
+		defer ticker.Stop()
+
+		for {
+			select {
+			case <-heartbeatCtx.Done():
+				return
+			case <-ticker.C:
+				heartbeatUpdateCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+				err := InternalRepo.HeartbeatGameServer(heartbeatUpdateCtx, registration.ServerID)
+				cancel()
+				if err != nil {
+					logger.Errorf("Failed to update game server heartbeat: %v", err)
+				}
+			}
+		}
+	}()
+
+	usecase := app.NewApp(cfg, InternalRepo, logger)
 	// ! Init REST
 	server := http.NewHTTPServer(cfg, usecase)
 	logger.Info("Start HTTP server")
@@ -66,11 +107,19 @@ func main() {
 	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
 	<-quit
 	logger.Info("Shutdown HTTP Server ...")
+	heartbeatCancel()
+	heartbeatWG.Wait()
 
 	// ! Graceful shutdown
 	err = server.Stop(ctx)
 	if err != nil {
 		logger.Fatal("Server Shutdown:", err)
+	}
+
+	shutdownCtx, shutdownCancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer shutdownCancel()
+	if err := InternalRepo.DeactivateGameServer(shutdownCtx, registration.ServerID); err != nil {
+		logger.Errorf("Failed to deactivate game server instance: %v", err)
 	}
 	select {
 	case <-ctx.Done():

@@ -11,6 +11,12 @@ func MainRouter(r *gin.RouterGroup, a *app.App) {
 	r.GET("/healthz", func(ctx *gin.Context) { handlers.Healthz(ctx, a) })
 	r.GET("/ping", func(ctx *gin.Context) { handlers.PingPong(ctx, a) })
 }
+
+func InternalRouter(r *gin.RouterGroup, a *app.App) {
+	r.GET("/rooms/:room_id/owner", func(ctx *gin.Context) { handlers.ResolveRoomOwner(ctx, a) })
+	r.GET("/game-servers/next", func(ctx *gin.Context) { handlers.SelectAvailableGameServer(ctx, a) })
+}
+
 func AdminRouter(r *gin.RouterGroup, a *app.App) {
 	// admin := r.Group("", middlewares.AdminOnly(a))
 }

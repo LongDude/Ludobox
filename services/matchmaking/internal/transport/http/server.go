@@ -90,6 +90,7 @@ func NewHTTPServer(conf *config.Config, a *app.App) *Server {
 		}
 	}
 	// Register routes
+	InternalRouter(s.app.Group("/internal"), a)
 	AdminRouter(s.app.Group("/api/admin"), a)
 	MainRouter(s.app.Group("/api"), a)
 	return &s

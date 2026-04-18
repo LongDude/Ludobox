@@ -6,10 +6,10 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
-type adminRepository struct {
+type internalRepository struct {
 	db *pgxpool.Pool
 }
 
-func NewAdminRepository(db *pgxpool.Pool) repository.AdminRepository {
-	return &adminRepository{db: db}
+func NewInternalRepository(db *pgxpool.Pool) repository.InternalRepository {
+	return &internalRepository{db: db}
 }

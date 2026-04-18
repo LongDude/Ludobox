@@ -1,20 +1,29 @@
-local function send_validate_request(host, port, auth_header)
+local function send_get_request(host, port, path, extra_headers)
     local socket = core.tcp()
+    local address = host .. ":" .. tostring(port or "8080")
 
     socket:settimeout(2000)
 
-    if not socket:connect(host, port) then
+    if not socket:connect(address) then
         socket:close()
         return nil, "connect_failed"
     end
 
-    local request = table.concat({
-        "GET /api/auth/validate HTTP/1.0",
+    local lines = {
+        "GET " .. path .. " HTTP/1.0",
         "Host: " .. host,
-        "Authorization: " .. auth_header,
-        "",
-        ""
-    }, "\r\n")
+    }
+
+    if extra_headers then
+        for _, header in ipairs(extra_headers) do
+            table.insert(lines, header)
+        end
+    end
+
+    table.insert(lines, "")
+    table.insert(lines, "")
+
+    local request = table.concat(lines, "\r\n")
 
     if not socket:send(request) then
         socket:close()
@@ -34,6 +43,8 @@ local function send_validate_request(host, port, auth_header)
         end
     end
 
+    local body = socket:receive("*a") or ""
+
     socket:close()
 
     local status_code = tonumber(string.match(status_line, "^HTTP/%d+%.%d+ (%d%d%d)"))
@@ -41,7 +52,7 @@ local function send_validate_request(host, port, auth_header)
         return nil, "bad_status_line"
     end
 
-    return status_code, nil
+    return status_code, body, nil
 end
 
 core.register_action("validate_sso_access_token", { "http-req" }, function(txn)
@@ -57,9 +68,11 @@ core.register_action("validate_sso_access_token", { "http-req" }, function(txn)
         end
     end
 
-    local host = os.getenv("SSO_VALIDATE_HOST") or "sso-core"
-    local port = os.getenv("SSO_VALIDATE_PORT") or "8080"
-    local status_code, err = send_validate_request(host, port, auth_header)
+    local host = os.getenv("HAPROXY_LOOPBACK_HOST") or "127.0.0.1"
+    local port = os.getenv("HAPROXY_LOOPBACK_PORT") or "80"
+    local status_code, _, err = send_get_request(host, port, "/__internal/auth/validate", {
+        "Authorization: " .. auth_header,
+    })
 
     if not status_code then
         txn:set_var("txn.sso_validate_ok", false)
@@ -78,6 +91,46 @@ core.register_action("validate_sso_access_token", { "http-req" }, function(txn)
 
     txn:set_var("txn.sso_validate_ok", false)
     txn:set_var("txn.sso_validate_outage", status_code >= 500)
+end)
+
+core.register_action("resolve_game_room_owner", { "http-req" }, function(txn)
+    local room_id = txn:get_var("txn.game_room_id")
+    if not room_id or room_id == "" then
+        txn:set_var("txn.game_owner_lookup_ok", false)
+        txn:set_var("txn.game_owner_lookup_outage", false)
+        return
+    end
+
+    local host = os.getenv("HAPROXY_LOOPBACK_HOST") or "127.0.0.1"
+    local port = os.getenv("HAPROXY_LOOPBACK_PORT") or "80"
+    local status_code, body, err = send_get_request(host, port, "/__internal/matchmaking/rooms/" .. room_id .. "/owner", nil)
+
+    if not status_code then
+        txn:set_var("txn.game_owner_lookup_ok", false)
+        txn:set_var("txn.game_owner_lookup_outage", true)
+        txn:set_var("txn.game_owner_lookup_error", err or "unknown_error")
+        return
+    end
+
+    txn:set_var("txn.game_owner_lookup_status", status_code)
+
+    if status_code ~= 200 then
+        txn:set_var("txn.game_owner_lookup_ok", false)
+        txn:set_var("txn.game_owner_lookup_outage", status_code >= 500)
+        return
+    end
+
+    local instance_key = string.match(body or "", '"instance_key"%s*:%s*"([^"]+)"')
+    if not instance_key or instance_key == "" then
+        txn:set_var("txn.game_owner_lookup_ok", false)
+        txn:set_var("txn.game_owner_lookup_outage", false)
+        txn:set_var("txn.game_owner_lookup_error", "instance_key_missing")
+        return
+    end
+
+    txn:set_var("txn.game_owner_instance_key", instance_key)
+    txn:set_var("txn.game_owner_lookup_ok", true)
+    txn:set_var("txn.game_owner_lookup_outage", false)
 end)
 
 core.register_action("extract_game_room_id", { "http-req" }, function(txn)

@@ -1,15 +1,14 @@
 package repository
 
 import (
-	"errors"
+	"context"
+	"time"
+	"user_service/internal/domain"
 )
 
-var (
-	ErrorUserNotFound     = errors.New("user not found")
-	ErrorUserAlreadyExist = errors.New("user already exist")
-)
-
-type AdminRepository interface {
+type InternalRepository interface {
+	ResolveRoomOwner(ctx context.Context, roomID int64) (*domain.GameServer, error)
+	SelectAvailableGameServer(ctx context.Context, staleAfter time.Duration) (*domain.GameServer, error)
 }
 type SessionRepository interface {
 }

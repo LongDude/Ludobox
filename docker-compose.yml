@@ -6,8 +6,8 @@ services:
     env_file:
       - ./services/sso/.env
     environment:
-      SSO_VALIDATE_HOST: sso-core
-      SSO_VALIDATE_PORT: "8080"
+      HAPROXY_LOOPBACK_HOST: 127.0.0.1
+      HAPROXY_LOOPBACK_PORT: "80"
     depends_on:
       sso-core:
         condition: service_started
