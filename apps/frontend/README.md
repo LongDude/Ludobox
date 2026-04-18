@@ -73,9 +73,9 @@ Nginx раздаёт статику на http://localhost (порт 80).
 - `src/stores/` — Pinia‑хранилища (auth/chat/paper/settings/toast).
 - `src/api/` — слой API на Axios:
   - `src/api/base/useBaseApi.ts` — клиент для SSO с перехватом 401 → refresh.
-  - `src/api/base/useAlibApi.ts` — клиент для LudaBox API.
+  - `src/api/base/useLudaApi.ts` — клиент для LudaBox API.
   - `src/api/useSSOApi.ts` — методы SSO.
-  - `src/api/useAlibApi.ts` — методы LudaBox API.
+  - `src/api/useLudaApi.ts` — методы LudaBox API.
 - `src/views/` — страницы приложения.
 - `src/components/` — UI‑компоненты (панели, тосты, диалоги).
 - `src/i18n.ts` — простая i18n (en/ru).
