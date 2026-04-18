@@ -409,6 +409,21 @@ paths:
       summary: Create user
       tags:
       - User
+  /auth/healthz:
+    get:
+      description: Lightweight liveness probe
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: Service health
+      tags:
+      - System
   /auth/login:
     post:
       consumes:

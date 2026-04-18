@@ -7,6 +7,7 @@ import (
 	"net/url"
 	"user_service/internal/app"
 	"user_service/internal/config"
+	"user_service/internal/transport/http/handlers"
 
 	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
@@ -73,6 +74,9 @@ func NewHTTPServer(conf *config.Config, a *app.App) *Server {
 		AllowHeaders:     []string{"Content-Type", "Authorization"},
 		AllowCredentials: true,
 	}))
+
+	// Root liveness endpoint used by Docker and HAProxy internal health checks.
+	s.app.GET("/healthz", func(ctx *gin.Context) { handlers.Healthz(ctx, a) })
 
 	// Swagger route: enable conditionally and optionally protect with Basic Auth
 	if conf.SwaggerEnabled {

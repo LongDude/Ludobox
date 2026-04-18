@@ -9,6 +9,7 @@ import (
 )
 
 func MainRouter(r *gin.RouterGroup, a *app.App) {
+	r.GET("/healthz", func(ctx *gin.Context) { handlers.Healthz(ctx, a) })
 	r.POST("/logout", func(ctx *gin.Context) { handlers.Logout(ctx, a) })
 	r.POST("/refresh", func(ctx *gin.Context) { handlers.Refresh(ctx, a) })
 	r.PUT("/update", func(ctx *gin.Context) { handlers.UpdateUser(ctx, a) })

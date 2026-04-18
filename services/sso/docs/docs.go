@@ -354,6 +354,29 @@ const docTemplate = `{
                 }
             }
         },
+        "/auth/healthz": {
+            "get": {
+                "description": "Lightweight liveness probe",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "System"
+                ],
+                "summary": "Service health",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    }
+                }
+            }
+        },
         "/auth/login": {
             "post": {
                 "description": "Logs in the user and returns access and refresh tokens",

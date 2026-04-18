@@ -8,6 +8,7 @@ import (
 )
 
 func MainRouter(r *gin.RouterGroup, a *app.App) {
+	r.GET("/healthz", func(ctx *gin.Context) { handlers.Healthz(ctx, a) })
 	r.GET("/ping", func(ctx *gin.Context) { handlers.PingPong(ctx, a) })
 }
 func AdminRouter(r *gin.RouterGroup, a *app.App) {

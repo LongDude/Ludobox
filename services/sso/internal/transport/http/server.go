@@ -3,6 +3,7 @@ package http
 import (
 	"authorization_service/internal/app"
 	"authorization_service/internal/config"
+	"authorization_service/internal/transport/http/handlers"
 	"context"
 	"fmt"
 	"net/http"
@@ -73,6 +74,9 @@ func NewHTTPServer(conf *config.Config, a *app.App) *Server {
 		AllowHeaders:     []string{"Content-Type", "Authorization"},
 		AllowCredentials: true,
 	}))
+
+	// Root liveness endpoint used by Docker and HAProxy internal health checks.
+	s.app.GET("/healthz", func(ctx *gin.Context) { handlers.Healthz(ctx, a) })
 
 	// Swagger route: enable conditionally and optionally protect with Basic Auth
 	if conf.SwaggerEnabled {
