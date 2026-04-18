@@ -27,7 +27,7 @@ const avatarLetter = computed(() => {
 </script>
 <template>
   <div class="up-tab" :class="{ collapsed: useSetting.LeftTabHidden }">
-    <img class="logo" alt="Logo" style="width: auto; height: 40px" />
+    <img class="logo" src="./../assets/logo.svg" alt="Logo" style="width: auto; height: 40px" />
     <div class="button-group">
       <button
         class="btn avatar"

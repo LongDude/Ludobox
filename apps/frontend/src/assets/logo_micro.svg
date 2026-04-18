@@ -1,0 +1,63 @@
+<svg width="260" height="240" viewBox="12 15 260 240" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="260" y2="240" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#FFF7ED"/>
+      <stop offset="1" stop-color="#FEF3C7"/>
+    </linearGradient>
+
+    <linearGradient id="ballGrad" x1="36" y1="36" x2="180" y2="180" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#F59E0B"/>
+      <stop offset="1" stop-color="#EF4444"/>
+    </linearGradient>
+
+    <linearGradient id="ticketGrad" x1="70" y1="80" x2="190" y2="170" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#8B5CF6"/>
+      <stop offset="1" stop-color="#EC4899"/>
+    </linearGradient>
+
+    <linearGradient id="textGrad" x1="250" y1="60" x2="720" y2="170" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#7C2D12"/>
+      <stop offset="1" stop-color="#991B1B"/>
+    </linearGradient>
+
+    <filter id="shadow" x="-20%" y="-20%" width="160%" height="160%">
+      <feDropShadow dx="0" dy="12" stdDeviation="12" flood-color="#7C2D12" flood-opacity="0.16"/>
+    </filter>
+  </defs>
+
+  <g transform="translate(28 28)" filter="url(#shadow)">
+    <!-- ticket -->
+    <path d="M72 86
+             C72 77 79 70 88 70
+             H168
+             C177 70 184 77 184 86
+             C172 90 172 106 184 110
+             V136
+             C172 140 172 156 184 160
+             C184 169 177 176 168 176
+             H88
+             C79 176 72 169 72 160
+             C84 156 84 140 72 136
+             V110
+             C84 106 84 90 72 86Z"
+          fill="url(#ticketGrad)"/>
+
+    <!-- ticket dashes -->
+    <path d="M100 94H156M100 108H146M100 122H156M100 136H140" stroke="white" stroke-width="6" stroke-linecap="round" opacity="0.9"/>
+
+    <!-- lottery ball -->
+    <circle cx="92" cy="78" r="56" fill="url(#ballGrad)"/>
+    <circle cx="92" cy="78" r="56" stroke="white" stroke-opacity="0.35" stroke-width="4"/>
+    <circle cx="92" cy="78" r="28" fill="white"/>
+    <text x="92" y="88"
+          text-anchor="middle"
+          font-family="Inter, Segoe UI, Arial, sans-serif"
+          font-size="28"
+          font-weight="900"
+          fill="#DC2626">7</text>
+
+    <!-- spark -->
+    <path d="M152 34L158 48L172 54L158 60L152 74L146 60L132 54L146 48L152 34Z"
+          fill="#FBBF24"/>
+  </g>
+</svg>

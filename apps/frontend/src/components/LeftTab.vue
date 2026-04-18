@@ -74,7 +74,7 @@ onBeforeUnmount(() => {
   <div class="left-tab" :class="{ hidden: leftTabHidden }">
     <div class="header" :class="{ hidden: leftTabHidden }">
       <button class="btn btn-icon" type="button" @click="RedirecttoHome" aria-label="Home">
-        <img alt="Home" class="logo" />
+        <img alt="Home" src="./../assets/logo_micro.svg" class="logo" />
       </button>
       <button
         class="btn btn-icon sidebar-toggle"
@@ -454,8 +454,8 @@ onBeforeUnmount(() => {
   transform: translateY(1px);
 }
 .btn-icon .logo {
-  width: 1.2em;
-  height: 1.2em;
+  width: 60px;
+  height: 60px;
 }
 .sidebar-toggle .chevron {
   width: 14px;
