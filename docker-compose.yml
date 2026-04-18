@@ -173,7 +173,6 @@ services:
       - rooms_network
 
   matchmaking-core:
-    container_name: matchmaking_core
     build:
       context: ./services/matchmaking
       dockerfile: ./dockerfile
@@ -191,7 +190,6 @@ services:
       - rooms_network
 
   user-service-core:
-    container_name: user_service_core
     build:
       context: ./services/user_service
       dockerfile: ./dockerfile

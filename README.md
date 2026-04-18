@@ -19,3 +19,6 @@ Web-Сервис для проведения лотерей построенны
 > - [Game Server](services/game_server/readme.md)
 > - [Matchmaking Server](services/matchmaking/readme.md)
 > - [User Server](services/user_service/readme.md)
+
+Для создания нескольких инстантов
+docker compose up --build -d --scale matchmaking-core=3 --scale user-service-core=2 --scale game-server-core=2
