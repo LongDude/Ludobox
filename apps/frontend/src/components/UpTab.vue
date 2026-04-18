@@ -29,6 +29,9 @@ const avatarLetter = computed(() => {
   <div class="up-tab" :class="{ collapsed: useSetting.LeftTabHidden }">
     <img class="logo" src="./../assets/logo.svg" alt="Logo" style="width: auto; height: 40px" />
     <div class="button-group">
+      <div class="balance"><img src="./../assets/balance.svg" alt="Баланс:" class="logo" style="width: auto; height: 30px">
+        <h3>1000</h3>
+      </div>
       <button
         class="btn avatar"
         @click="RedirecttoProfile"
@@ -124,11 +127,18 @@ const avatarLetter = computed(() => {
   margin-left: auto;
   display: inline-flex;
   align-items: center;
-  gap: 10px;
+  gap: 15px;
 }
 .up-tab h3 {
   margin: 0;
   line-height: 1.2;
   color: var(--color-text-primary);
+}
+
+.balance{
+  display: flex;
+  align-items: center;
+  flex-direction: row;
+  gap: 10px;
 }
 </style>

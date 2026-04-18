@@ -1,9 +1,9 @@
 import { useAuthStore } from '@/stores/authStore'
 import axios, { AxiosError } from 'axios'
-import { ALIB_API_URL } from '@/config'
+import { LUDABOX_API_URL } from '@/config'
 
 export const api = axios.create({
-  baseURL: ALIB_API_URL,
+  baseURL: LUDABOX_API_URL,
   timeout: 20000,
   withCredentials: true,
 })
