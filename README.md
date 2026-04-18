@@ -21,4 +21,17 @@ Web-Сервис для проведения лотерей построенны
 > - [User Server](services/user_service/readme.md)
 
 Для создания нескольких инстантов
-docker compose up --build -d --scale matchmaking-core=3 --scale user-service-core=2 --scale game-server-core=2
+docker compose up --build -d --scale matchmaking-core=3 --scale user-service-core=2
+
+### Sticky routing для `game_server`
+- `haproxy` маршрутизирует room-scoped запросы в `game_server` по `room_id`, чтобы одна и та же комната всегда попадала в один и тот же инстанс `game_server`.
+- `game_server` поднимается как две явные пары:
+  - `game-server-core-1` -> `game-redis-1`
+  - `game-server-core-2` -> `game-redis-2`
+- Это важно, потому что у каждого `game_server` свой Redis и активное состояние комнаты не должно "скакать" между инстансами.
+- Источники `room_id`, которые понимает gateway:
+  - заголовок `X-Room-ID`
+  - query-параметр `room_id`
+  - path вида `/api/game/rooms/<room_id>` или `/api/game/rounds/<room_id>`
+- Для room-scoped create/update/delete запросов `room_id` обязателен уже на входе в gateway. Иначе `haproxy` вернёт `400`, чтобы комната не создалась на случайном инстансе и не потерялась для последующих sticky-запросов.
+- Если `room_id` не передан, запрос уходит в обычный `roundrobin` backend `game_server`.

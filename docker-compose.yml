@@ -11,7 +11,9 @@ services:
     depends_on:
       sso-core:
         condition: service_started
-      game-server-core:
+      game-server-core-1:
+        condition: service_started
+      game-server-core-2:
         condition: service_started
       matchmaking-core:
         condition: service_started
@@ -106,14 +108,33 @@ services:
     networks:
       - rooms_network
 
-  game-redis:
+  game-redis-1:
     image: redis:8-alpine
-    container_name: game_redis
+    container_name: game_redis_1
     restart: unless-stopped
     env_file:
       - ./services/game_server/.env
+    command:
+      - sh
+      - -c
+      - redis-server --appendonly yes --requirepass "$$REDIS_PASSWORD"
     volumes:
-      - game_redis_data:/data
+      - game_redis_1_data:/data
+    networks:
+      - rooms_network
+
+  game-redis-2:
+    image: redis:8-alpine
+    container_name: game_redis_2
+    restart: unless-stopped
+    env_file:
+      - ./services/game_server/.env
+    command:
+      - sh
+      - -c
+      - redis-server --appendonly yes --requirepass "$$REDIS_PASSWORD"
+    volumes:
+      - game_redis_2_data:/data
     networks:
       - rooms_network
 
@@ -154,18 +175,42 @@ services:
     networks:
       - rooms_network
 
-  game-server-core:
-    container_name: game_server_core
+  game-server-core-1:
+    container_name: game_server_core_1
     build:
       context: ./services/game_server
       dockerfile: ./dockerfile
     restart: unless-stopped
     env_file:
       - ./services/game_server/.env
+    environment:
+      REDIS_HOST: game-redis-1
+      INSTANCE_ID: game-server-core-1
     depends_on:
       shared-postgres:
         condition: service_healthy
-      game-redis:
+      game-redis-1:
+        condition: service_started
+      shared-migrator:
+        condition: service_completed_successfully
+    networks:
+      - rooms_network
+
+  game-server-core-2:
+    container_name: game_server_core_2
+    build:
+      context: ./services/game_server
+      dockerfile: ./dockerfile
+    restart: unless-stopped
+    env_file:
+      - ./services/game_server/.env
+    environment:
+      REDIS_HOST: game-redis-2
+      INSTANCE_ID: game-server-core-2
+    depends_on:
+      shared-postgres:
+        condition: service_healthy
+      game-redis-2:
         condition: service_started
       shared-migrator:
         condition: service_completed_successfully
@@ -210,7 +255,8 @@ volumes:
   sso_postgres_data:
   sso_redis_data:
   shared_postgres_data:
-  game_redis_data:
+  game_redis_1_data:
+  game_redis_2_data:
   matchmaking_redis_data:
   user_redis_data:
 

@@ -79,3 +79,23 @@ core.register_action("validate_sso_access_token", { "http-req" }, function(txn)
     txn:set_var("txn.sso_validate_ok", false)
     txn:set_var("txn.sso_validate_outage", status_code >= 500)
 end)
+
+core.register_action("extract_game_room_id", { "http-req" }, function(txn)
+    local room_id = txn.sf:req_hdr("X-Room-ID")
+
+    if not room_id or room_id == "" then
+        room_id = txn.sf:urlp("room_id")
+    end
+
+    if (not room_id or room_id == "") then
+        local path = txn.sf:path() or ""
+        room_id = string.match(path, "^/api/game/rooms/([^/?]+)")
+            or string.match(path, "^/api/game/room/([^/?]+)")
+            or string.match(path, "^/api/game/rounds/([^/?]+)")
+            or string.match(path, "^/api/game/round/([^/?]+)")
+    end
+
+    if room_id and room_id ~= "" then
+        txn:set_var("txn.game_room_id", room_id)
+    end
+end)
