@@ -40,3 +40,39 @@ func getOperatorArray(op string) string {
 		return "@>"
 	}
 }
+
+func isScalarOperator(op string) bool {
+	switch op {
+	case "eq", "neq", "gt", "lt", "gte", "lte", "in", "not_in":
+		return true
+	default:
+		return false
+	}
+}
+
+func isStringOperator(op string) bool {
+	switch op {
+	case "eq", "neq", "like", "not_like", "in", "not_in":
+		return true
+	default:
+		return false
+	}
+}
+
+func isBoolOperator(op string) bool {
+	switch op {
+	case "eq", "neq", "in", "not_in":
+		return true
+	default:
+		return false
+	}
+}
+
+func isArrayOperator(op string) bool {
+	switch op {
+	case "contains", "contained", "overlap":
+		return true
+	default:
+		return false
+	}
+}

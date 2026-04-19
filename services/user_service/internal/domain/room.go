@@ -7,7 +7,7 @@ type Room struct {
 	ConfigID     int        `json:"config_id"`
 	GameServerID int        `json:"server_id"`
 	Status       RoomStatus `json:"status"`
-	ArchivedAt   time.Time  `json:"archived_at"`
+	ArchivedAt   *time.Time `json:"archived_at,omitempty"`
 }
 
 type RoomStatus string
