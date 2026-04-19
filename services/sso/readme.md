@@ -149,8 +149,8 @@ Access tokens can be supplied either via the `access_token` field (for `UpdateUs
 - Standalone execution example:
   ```sh
   go run ./tools/migrator \
-    -user="$DB_USER" -password="$DB_PASSWORD" \
-    -host="$DB_HOST" -port="$DB_PORT" -dbname="$DB_NAME" \
+    -user="$POSTGRES_USER" -password="$POSTGRES_PASSWORD" \
+    -host="$POSTGRES_HOST" -port="$POSTGRES_PORT" -dbname="$POSTGRES_DB" \
     -migrations-path="$(pwd)/db/migrations"
   ```
 
@@ -190,7 +190,7 @@ Access tokens can be supplied either via the `access_token` field (for `UpdateUs
   `SWAGGER_USER`/`SWAGGER_PASSWORD`: if both set, Swagger endpoints are protected with Basic Auth.
 
 ### Database & Redis
-- `DB_HOST`, `DB_PORT`, `DB_USER`, `DB_PASSWORD`, `DB_NAME`, `DB_SSL` (default `disable`).
+- `POSTGRES_HOST`, `POSTGRES_PORT`, `POSTGRES_USER`, `POSTGRES_PASSWORD`, `POSTGRES_DB`, `POSTGRES_SSL` (default `disable`).
 - `REDIS_HOST`, `REDIS_PORT`, `REDIS_PASSWORD`, `REDIS_DB` (default `0`). Redis is required; sessions and blocklist depend on it.
 
 ### JWT & Cookies

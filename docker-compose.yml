@@ -32,10 +32,8 @@ services:
     image: postgres:17
     container_name: sso_postgres
     restart: unless-stopped
-    environment:
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: password
-      POSTGRES_DB: db
+    env_file:
+      - ./services/sso/.env
     healthcheck:
       test: ["CMD", "pg_isready", "-U", "postgres"]
       interval: 5s
@@ -68,7 +66,7 @@ services:
     env_file:
       - ./services/sso/.env
     environment:
-      DB_HOST: sso-postgres
+      POSTGRES_HOST: sso-postgres
     depends_on:
       sso-postgres:
         condition: service_healthy
@@ -168,7 +166,7 @@ services:
     env_file:
       - .env
     environment:
-      DB_HOST: shared-postgres
+      POSTGRES_HOST: shared-postgres
     depends_on:
       shared-postgres:
         condition: service_healthy

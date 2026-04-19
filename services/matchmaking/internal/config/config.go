@@ -1,8 +1,9 @@
 package config
 
 import (
-	"github.com/ilyakaznacheev/cleanenv"
 	"user_service/internal/types"
+
+	"github.com/ilyakaznacheev/cleanenv"
 )
 
 type Config struct {
@@ -22,12 +23,12 @@ type Config struct {
 }
 
 type PostgresConfig struct {
-	Host     string `env:"DB_HOST" env-required:"true"`
-	Port     int    `env:"DB_PORT" env-required:"true"`
-	User     string `env:"DB_USER" env-required:"true"`
-	Password string `env:"DB_PASSWORD" env-required:"true"`
-	DBName   string `env:"DB_NAME" env-required:"true"`
-	SSLMode  string `env:"DB_SSL" env-default:"disable"`
+	Host     string `env:"POSTGRES_HOST" env-required:"true"`
+	Port     int    `env:"POSTGRES_PORT" env-required:"true"`
+	User     string `env:"POSTGRES_USER" env-required:"true"`
+	Password string `env:"POSTGRES_PASSWORD" env-required:"true"`
+	DBName   string `env:"POSTGRES_DB" env-required:"true"`
+	SSLMode  string `env:"POSTGRES_SSL" env-default:"disable"`
 }
 
 type RedisConfig struct {
