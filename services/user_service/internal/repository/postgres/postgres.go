@@ -21,3 +21,11 @@ type configRepository struct {
 func NewConfigRepository(db *pgxpool.Pool) repository.ConfigRepository {
 	return &configRepository{db: db}
 }
+
+type roomRepository struct {
+	db *pgxpool.Pool
+}
+
+func NewRoomRepository(db *pgxpool.Pool) repository.RoomRepository {
+	return &roomRepository{db: db}
+}

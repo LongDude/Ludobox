@@ -29,5 +29,12 @@ type ConfigRepository interface {
 	UpdateConfigByID(ctx context.Context, id int, config *domain.Config) (*domain.Config, error)
 	DeleteConfigByID(ctx context.Context, id int) error
 }
+type RoomRepository interface {
+	CreateRoomByConfigID(ctx context.Context, config_id int) (*domain.Room, error)
+	GetRoomByID(ctx context.Context, id int) (*domain.Room, error)
+	GetNotArchivedRooms(ctx context.Context, params domain.ListParams) (domain.ListResponse[domain.Room], error)
+	UpdateRoomByID(ctx context.Context, id int, room *domain.Room) (*domain.Room, error)
+	DeleteRoomByID(ctx context.Context, id int) error
+}
 type SessionRepository interface {
 }
