@@ -1,5 +1,76 @@
 basePath: /api
 definitions:
+  presenters.ConfigResponse:
+    properties:
+      archived_at:
+        type: string
+      boost_power:
+        type: integer
+      boost_price:
+        type: integer
+      capacity:
+        type: integer
+      commission:
+        type: integer
+      config_id:
+        type: integer
+      game_id:
+        type: integer
+      is_boost:
+        type: boolean
+      min_users:
+        type: integer
+      number_winners:
+        type: integer
+      registration_price:
+        type: integer
+      time:
+        type: integer
+      winning_distribution:
+        items:
+          type: integer
+        type: array
+    type: object
+  presenters.ConfigUpsertRequest:
+    properties:
+      boost_power:
+        type: integer
+      boost_price:
+        type: integer
+      capacity:
+        type: integer
+      commission:
+        type: integer
+      game_id:
+        type: integer
+      is_boost:
+        type: boolean
+      min_users:
+        type: integer
+      number_winners:
+        type: integer
+      registration_price:
+        type: integer
+      time:
+        type: integer
+      winning_distribution:
+        items:
+          type: integer
+        type: array
+    type: object
+  presenters.ConfigsResponse:
+    properties:
+      items:
+        items:
+          $ref: '#/definitions/presenters.ConfigResponse'
+        type: array
+      page:
+        type: integer
+      page_size:
+        type: integer
+      total:
+        type: integer
+    type: object
   presenters.ErrorResponse:
     properties:
       error:
@@ -52,6 +123,273 @@ info:
   title: LudaBox API
   version: "1.0"
 paths:
+  /admin/config:
+    post:
+      consumes:
+      - application/json
+      description: Creates a new room config.
+      parameters:
+      - description: Authorization Token
+        in: header
+        name: Authorization
+        required: true
+        type: string
+      - description: Config payload
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/presenters.ConfigUpsertRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/presenters.ConfigResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/presenters.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/presenters.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/presenters.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/presenters.ErrorResponse'
+      summary: Create config
+      tags:
+      - Config
+  /admin/config/{config_id}:
+    delete:
+      consumes:
+      - application/json
+      description: Archives an active config.
+      parameters:
+      - description: Authorization Token
+        in: header
+        name: Authorization
+        required: true
+        type: string
+      - description: Config id
+        in: path
+        name: config_id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "204":
+          description: No Content
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/presenters.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/presenters.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/presenters.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/presenters.ErrorResponse'
+        "409":
+          description: Conflict
+          schema:
+            $ref: '#/definitions/presenters.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/presenters.ErrorResponse'
+      summary: Archive config
+      tags:
+      - Config
+    get:
+      consumes:
+      - application/json
+      description: Returns a single room config by id.
+      parameters:
+      - description: Authorization Token
+        in: header
+        name: Authorization
+        required: true
+        type: string
+      - description: Config id
+        in: path
+        name: config_id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/presenters.ConfigResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/presenters.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/presenters.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/presenters.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/presenters.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/presenters.ErrorResponse'
+      summary: Get config by id
+      tags:
+      - Config
+    put:
+      consumes:
+      - application/json
+      description: Archives the existing config and creates a new config revision.
+      parameters:
+      - description: Authorization Token
+        in: header
+        name: Authorization
+        required: true
+        type: string
+      - description: Config id
+        in: path
+        name: config_id
+        required: true
+        type: integer
+      - description: Config payload
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/presenters.ConfigUpsertRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/presenters.ConfigResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/presenters.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/presenters.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/presenters.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/presenters.ErrorResponse'
+        "409":
+          description: Conflict
+          schema:
+            $ref: '#/definitions/presenters.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/presenters.ErrorResponse'
+      summary: Replace config by id
+      tags:
+      - Config
+  /admin/configs/used:
+    get:
+      consumes:
+      - application/json
+      description: Returns non-archived configs with pagination, optional sorting
+        and filtering.
+      parameters:
+      - description: Authorization Token
+        in: header
+        name: Authorization
+        required: true
+        type: string
+      - description: Page number
+        in: query
+        name: page
+        type: integer
+      - description: Page size
+        in: query
+        name: page_size
+        type: integer
+      - description: Sort field
+        in: query
+        name: sort_field
+        type: string
+      - description: Sort direction (asc/desc)
+        in: query
+        name: sort_direction
+        type: string
+      - collectionFormat: csv
+        description: Comma-separated filter fields
+        in: query
+        items:
+          type: string
+        name: filter_fields
+        type: array
+      - collectionFormat: csv
+        description: Comma-separated filter operators (eq, neq, gt, lt, gte, lte,
+          in, not_in, contains, contained, overlap)
+        in: query
+        items:
+          type: string
+        name: filter_operators
+        type: array
+      - collectionFormat: csv
+        description: Comma-separated filter values
+        in: query
+        items:
+          type: string
+        name: filter_values
+        type: array
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/presenters.ConfigsResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/presenters.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/presenters.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/presenters.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/presenters.ErrorResponse'
+      summary: List active configs
+      tags:
+      - Config
   /healthz:
     get:
       description: Lightweight liveness probe

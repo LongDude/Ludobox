@@ -13,3 +13,11 @@ type userRepository struct {
 func NewUserRepository(db *pgxpool.Pool) repository.UserRepository {
 	return &userRepository{db: db}
 }
+
+type configRepository struct {
+	db *pgxpool.Pool
+}
+
+func NewConfigRepository(db *pgxpool.Pool) repository.ConfigRepository {
+	return &configRepository{db: db}
+}
