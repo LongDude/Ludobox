@@ -43,7 +43,7 @@ CREATE TABLE IF NOT EXISTS round_participants
     boost                 INT NOT NULL DEFAULT 0 CHECK (boost >= 0),
     winning_money         BIGINT NOT NULL DEFAULT 0 CHECK (winning_money >= 0),
     number_in_room        INT NOT NULL CHECK (number_in_room > 0),
-    exit_room_at          TIMESTAMPTZ NULL,
+    exit_room_at          TIMESTAMPTZ NULL
 );
 
 CREATE INDEX IF NOT EXISTS idx_round_participants_rounds_id ON round_participants (rounds_id);

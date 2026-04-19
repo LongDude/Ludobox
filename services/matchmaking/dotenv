@@ -9,11 +9,11 @@ ALLOWED_CORS_ORIGINS=http://localhost:5173,http://localhost:8080,http://localhos
 DEFAULT_ADMIN_EMAILS=admin@gmail.com
 
 # Database
-DB_HOST=shared-postgres
-DB_PORT=5432
-DB_USER=postgres
-DB_PASSWORD=password
-DB_NAME=db
+POSTGRES_HOST=shared-postgres
+POSTGRES_PORT=5432
+POSTGRES_USER=postgres
+POSTGRES_PASSWORD=password
+POSTGRES_DB=db
 SSLMode=
 
 # Redis
