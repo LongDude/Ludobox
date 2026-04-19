@@ -7,9 +7,13 @@ import (
 )
 
 var (
-	ErrorUserNotFound     = errors.New("user not found")
-	ErrorUserAlreadyExist = errors.New("user already exist")
-	ErrorNegativeBalance  = errors.New("balance cannot be negative")
+	ErrorUserNotFound      = errors.New("user not found")
+	ErrorUserAlreadyExist  = errors.New("user already exist")
+	ErrorNegativeBalance   = errors.New("balance cannot be negative")
+	ErrorConfigNotFound    = errors.New("config not found")
+	ErrorConfigArchived    = errors.New("config is archived")
+	ErrorInvalidConfig     = errors.New("config is invalid")
+	ErrorInvalidListParams = errors.New("invalid list params")
 )
 
 type UserRepository interface {

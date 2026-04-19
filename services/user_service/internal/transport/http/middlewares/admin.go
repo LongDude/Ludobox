@@ -1,10 +1,14 @@
 package middlewares
 
 import (
+	"encoding/json"
 	"fmt"
+	"net/http"
 	"strings"
+	"time"
 	"user_service/internal/app"
 	"user_service/internal/domain"
+	"user_service/internal/transport/http/presenters"
 
 	"github.com/gin-gonic/gin"
 )
@@ -15,26 +19,72 @@ const (
 	adminRole      = "ADMIN"
 )
 
+type ssoAuthenticateResponse struct {
+	FirstName  string   `json:"first_name"`
+	LastName   string   `json:"last_name"`
+	Email      string   `json:"email"`
+	LocaleType *string  `json:"locale_type"`
+	Roles      []string `json:"roles"`
+}
+
 // AdminOnly ensures that the request is performed by a user that has admin privileges.
-// !TODO For admin roles (check JWT)
 func AdminOnly(a *app.App) gin.HandlerFunc {
-	// defaultAdmins := buildAdminLookup(a.Config.DefaultAdminEmails)
+	defaultAdmins := buildAdminLookup(a.Config.DefaultAdminEmails)
+	httpClient := &http.Client{Timeout: 5 * time.Second}
 
 	return func(ctx *gin.Context) {
-		// token, err := extractBearerToken(ctx.GetHeader("Authorization"))
-		// if err != nil {
-		// 	ctx.AbortWithStatusJSON(http.StatusUnauthorized, presenters.Error(err))
-		// 	return
-		// }
+		token, err := extractBearerToken(ctx.GetHeader("Authorization"))
+		if err != nil {
+			ctx.AbortWithStatusJSON(http.StatusUnauthorized, presenters.Error(err))
+			return
+		}
 
-		// if !userHasAdminPrivileges(user, defaultAdmins) {
-		// 	ctx.AbortWithStatusJSON(http.StatusForbidden, presenters.Error(fmt.Errorf("admin access required")))
-		// 	return
-		// }
+		user, authErr := authenticateAdminViaSSO(ctx, httpClient, a.Config.SSOAuthenticateURL, token)
+		if authErr != nil {
+			ctx.AbortWithStatusJSON(http.StatusUnauthorized, presenters.Error(fmt.Errorf("failed to authenticate via sso: %w", authErr)))
+			return
+		}
 
-		// ctx.Set(ContextUserKey, user)
+		if !userHasAdminPrivileges(user, defaultAdmins) {
+			ctx.AbortWithStatusJSON(http.StatusForbidden, presenters.Error(fmt.Errorf("admin access required")))
+			return
+		}
+
+		ctx.Set(ContextUserKey, user)
 		ctx.Next()
 	}
+}
+
+func authenticateAdminViaSSO(ctx *gin.Context, client *http.Client, authenticateURL, token string) (*domain.User, error) {
+	req, err := http.NewRequestWithContext(ctx.Request.Context(), http.MethodGet, authenticateURL, nil)
+	if err != nil {
+		return nil, fmt.Errorf("build sso request: %w", err)
+	}
+	req.Header.Set("Authorization", "Bearer "+token)
+	req.Header.Set("Accept", "application/json")
+
+	resp, err := client.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("request sso authenticate: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("sso authenticate returned status %d", resp.StatusCode)
+	}
+
+	var payload ssoAuthenticateResponse
+	if err := json.NewDecoder(resp.Body).Decode(&payload); err != nil {
+		return nil, fmt.Errorf("decode sso authenticate response: %w", err)
+	}
+
+	return &domain.User{
+		FirstName:  payload.FirstName,
+		LastName:   payload.LastName,
+		Email:      payload.Email,
+		LocaleType: payload.LocaleType,
+		Roles:      payload.Roles,
+	}, nil
 }
 
 func extractBearerToken(header string) (string, error) {
