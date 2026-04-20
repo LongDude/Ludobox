@@ -491,9 +491,10 @@ function isActive(path: string) {
   }
 
   .shell {
-    grid-template-rows: auto auto;
+    grid-template-rows: auto;
   }
 
+  .header,
   .profile-card {
     display: none;
   }

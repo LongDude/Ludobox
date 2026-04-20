@@ -98,6 +98,17 @@ async function logout() {
       </div>
 
       <button
+        v-if="authStore.isAuthenticated"
+        class="action-button avatar mobile-profile-action"
+        type="button"
+        :aria-label="userName"
+        @click="redirectTo('/profile')"
+      >
+        <img v-if="avatarUrl" :src="avatarUrl" alt="" class="avatar-image" />
+        <span v-else>{{ avatarLetter }}</span>
+      </button>
+
+      <button
         v-if="!authStore.isAuthenticated"
         class="action-button text-button"
         type="button"
@@ -320,6 +331,7 @@ async function logout() {
 }
 
 .avatar {
+  display: none;
   width: 2.5rem;
   padding: 0;
   overflow: hidden;
@@ -345,6 +357,10 @@ async function logout() {
     left: 0.75rem;
     right: 0.75rem;
     top: 0.75rem;
+  }
+
+  .mobile-profile-action {
+    display: inline-flex;
   }
 }
 
