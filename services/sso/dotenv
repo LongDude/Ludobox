@@ -3,13 +3,13 @@ DOMAIN=localhost
 PUBLIC_URL=http://localhost
 
 # Allowed origins (comma-separated)
-ALLOWED_REDIRECT_URLS=http://localhost:5173,http://localhost:8080
-ALLOWED_CORS_ORIGINS=http://localhost:5173,http://localhost:8080
+ALLOWED_REDIRECT_URLS=http://localhost:5173,http://localhost:8080,http://localhost
+ALLOWED_CORS_ORIGINS=http://localhost:5173,http://localhost:8080,http://localhost
 # Default admin emails (comma-separated)
 DEFAULT_ADMIN_EMAILS=admin@example.com
 
 # Database
-POSTGRES_HOST=postgres
+POSTGRES_HOST=sso-postgres
 POSTGRES_PORT=5432
 POSTGRES_USER=postgres
 POSTGRES_PASSWORD=password
