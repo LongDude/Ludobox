@@ -1,9 +1,5 @@
 package presenters
 
-type TestResponse struct {
-	Pong string `json:"pong" binding:"required" validate:"required"`
-}
-
 type UserResponse struct {
 	UserID   int    `json:"user_id" example:"42"`
 	Nickname string `json:"nickname" example:"user_42"`
