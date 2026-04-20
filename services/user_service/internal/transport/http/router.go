@@ -28,4 +28,5 @@ func AdminRouter(r *gin.RouterGroup, a *app.App) {
 	admin.POST("/room", func(ctx *gin.Context) { handlers.CreateRoomByConfigID(ctx, a) })
 	admin.PUT("/room/:room_id", func(ctx *gin.Context) { handlers.UpdateRoomByID(ctx, a) })
 	admin.DELETE("/room/:room_id", func(ctx *gin.Context) { handlers.DeleteRoomByID(ctx, a) })
+	admin.GET("/servers", func(ctx *gin.Context) { handlers.GetServers(ctx, a) })
 }
