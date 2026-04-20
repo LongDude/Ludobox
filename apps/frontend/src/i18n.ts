@@ -125,13 +125,13 @@ const messages: Record<Locale, Record<string, string>> = {
     'admin.dashboard.scopeValue': 'Configs + rooms',
     'admin.dashboard.scopeHint': 'Revision control, room creation, room reassignment',
     'admin.dashboard.visibilityLabel': 'Visibility',
-    'admin.dashboard.visibilityValue': 'Server buckets',
-    'admin.dashboard.visibilityHint': 'Grouped by server_id from the public admin API',
+    'admin.dashboard.visibilityValue': 'Full fleet',
+    'admin.dashboard.visibilityHint': 'Includes idle servers and status',
     'admin.dashboard.tabsAria': 'Admin sections',
     'admin.dashboard.tabs.overview.label': 'Servers',
-    'admin.dashboard.tabs.overview.title': 'Live room pressure',
+    'admin.dashboard.tabs.overview.title': 'Fleet status and rooms',
     'admin.dashboard.tabs.overview.description':
-      'See how active rooms are distributed across currently visible servers.',
+      'See all game servers, including idle ones, together with their room load.',
     'admin.dashboard.tabs.configs.label': 'Configs',
     'admin.dashboard.tabs.configs.title': 'Economy and balancing',
     'admin.dashboard.tabs.configs.description':
@@ -317,10 +317,11 @@ const messages: Record<Locale, Record<string, string>> = {
     'admin.roomsSection.roomTitle': 'Room #{id}',
 
     'admin.overviewSection.eyebrow': 'Fleet view',
-    'admin.overviewSection.title': 'Active room distribution by server',
+    'admin.overviewSection.title': 'Server fleet and room overview',
     'admin.overviewSection.description':
       'Shows the current status of servers and rooms on them.',
     'admin.overviewSection.stats.servers': 'Servers observed',
+    'admin.overviewSection.stats.availableServers': 'Available servers',
     'admin.overviewSection.stats.rooms': 'Active rooms',
     'admin.overviewSection.stats.openRooms': 'Open rooms',
     'admin.overviewSection.stats.liveRounds': 'Rounds in game',
@@ -328,6 +329,15 @@ const messages: Record<Locale, Record<string, string>> = {
     'admin.overviewSection.error.load': 'Failed to build the server overview.',
     'admin.overviewSection.serverTitle': 'Server {id}',
     'admin.overviewSection.serverRooms': '{count} rooms currently assigned',
+    'admin.overviewSection.serverMeta.status': 'Status',
+    'admin.overviewSection.serverMeta.instanceKey': 'Instance key',
+    'admin.overviewSection.serverMeta.redisHost': 'Redis host',
+    'admin.overviewSection.serverMeta.heartbeat': 'Last heartbeat',
+    'admin.overviewSection.serverStatus.up': 'Up',
+    'admin.overviewSection.serverStatus.down': 'Down',
+    'admin.overviewSection.serverStatus.maintenance': 'Maintenance',
+    'admin.overviewSection.serverStatus.archived': 'Archived',
+    'admin.overviewSection.serverStatus.unknown': 'Unknown',
     'admin.overviewSection.live': '{count} live',
     'admin.overviewSection.open': '{count} open',
     'admin.overviewSection.inGame': '{count} in game',
@@ -335,6 +345,9 @@ const messages: Record<Locale, Record<string, string>> = {
     'admin.overviewSection.roomTitle': 'Room #{id}',
     'admin.overviewSection.roomSummary':
       'Game {gameId} - {capacity} seats - entry {price}',
+    'admin.overviewSection.noAssignedRooms': 'No rooms are currently assigned to this server.',
+    'admin.overviewSection.noServers': 'No game servers were returned by the admin API.',
+    'admin.overviewSection.idleServers': '{count} servers are currently idle with no rooms assigned.',
     'admin.overviewSection.noRooms':
       'No active rooms are currently visible through the public admin API.',
 
@@ -487,18 +500,18 @@ const messages: Record<Locale, Record<string, string>> = {
     'admin.dashboard.kicker': 'Центр администрирования',
     'admin.dashboard.title': 'Операционный пульт Ludobox',
     'admin.dashboard.intro':
-      'Теперь админская работа собрана в единое пространство: конфиги, комнаты, серверы и доступ пользователей находятся в одном shell и подчиняются общей теме интерфейса.',
+      'Теперь админская работа собрана в единое пространство: конфиги, комнаты, серверы и доступ пользователей находятся в одном shell.',
     'admin.dashboard.scopeLabel': 'Область',
     'admin.dashboard.scopeValue': 'Конфиги и комнаты',
     'admin.dashboard.scopeHint': 'Ревизии, создание комнат и перенос по серверам',
     'admin.dashboard.visibilityLabel': 'Наблюдение',
     'admin.dashboard.visibilityValue': 'Серверные группы',
-    'admin.dashboard.visibilityHint': 'Группировка по server_id из публичного admin API',
+    'admin.dashboard.visibilityHint': 'Включает idle-серверы',
     'admin.dashboard.tabsAria': 'Разделы админки',
     'admin.dashboard.tabs.overview.label': 'Серверы',
-    'admin.dashboard.tabs.overview.title': 'Нагрузка по комнатам',
+    'admin.dashboard.tabs.overview.title': 'Статусы серверов и комнаты',
     'admin.dashboard.tabs.overview.description':
-      'Показывает, как активные комнаты распределены по доступным серверам.',
+      'Показывает все игровые серверы, включая пустые, вместе с их загрузкой по комнатам',
     'admin.dashboard.tabs.configs.label': 'Конфиги',
     'admin.dashboard.tabs.configs.title': 'Экономика и баланс',
     'admin.dashboard.tabs.configs.description':
@@ -698,6 +711,7 @@ const messages: Record<Locale, Record<string, string>> = {
     'admin.overviewSection.description':
       'Показывает текущее состояние серверов и комнат на них.',
     'admin.overviewSection.stats.servers': 'Наблюдаемых серверов',
+    'admin.overviewSection.stats.availableServers': 'Доступных серверов',
     'admin.overviewSection.stats.rooms': 'Активных комнат',
     'admin.overviewSection.stats.openRooms': 'Открытых комнат',
     'admin.overviewSection.stats.liveRounds': 'Раундов в игре',
@@ -705,6 +719,15 @@ const messages: Record<Locale, Record<string, string>> = {
     'admin.overviewSection.error.load': 'Не удалось собрать обзор серверов.',
     'admin.overviewSection.serverTitle': 'Сервер {id}',
     'admin.overviewSection.serverRooms': 'Сейчас назначено комнат: {count}',
+    'admin.overviewSection.serverMeta.status': 'Статус',
+    'admin.overviewSection.serverMeta.instanceKey': 'Ключ инстанса',
+    'admin.overviewSection.serverMeta.redisHost': 'Redis host',
+    'admin.overviewSection.serverMeta.heartbeat': 'Последний отклик',
+    'admin.overviewSection.serverStatus.up': 'Доступен',
+    'admin.overviewSection.serverStatus.down': 'Недоступен',
+    'admin.overviewSection.serverStatus.maintenance': 'Обслуживание',
+    'admin.overviewSection.serverStatus.archived': 'Архивирован',
+    'admin.overviewSection.serverStatus.unknown': 'Неизвестно',
     'admin.overviewSection.live': 'В игре: {count}',
     'admin.overviewSection.open': 'Открыто: {count}',
     'admin.overviewSection.inGame': 'В игре: {count}',
@@ -712,6 +735,9 @@ const messages: Record<Locale, Record<string, string>> = {
     'admin.overviewSection.roomTitle': 'Комната #{id}',
     'admin.overviewSection.roomSummary':
       'Игра {gameId} - {capacity} мест - вход {price}',
+    'admin.overviewSection.noAssignedRooms': 'На этот сервер сейчас не назначено ни одной комнаты.',
+    'admin.overviewSection.noServers': 'Admin API не вернул ни одного игрового сервера.',
+    'admin.overviewSection.idleServers': 'Сейчас без назначенных комнат простаивает серверов: {count}.',
     'admin.overviewSection.noRooms':
       'Через публичный admin API сейчас не видно активных комнат.',
 

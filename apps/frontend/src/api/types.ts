@@ -165,3 +165,22 @@ export interface RoomUpdateRequest {
   server_id?: number
   archived_at?: string | null
 }
+
+export type GameServerStatus = string
+
+export interface GameServerResponse {
+  server_id: number
+  instance_key: string
+  redis_host: string
+  status: GameServerStatus
+  started_at?: string | null
+  last_heartbeat_at?: string | null
+  archived_at?: string | null
+}
+
+export interface GameServerListResponse {
+  items: GameServerResponse[]
+  total: number
+  page: number
+  page_size: number
+}

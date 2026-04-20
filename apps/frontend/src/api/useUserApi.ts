@@ -4,6 +4,7 @@ import type {
   ConfigListResponse,
   ConfigResponse,
   ConfigUpsertRequest,
+  GameServerListResponse,
   RoomCreateRequest,
   RoomListResponse,
   RoomResponse,
@@ -70,5 +71,10 @@ export const UserApi = {
   },
   deleteRoom(roomId: number) {
     return api.delete<void>(`/users/admin/room/${roomId}`).then((response) => response.data)
+  },
+  listServers(request?: AdminListRequest) {
+    return api
+      .get<GameServerListResponse>('/users/admin/servers', { params: buildAdminParams(request) })
+      .then((response) => response.data)
   },
 }
