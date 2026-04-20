@@ -17,13 +17,15 @@ type App struct {
 func NewApp(
 	cfg *config.Config,
 	InternalRepository repository.InternalRepository,
+	SessionRepository repository.SessionRepository,
 	Logger *logrus.Logger,
 ) *App {
-	baseURL := cfg.PublicURL
-	if baseURL == "" {
-		baseURL = "http://" + cfg.Domain + ":" + cfg.HttpServerConfig.Port
-	}
-	InternalService := service.NewInternalService(InternalRepository, Logger)
+	InternalService := service.NewInternalService(
+		InternalRepository,
+		SessionRepository,
+		cfg.RecommendationCacheTTL.Duration(),
+		Logger,
+	)
 	return &App{
 		Config:          cfg,
 		InternalService: InternalService,

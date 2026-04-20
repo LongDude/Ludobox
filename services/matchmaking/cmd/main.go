@@ -9,6 +9,7 @@ import (
 	"user_service/internal/app"
 	"user_service/internal/config"
 	"user_service/internal/repository/postgres"
+	"user_service/internal/repository/redis"
 	"user_service/internal/transport/http"
 	"user_service/internal/validation"
 	"user_service/pkg/logger"
@@ -41,16 +42,21 @@ func main() {
 		return
 	}
 	// ! Init redis
-	// redisClient, err := storage.RedisConnect(ctx, cfg.RedisConfig)
-	// if err != nil {
-	// 	logger.Fatalf("Failed to create conection to redis with error: %v", err)
-	// 	return
-	// }
+	redisClient, err := storage.RedisConnect(ctx, cfg.RedisConfig)
+	if err != nil {
+		logger.Fatalf("Failed to create conection to redis with error: %v", err)
+		return
+	}
+	defer func() {
+		if closeErr := redisClient.Close(); closeErr != nil {
+			logger.Errorf("Failed to close redis with error: %v", closeErr)
+		}
+	}()
 
-	// SessionRepo := redis.NewSessionRepository(redisClient)
+	SessionRepo := redis.NewSessionRepository(redisClient)
 	InternalRepo := postgres.NewInternalRepository(pgPool)
 
-	usecase := app.NewApp(cfg, InternalRepo, logger)
+	usecase := app.NewApp(cfg, InternalRepo, SessionRepo, logger)
 	// ! Init REST
 	server := http.NewHTTPServer(cfg, usecase)
 	logger.Info("Start HTTP server")

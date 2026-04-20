@@ -12,16 +12,27 @@ import (
 type InternalService interface {
 	ResolveRoomOwner(ctx context.Context, roomID int64, staleAfter time.Duration) (*domain.GameServer, error)
 	SelectAvailableGameServer(ctx context.Context, staleAfter time.Duration) (*domain.GameServer, error)
+	RecommendRooms(ctx context.Context, preferences domain.MatchmakingPreferences) ([]domain.RoomRecommendation, bool, error)
+	QuickMatch(ctx context.Context, preferences domain.MatchmakingPreferences) (*domain.QuickMatchResult, error)
 }
 
 type internalService struct {
 	internalRepository repository.InternalRepository
+	sessionRepository  repository.SessionRepository
+	recommendationTTL  time.Duration
 	logger             *logrus.Logger
 }
 
-func NewInternalService(internalRepository repository.InternalRepository, logger *logrus.Logger) InternalService {
+func NewInternalService(
+	internalRepository repository.InternalRepository,
+	sessionRepository repository.SessionRepository,
+	recommendationTTL time.Duration,
+	logger *logrus.Logger,
+) InternalService {
 	return &internalService{
 		internalRepository: internalRepository,
+		sessionRepository:  sessionRepository,
+		recommendationTTL:  recommendationTTL,
 		logger:             logger,
 	}
 }
