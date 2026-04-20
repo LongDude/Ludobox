@@ -31,68 +31,6 @@
                     }
                 }
             }
-        },
-        "/ping": {
-            "get": {
-                "description": "ping pong",
-                "consumes": [
-                    "application/json"
-                ],
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "Test"
-                ],
-                "summary": "ping pong",
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "$ref": "#/definitions/presenters.TestResponse"
-                        }
-                    },
-                    "401": {
-                        "description": "Unauthorized",
-                        "schema": {
-                            "$ref": "#/definitions/presenters.ErrorResponse"
-                        }
-                    },
-                    "403": {
-                        "description": "Forbidden",
-                        "schema": {
-                            "$ref": "#/definitions/presenters.ErrorResponse"
-                        }
-                    },
-                    "500": {
-                        "description": "Internal Server Error",
-                        "schema": {
-                            "$ref": "#/definitions/presenters.ErrorResponse"
-                        }
-                    }
-                }
-            }
-        }
-    },
-    "definitions": {
-        "presenters.ErrorResponse": {
-            "type": "object",
-            "properties": {
-                "error": {
-                    "type": "string"
-                }
-            }
-        },
-        "presenters.TestResponse": {
-            "type": "object",
-            "required": [
-                "pong"
-            ],
-            "properties": {
-                "pong": {
-                    "type": "string"
-                }
-            }
         }
     }
 }
