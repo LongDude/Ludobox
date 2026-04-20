@@ -15,8 +15,11 @@ type queryRower interface {
 	QueryRow(ctx context.Context, sql string, args ...any) pgx.Row
 }
 
-func (ar *internalRepository) RecommendRooms(ctx context.Context, preferences domain.MatchmakingPreferences) ([]domain.RoomRecommendation, error) {
+func (ar *internalRepository) RecommendRooms(ctx context.Context, preferences domain.MatchmakingPreferences) (domain.ListResponse[domain.RoomRecommendation], error) {
 	staleAfterSeconds := normalizeStaleAfterSeconds(preferences.StaleAfter)
+	response := domain.ListResponse[domain.RoomRecommendation]{
+		Items: make([]domain.RoomRecommendation, 0),
+	}
 
 	var (
 		gameID               any
@@ -95,6 +98,7 @@ func (ar *internalRepository) RecommendRooms(ctx context.Context, preferences do
 			COALESCE(ap.current_players, 0) AS current_players,
 			gs.instance_key,
 			gs.redis_host,
+			COUNT(*) OVER()::BIGINT AS total_count,
 			(
 				CASE
 					WHEN uh.preferred_game_id IS NOT NULL AND c.game_id = uh.preferred_game_id THEN 40
@@ -143,7 +147,7 @@ func (ar *internalRepository) RecommendRooms(ctx context.Context, preferences do
 		  AND ($7::BOOLEAN IS NULL OR c.is_boost = $7)
 		  AND ($8::INT IS NULL OR c.boost_power >= $8)
 		ORDER BY score DESC, COALESCE(ap.current_players, 0) DESC, r.room_id ASC
-		LIMIT $10;
+		LIMIT $10 OFFSET $11;
 	`
 
 	rows, err := ar.db.Query(
@@ -159,15 +163,16 @@ func (ar *internalRepository) RecommendRooms(ctx context.Context, preferences do
 		minBoostPower,
 		staleAfterSeconds,
 		preferences.Limit,
+		preferences.Offset,
 	)
 	if err != nil {
-		return nil, fmt.Errorf("recommend rooms: %w", err)
+		return response, fmt.Errorf("recommend rooms: %w", err)
 	}
 	defer rows.Close()
 
-	recommendations := make([]domain.RoomRecommendation, 0, preferences.Limit)
 	for rows.Next() {
 		var recommendation domain.RoomRecommendation
+		var totalCount int64
 		if scanErr := rows.Scan(
 			&recommendation.RoomID,
 			&recommendation.ConfigID,
@@ -181,18 +186,20 @@ func (ar *internalRepository) RecommendRooms(ctx context.Context, preferences do
 			&recommendation.CurrentPlayers,
 			&recommendation.InstanceKey,
 			&recommendation.RedisHost,
+			&totalCount,
 			&recommendation.Score,
 		); scanErr != nil {
-			return nil, fmt.Errorf("scan recommendation: %w", scanErr)
+			return response, fmt.Errorf("scan recommendation: %w", scanErr)
 		}
 
-		recommendations = append(recommendations, recommendation)
+		response.Total = totalCount
+		response.Items = append(response.Items, recommendation)
 	}
 	if err := rows.Err(); err != nil {
-		return nil, fmt.Errorf("iterate recommendations: %w", err)
+		return response, fmt.Errorf("iterate recommendations: %w", err)
 	}
 
-	return recommendations, nil
+	return response, nil
 }
 
 func (ar *internalRepository) GetUserActiveRoom(ctx context.Context, userID int64) (*domain.RoomMembership, error) {

@@ -1,45 +1,18 @@
 basePath: /api
 definitions:
-  dto.QuickMatchRequest:
-    properties:
-      game_id:
-        type: integer
-      is_boost:
-        type: boolean
-      max_capacity:
-        type: integer
-      max_registration_price:
-        type: integer
-      min_boost_power:
-        type: integer
-      min_capacity:
-        type: integer
-      min_registration_price:
-        type: integer
-    type: object
-  dto.RecommendRoomsRequest:
-    properties:
-      game_id:
-        type: integer
-      is_boost:
-        type: boolean
-      limit:
-        type: integer
-      max_capacity:
-        type: integer
-      max_registration_price:
-        type: integer
-      min_boost_power:
-        type: integer
-      min_capacity:
-        type: integer
-      min_registration_price:
-        type: integer
-    type: object
   presenters.ErrorResponse:
     properties:
       error:
         type: string
+    type: object
+  presenters.Pagination:
+    properties:
+      page:
+        type: integer
+      page_size:
+        type: integer
+      total:
+        type: integer
     type: object
   presenters.QuickMatchResponse:
     properties:
@@ -62,6 +35,8 @@ definitions:
         items:
           $ref: '#/definitions/presenters.RoomRecommendationResponse'
         type: array
+      pagination:
+        $ref: '#/definitions/presenters.Pagination'
     type: object
   presenters.RoomRecommendationResponse:
     properties:
@@ -115,9 +90,7 @@ paths:
       tags:
       - System
   /rooms/quick-match:
-    post:
-      consumes:
-      - application/json
+    get:
       description: Finds the best available room for the authenticated user and immediately
         joins it.
       parameters:
@@ -126,12 +99,34 @@ paths:
         name: Authorization
         required: true
         type: string
-      - description: Quick match filters
-        in: body
-        name: body
-        required: true
-        schema:
-          $ref: '#/definitions/dto.QuickMatchRequest'
+      - description: Game id
+        in: query
+        name: game_id
+        type: integer
+      - description: Minimum registration price
+        in: query
+        name: min_registration_price
+        type: integer
+      - description: Maximum registration price
+        in: query
+        name: max_registration_price
+        type: integer
+      - description: Minimum room capacity
+        in: query
+        name: min_capacity
+        type: integer
+      - description: Maximum room capacity
+        in: query
+        name: max_capacity
+        type: integer
+      - description: Filter by boost availability
+        in: query
+        name: is_boost
+        type: boolean
+      - description: Minimum boost power
+        in: query
+        name: min_boost_power
+        type: integer
       produces:
       - application/json
       responses:
@@ -159,9 +154,7 @@ paths:
       tags:
       - Matchmaking
   /rooms/recommendations:
-    post:
-      consumes:
-      - application/json
+    get:
       description: Returns recommended open rooms for the authenticated user based
         on filters and play history.
       parameters:
@@ -170,12 +163,42 @@ paths:
         name: Authorization
         required: true
         type: string
-      - description: Recommendation filters
-        in: body
-        name: body
-        required: true
-        schema:
-          $ref: '#/definitions/dto.RecommendRoomsRequest'
+      - description: Game id
+        in: query
+        name: game_id
+        type: integer
+      - description: Minimum registration price
+        in: query
+        name: min_registration_price
+        type: integer
+      - description: Maximum registration price
+        in: query
+        name: max_registration_price
+        type: integer
+      - description: Minimum room capacity
+        in: query
+        name: min_capacity
+        type: integer
+      - description: Maximum room capacity
+        in: query
+        name: max_capacity
+        type: integer
+      - description: Filter by boost availability
+        in: query
+        name: is_boost
+        type: boolean
+      - description: Minimum boost power
+        in: query
+        name: min_boost_power
+        type: integer
+      - description: Page number
+        in: query
+        name: page
+        type: integer
+      - description: Page size
+        in: query
+        name: page_size
+        type: integer
       produces:
       - application/json
       responses:

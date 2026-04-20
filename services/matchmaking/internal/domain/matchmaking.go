@@ -22,6 +22,7 @@ type MatchmakingPreferences struct {
 	IsBoost              *bool
 	MinBoostPower        *int32
 	Limit                int32
+	Offset               int32
 	StaleAfter           time.Duration
 }
 

@@ -7,24 +7,24 @@ import (
 	"user_service/internal/repository"
 )
 
-func (s *sessionRepository) GetRoomRecommendations(ctx context.Context, key string) ([]domain.RoomRecommendation, error) {
+func (s *sessionRepository) GetRoomRecommendations(ctx context.Context, key string) (domain.ListResponse[domain.RoomRecommendation], error) {
 	exists, err := s.redis.Exists(ctx, key)
 	if err != nil {
-		return nil, err
+		return domain.ListResponse[domain.RoomRecommendation]{}, err
 	}
 	if !exists {
-		return nil, repository.ErrorCacheMiss
+		return domain.ListResponse[domain.RoomRecommendation]{}, repository.ErrorCacheMiss
 	}
 
-	var recommendations []domain.RoomRecommendation
+	var recommendations domain.ListResponse[domain.RoomRecommendation]
 	if err := s.redis.Get(ctx, key, &recommendations); err != nil {
-		return nil, err
+		return domain.ListResponse[domain.RoomRecommendation]{}, err
 	}
 
 	return recommendations, nil
 }
 
-func (s *sessionRepository) SetRoomRecommendations(ctx context.Context, key string, recommendations []domain.RoomRecommendation, ttl time.Duration) error {
+func (s *sessionRepository) SetRoomRecommendations(ctx context.Context, key string, recommendations domain.ListResponse[domain.RoomRecommendation], ttl time.Duration) error {
 	return s.redis.Set(ctx, key, recommendations, ttl)
 }
 

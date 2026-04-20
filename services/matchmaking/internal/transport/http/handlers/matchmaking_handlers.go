@@ -17,15 +17,22 @@ import (
 // @Summary Recommend rooms
 // @Description Returns recommended open rooms for the authenticated user based on filters and play history.
 // @Tags Matchmaking
-// @Accept json
 // @Produce json
 // @Param Authorization header string true "Bearer access token"
-// @Param body body dto.RecommendRoomsRequest true "Recommendation filters"
+// @Param game_id query int false "Game id"
+// @Param min_registration_price query int false "Minimum registration price"
+// @Param max_registration_price query int false "Maximum registration price"
+// @Param min_capacity query int false "Minimum room capacity"
+// @Param max_capacity query int false "Maximum room capacity"
+// @Param is_boost query bool false "Filter by boost availability"
+// @Param min_boost_power query int false "Minimum boost power"
+// @Param page query int false "Page number"
+// @Param page_size query int false "Page size"
 // @Success 200 {object} presenters.RecommendRoomsResponse
 // @Failure 400 {object} presenters.ErrorResponse
 // @Failure 401 {object} presenters.ErrorResponse
 // @Failure 500 {object} presenters.ErrorResponse
-// @Router /rooms/recommendations [post]
+// @Router /rooms/recommendations [get]
 func RecommendRooms(ctx *gin.Context, a *app.App) {
 	userID, ok := authenticatedUserID(ctx)
 	if !ok {
@@ -34,9 +41,18 @@ func RecommendRooms(ctx *gin.Context, a *app.App) {
 	}
 
 	var req dto.RecommendRoomsRequest
-	if err := ctx.ShouldBindJSON(&req); err != nil {
+	if err := ctx.ShouldBindQuery(&req); err != nil {
 		ctx.JSON(http.StatusBadRequest, presenters.ErrorResponse{Error: err.Error()})
 		return
+	}
+
+	page := req.Page
+	if page <= 0 {
+		page = 1
+	}
+	pageSize := req.PageSize
+	if pageSize <= 0 {
+		pageSize = 10
 	}
 
 	preferences := domain.MatchmakingPreferences{
@@ -48,7 +64,8 @@ func RecommendRooms(ctx *gin.Context, a *app.App) {
 		MaxCapacity:          req.MaxCapacity,
 		IsBoost:              req.IsBoost,
 		MinBoostPower:        req.MinBoostPower,
-		Limit:                req.Limit,
+		Limit:                pageSize,
+		Offset:               (page - 1) * pageSize,
 		StaleAfter:           a.Config.GameServerStaleAfter.Duration(),
 	}
 
@@ -64,14 +81,19 @@ func RecommendRooms(ctx *gin.Context, a *app.App) {
 		return
 	}
 
-	items := make([]presenters.RoomRecommendationResponse, 0, len(recommendations))
-	for _, recommendation := range recommendations {
+	items := make([]presenters.RoomRecommendationResponse, 0, len(recommendations.Items))
+	for _, recommendation := range recommendations.Items {
 		items = append(items, toRoomRecommendationResponse(recommendation))
 	}
 
 	ctx.JSON(http.StatusOK, presenters.RecommendRoomsResponse{
 		Items:  items,
 		Cached: cached,
+		Pagination: presenters.Pagination{
+			Total:    recommendations.Total,
+			Page:     int64(page),
+			PageSize: int64(pageSize),
+		},
 	})
 }
 
@@ -79,16 +101,21 @@ func RecommendRooms(ctx *gin.Context, a *app.App) {
 // @Summary Quick match
 // @Description Finds the best available room for the authenticated user and immediately joins it.
 // @Tags Matchmaking
-// @Accept json
 // @Produce json
 // @Param Authorization header string true "Bearer access token"
-// @Param body body dto.QuickMatchRequest true "Quick match filters"
+// @Param game_id query int false "Game id"
+// @Param min_registration_price query int false "Minimum registration price"
+// @Param max_registration_price query int false "Maximum registration price"
+// @Param min_capacity query int false "Minimum room capacity"
+// @Param max_capacity query int false "Maximum room capacity"
+// @Param is_boost query bool false "Filter by boost availability"
+// @Param min_boost_power query int false "Minimum boost power"
 // @Success 200 {object} presenters.QuickMatchResponse
 // @Failure 400 {object} presenters.ErrorResponse
 // @Failure 401 {object} presenters.ErrorResponse
 // @Failure 404 {object} presenters.ErrorResponse
 // @Failure 500 {object} presenters.ErrorResponse
-// @Router /rooms/quick-match [post]
+// @Router /rooms/quick-match [get]
 func QuickMatch(ctx *gin.Context, a *app.App) {
 	userID, ok := authenticatedUserID(ctx)
 	if !ok {
@@ -97,7 +124,7 @@ func QuickMatch(ctx *gin.Context, a *app.App) {
 	}
 
 	var req dto.QuickMatchRequest
-	if err := ctx.ShouldBindJSON(&req); err != nil {
+	if err := ctx.ShouldBindQuery(&req); err != nil {
 		ctx.JSON(http.StatusBadRequest, presenters.ErrorResponse{Error: err.Error()})
 		return
 	}

@@ -9,8 +9,8 @@ import (
 
 func MainRouter(r *gin.RouterGroup, a *app.App) {
 	r.GET("/healthz", func(ctx *gin.Context) { handlers.Healthz(ctx, a) })
-	r.POST("/rooms/recommendations", func(ctx *gin.Context) { handlers.RecommendRooms(ctx, a) })
-	r.POST("/rooms/quick-match", func(ctx *gin.Context) { handlers.QuickMatch(ctx, a) })
+	r.GET("/rooms/recommendations", func(ctx *gin.Context) { handlers.RecommendRooms(ctx, a) })
+	r.GET("/rooms/quick-match", func(ctx *gin.Context) { handlers.QuickMatch(ctx, a) })
 }
 
 func InternalRouter(r *gin.RouterGroup, a *app.App) {

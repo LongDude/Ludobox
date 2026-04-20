@@ -12,7 +12,7 @@ import (
 type InternalService interface {
 	ResolveRoomOwner(ctx context.Context, roomID int64, staleAfter time.Duration) (*domain.GameServer, error)
 	SelectAvailableGameServer(ctx context.Context, staleAfter time.Duration) (*domain.GameServer, error)
-	RecommendRooms(ctx context.Context, preferences domain.MatchmakingPreferences) ([]domain.RoomRecommendation, bool, error)
+	RecommendRooms(ctx context.Context, preferences domain.MatchmakingPreferences) (domain.ListResponse[domain.RoomRecommendation], bool, error)
 	QuickMatch(ctx context.Context, preferences domain.MatchmakingPreferences) (*domain.QuickMatchResult, error)
 }
 

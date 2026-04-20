@@ -18,10 +18,10 @@ const (
 	defaultStaleAfter          time.Duration = 15 * time.Second
 )
 
-func (s *internalService) RecommendRooms(ctx context.Context, preferences domain.MatchmakingPreferences) ([]domain.RoomRecommendation, bool, error) {
+func (s *internalService) RecommendRooms(ctx context.Context, preferences domain.MatchmakingPreferences) (domain.ListResponse[domain.RoomRecommendation], bool, error) {
 	normalizedPreferences, err := normalizeMatchmakingPreferences(preferences, defaultRecommendationLimit)
 	if err != nil {
-		return nil, false, err
+		return domain.ListResponse[domain.RoomRecommendation]{}, false, err
 	}
 
 	return s.recommendRooms(ctx, normalizedPreferences, true)
@@ -64,11 +64,11 @@ func (s *internalService) QuickMatch(ctx context.Context, preferences domain.Mat
 	if err != nil {
 		return nil, err
 	}
-	if len(recommendations) == 0 {
+	if len(recommendations.Items) == 0 {
 		return nil, domain.ErrorNoAvailableRooms
 	}
 
-	for _, recommendation := range recommendations {
+	for _, recommendation := range recommendations.Items {
 		membership, joinErr := s.internalRepository.JoinRoom(ctx, normalizedPreferences.UserID, recommendation.RoomID, normalizedPreferences.StaleAfter)
 		if joinErr == nil {
 			s.invalidateRecommendationsCache(ctx)
@@ -120,7 +120,7 @@ func (s *internalService) recommendRooms(
 	ctx context.Context,
 	preferences domain.MatchmakingPreferences,
 	useCache bool,
-) ([]domain.RoomRecommendation, bool, error) {
+) (domain.ListResponse[domain.RoomRecommendation], bool, error) {
 	if useCache && s.sessionRepository != nil && s.recommendationTTL > 0 {
 		cacheKey := recommendationCacheKey(preferences)
 		recommendations, err := s.sessionRepository.GetRoomRecommendations(ctx, cacheKey)
@@ -133,7 +133,7 @@ func (s *internalService) recommendRooms(
 
 		recommendations, repoErr := s.internalRepository.RecommendRooms(ctx, preferences)
 		if repoErr != nil {
-			return nil, false, repoErr
+			return domain.ListResponse[domain.RoomRecommendation]{}, false, repoErr
 		}
 
 		if setErr := s.sessionRepository.SetRoomRecommendations(ctx, cacheKey, recommendations, s.recommendationTTL); setErr != nil {
@@ -145,7 +145,7 @@ func (s *internalService) recommendRooms(
 
 	recommendations, err := s.internalRepository.RecommendRooms(ctx, preferences)
 	if err != nil {
-		return nil, false, err
+		return domain.ListResponse[domain.RoomRecommendation]{}, false, err
 	}
 
 	return recommendations, false, nil
@@ -193,6 +193,9 @@ func normalizeMatchmakingPreferences(
 	if preferences.Limit > maxRecommendationLimit {
 		preferences.Limit = maxRecommendationLimit
 	}
+	if preferences.Offset < 0 {
+		preferences.Offset = 0
+	}
 
 	if preferences.StaleAfter <= 0 {
 		preferences.StaleAfter = defaultStaleAfter
@@ -213,6 +216,7 @@ func recommendationCacheKey(preferences domain.MatchmakingPreferences) string {
 		"is_boost:" + optionalBoolToString(preferences.IsBoost),
 		"min_boost_power:" + optionalInt32ToString(preferences.MinBoostPower),
 		"limit:" + strconv.FormatInt(int64(preferences.Limit), 10),
+		"offset:" + strconv.FormatInt(int64(preferences.Offset), 10),
 	}
 
 	return strings.Join(parts, "|")

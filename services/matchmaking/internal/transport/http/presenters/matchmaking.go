@@ -17,8 +17,9 @@ type RoomRecommendationResponse struct {
 }
 
 type RecommendRoomsResponse struct {
-	Items  []RoomRecommendationResponse `json:"items"`
-	Cached bool                         `json:"cached"`
+	Items      []RoomRecommendationResponse `json:"items"`
+	Cached     bool                         `json:"cached"`
+	Pagination Pagination                   `json:"pagination"`
 }
 
 type QuickMatchResponse struct {

@@ -39,11 +39,8 @@ const docTemplate = `{
             }
         },
         "/rooms/quick-match": {
-            "post": {
+            "get": {
                 "description": "Finds the best available room for the authenticated user and immediately joins it.",
-                "consumes": [
-                    "application/json"
-                ],
                 "produces": [
                     "application/json"
                 ],
@@ -60,13 +57,46 @@ const docTemplate = `{
                         "required": true
                     },
                     {
-                        "description": "Quick match filters",
-                        "name": "body",
-                        "in": "body",
-                        "required": true,
-                        "schema": {
-                            "$ref": "#/definitions/dto.QuickMatchRequest"
-                        }
+                        "type": "integer",
+                        "description": "Game id",
+                        "name": "game_id",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Minimum registration price",
+                        "name": "min_registration_price",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Maximum registration price",
+                        "name": "max_registration_price",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Minimum room capacity",
+                        "name": "min_capacity",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Maximum room capacity",
+                        "name": "max_capacity",
+                        "in": "query"
+                    },
+                    {
+                        "type": "boolean",
+                        "description": "Filter by boost availability",
+                        "name": "is_boost",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Minimum boost power",
+                        "name": "min_boost_power",
+                        "in": "query"
                     }
                 ],
                 "responses": {
@@ -104,11 +134,8 @@ const docTemplate = `{
             }
         },
         "/rooms/recommendations": {
-            "post": {
+            "get": {
                 "description": "Returns recommended open rooms for the authenticated user based on filters and play history.",
-                "consumes": [
-                    "application/json"
-                ],
                 "produces": [
                     "application/json"
                 ],
@@ -125,13 +152,58 @@ const docTemplate = `{
                         "required": true
                     },
                     {
-                        "description": "Recommendation filters",
-                        "name": "body",
-                        "in": "body",
-                        "required": true,
-                        "schema": {
-                            "$ref": "#/definitions/dto.RecommendRoomsRequest"
-                        }
+                        "type": "integer",
+                        "description": "Game id",
+                        "name": "game_id",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Minimum registration price",
+                        "name": "min_registration_price",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Maximum registration price",
+                        "name": "max_registration_price",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Minimum room capacity",
+                        "name": "min_capacity",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Maximum room capacity",
+                        "name": "max_capacity",
+                        "in": "query"
+                    },
+                    {
+                        "type": "boolean",
+                        "description": "Filter by boost availability",
+                        "name": "is_boost",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Minimum boost power",
+                        "name": "min_boost_power",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Page number",
+                        "name": "page",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Page size",
+                        "name": "page_size",
+                        "in": "query"
                     }
                 ],
                 "responses": {
@@ -164,66 +236,25 @@ const docTemplate = `{
         }
     },
     "definitions": {
-        "dto.QuickMatchRequest": {
-            "type": "object",
-            "properties": {
-                "game_id": {
-                    "type": "integer"
-                },
-                "is_boost": {
-                    "type": "boolean"
-                },
-                "max_capacity": {
-                    "type": "integer"
-                },
-                "max_registration_price": {
-                    "type": "integer"
-                },
-                "min_boost_power": {
-                    "type": "integer"
-                },
-                "min_capacity": {
-                    "type": "integer"
-                },
-                "min_registration_price": {
-                    "type": "integer"
-                }
-            }
-        },
-        "dto.RecommendRoomsRequest": {
-            "type": "object",
-            "properties": {
-                "game_id": {
-                    "type": "integer"
-                },
-                "is_boost": {
-                    "type": "boolean"
-                },
-                "limit": {
-                    "type": "integer"
-                },
-                "max_capacity": {
-                    "type": "integer"
-                },
-                "max_registration_price": {
-                    "type": "integer"
-                },
-                "min_boost_power": {
-                    "type": "integer"
-                },
-                "min_capacity": {
-                    "type": "integer"
-                },
-                "min_registration_price": {
-                    "type": "integer"
-                }
-            }
-        },
         "presenters.ErrorResponse": {
             "type": "object",
             "properties": {
                 "error": {
                     "type": "string"
+                }
+            }
+        },
+        "presenters.Pagination": {
+            "type": "object",
+            "properties": {
+                "page": {
+                    "type": "integer"
+                },
+                "page_size": {
+                    "type": "integer"
+                },
+                "total": {
+                    "type": "integer"
                 }
             }
         },
@@ -258,6 +289,9 @@ const docTemplate = `{
                     "items": {
                         "$ref": "#/definitions/presenters.RoomRecommendationResponse"
                     }
+                },
+                "pagination": {
+                    "$ref": "#/definitions/presenters.Pagination"
                 }
             }
         },
