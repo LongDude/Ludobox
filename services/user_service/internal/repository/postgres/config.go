@@ -23,18 +23,19 @@ type queryRower interface {
 }
 
 var configSortableColumns = map[string]string{
-	"config_id":          "config_id",
-	"game_id":            "game_id",
-	"capacity":           "capacity",
-	"registration_price": "registration_price",
-	"is_boost":           "is_boost",
-	"boost_price":        "boost_price",
-	"boost_power":        "boost_power",
-	"number_winners":     "number_winners",
-	"commission":         "commission",
-	"time":               "time",
-	"min_users":          "min_users",
-	"archived_at":        "archived_at",
+	"config_id":          "c.config_id",
+	"game_id":            "c.game_id",
+	"game_name":          "g.name_game",
+	"capacity":           "c.capacity",
+	"registration_price": "c.registration_price",
+	"is_boost":           "c.is_boost",
+	"boost_price":        "c.boost_price",
+	"boost_power":        "c.boost_power",
+	"number_winners":     "c.number_winners",
+	"commission":         "c.commission",
+	"time":               "c.time",
+	"min_users":          "c.min_users",
+	"archived_at":        "c.archived_at",
 }
 
 type configFilterField struct {
@@ -43,42 +44,19 @@ type configFilterField struct {
 }
 
 var configFilterColumns = map[string]configFilterField{
-	"config_id":            {column: "config_id", kind: "int"},
-	"game_id":              {column: "game_id", kind: "int"},
-	"capacity":             {column: "capacity", kind: "int"},
-	"registration_price":   {column: "registration_price", kind: "int"},
-	"is_boost":             {column: "is_boost", kind: "bool"},
-	"boost_price":          {column: "boost_price", kind: "int"},
-	"boost_power":          {column: "boost_power", kind: "int"},
-	"number_winners":       {column: "number_winners", kind: "int"},
-	"winning_distribution": {column: "winning_distribution", kind: "int_array"},
-	"commission":           {column: "commission", kind: "int"},
-	"time":                 {column: "time", kind: "int"},
-	"min_users":            {column: "min_users", kind: "int"},
-}
-
-var supportedScalarOperators = map[string]struct{}{
-	"eq":     {},
-	"neq":    {},
-	"gt":     {},
-	"lt":     {},
-	"gte":    {},
-	"lte":    {},
-	"in":     {},
-	"not_in": {},
-}
-
-var supportedBoolOperators = map[string]struct{}{
-	"eq":     {},
-	"neq":    {},
-	"in":     {},
-	"not_in": {},
-}
-
-var supportedArrayOperators = map[string]struct{}{
-	"contains":  {},
-	"contained": {},
-	"overlap":   {},
+	"config_id":            {column: "c.config_id", kind: "int"},
+	"game_id":              {column: "c.game_id", kind: "int"},
+	"game_name":            {column: "g.name_game", kind: "string"},
+	"capacity":             {column: "c.capacity", kind: "int"},
+	"registration_price":   {column: "c.registration_price", kind: "int"},
+	"is_boost":             {column: "c.is_boost", kind: "bool"},
+	"boost_price":          {column: "c.boost_price", kind: "int"},
+	"boost_power":          {column: "c.boost_power", kind: "int"},
+	"number_winners":       {column: "c.number_winners", kind: "int"},
+	"winning_distribution": {column: "c.winning_distribution", kind: "int_array"},
+	"commission":           {column: "c.commission", kind: "int"},
+	"time":                 {column: "c.time", kind: "int"},
+	"min_users":            {column: "c.min_users", kind: "int"},
 }
 
 func (c *configRepository) CreateNewConfig(ctx context.Context, config *domain.Config) (*domain.Config, error) {
@@ -97,23 +75,11 @@ func (c *configRepository) CreateNewConfig(ctx context.Context, config *domain.C
 			min_users
 		)
 		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
-		RETURNING
-			config_id,
-			game_id,
-			capacity,
-			registration_price,
-			is_boost,
-			boost_price,
-			boost_power,
-			number_winners,
-			winning_distribution,
-			commission,
-			time,
-			min_users,
-			archived_at
+		RETURNING config_id
 	`
 
-	created, err := scanConfig(c.db.QueryRow(
+	var createdID int64
+	if err := c.db.QueryRow(
 		ctx,
 		query,
 		int64(config.GameID),
@@ -127,12 +93,11 @@ func (c *configRepository) CreateNewConfig(ctx context.Context, config *domain.C
 		config.Commission,
 		config.Time,
 		config.MinUsers,
-	))
-	if err != nil {
+	).Scan(&createdID); err != nil {
 		return nil, wrapConfigMutationError("create config", err)
 	}
 
-	return created, nil
+	return c.GetConfigByID(ctx, int(createdID))
 }
 
 func (c *configRepository) DeleteConfigByID(ctx context.Context, id int) error {
@@ -180,26 +145,7 @@ func (c *configRepository) DeleteConfigByID(ctx context.Context, id int) error {
 }
 
 func (c *configRepository) GetConfigByID(ctx context.Context, id int) (*domain.Config, error) {
-	const query = `
-		SELECT
-			config_id,
-			game_id,
-			capacity,
-			registration_price,
-			is_boost,
-			boost_price,
-			boost_power,
-			number_winners,
-			winning_distribution,
-			commission,
-			time,
-			min_users,
-			archived_at
-		FROM config
-		WHERE config_id = $1
-	`
-
-	config, err := scanConfig(c.db.QueryRow(ctx, query, id))
+	config, err := getConfigByID(ctx, c.db, id)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return nil, repository.ErrorConfigNotFound
@@ -224,7 +170,7 @@ func (c *configRepository) GetConfigs(ctx context.Context, params domain.ListPar
 		pageSize = 10
 	}
 
-	whereParts := []string{"archived_at IS NULL"}
+	whereParts := []string{"c.archived_at IS NULL"}
 	args := make([]any, 0, len(params.Filter)+2)
 	for _, filter := range params.Filter {
 		clause, clauseArgs, err := buildConfigFilterClause(filter, len(args)+1)
@@ -241,27 +187,35 @@ func (c *configRepository) GetConfigs(ctx context.Context, params domain.ListPar
 		return response, err
 	}
 
-	countQuery := "SELECT COUNT(*) FROM config WHERE " + whereSQL
+	countQuery := `
+		SELECT COUNT(*)
+		FROM config c
+		JOIN games g ON g.game_id = c.game_id
+		WHERE ` + whereSQL
 	if err := c.db.QueryRow(ctx, countQuery, args...).Scan(&response.Total); err != nil {
 		return response, fmt.Errorf("count configs: %w", err)
 	}
 
 	listQuery := fmt.Sprintf(`
 		SELECT
-			config_id,
-			game_id,
-			capacity,
-			registration_price,
-			is_boost,
-			boost_price,
-			boost_power,
-			number_winners,
-			winning_distribution,
-			commission,
-			time,
-			min_users,
-			archived_at
-		FROM config
+			c.config_id,
+			c.game_id,
+			c.capacity,
+			c.registration_price,
+			c.is_boost,
+			c.boost_price,
+			c.boost_power,
+			c.number_winners,
+			c.winning_distribution,
+			c.commission,
+			c.time,
+			c.min_users,
+			c.archived_at,
+			g.game_id,
+			g.name_game,
+			g.archived_at
+		FROM config c
+		JOIN games g ON g.game_id = c.game_id
 		WHERE %s
 		ORDER BY %s
 		LIMIT $%d OFFSET $%d
@@ -336,23 +290,11 @@ func (c *configRepository) UpdateConfigByID(ctx context.Context, id int, config 
 			min_users
 		)
 		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
-		RETURNING
-			config_id,
-			game_id,
-			capacity,
-			registration_price,
-			is_boost,
-			boost_price,
-			boost_power,
-			number_winners,
-			winning_distribution,
-			commission,
-			time,
-			min_users,
-			archived_at
+		RETURNING config_id
 	`
 
-	updated, err := scanConfig(tx.QueryRow(
+	var updatedID int64
+	if err := tx.QueryRow(
 		ctx,
 		insertQuery,
 		int64(config.GameID),
@@ -366,12 +308,11 @@ func (c *configRepository) UpdateConfigByID(ctx context.Context, id int, config 
 		config.Commission,
 		config.Time,
 		config.MinUsers,
-	))
-	if err != nil {
+	).Scan(&updatedID); err != nil {
 		return nil, wrapConfigMutationError("replace config", err)
 	}
 
-	if err := replaceRoomsConfigID(ctx, tx, id, updated.ID); err != nil {
+	if err := replaceRoomsConfigID(ctx, tx, id, int(updatedID)); err != nil {
 		return nil, fmt.Errorf("replace rooms config id: %w", err)
 	}
 
@@ -379,12 +320,12 @@ func (c *configRepository) UpdateConfigByID(ctx context.Context, id int, config 
 		return nil, fmt.Errorf("commit update config transaction: %w", err)
 	}
 
-	return updated, nil
+	return c.GetConfigByID(ctx, int(updatedID))
 }
 
 func buildConfigOrderBy(sort *domain.Sort) (string, error) {
 	if sort == nil {
-		return "config_id DESC", nil
+		return "c.config_id DESC", nil
 	}
 
 	column, ok := configSortableColumns[strings.ToLower(strings.TrimSpace(sort.Field))]
@@ -413,15 +354,19 @@ func buildConfigFilterClause(filter domain.Filter, startIndex int) (string, []an
 	operatorName := strings.ToLower(strings.TrimSpace(filter.Operator))
 	switch field.kind {
 	case "int":
-		if _, ok := supportedScalarOperators[operatorName]; !ok {
+		if !isScalarOperator(operatorName) {
 			return "", nil, fmt.Errorf("%w: unsupported filter operator %q for field %q", repository.ErrorInvalidListParams, filter.Operator, filter.Field)
 		}
 	case "bool":
-		if _, ok := supportedBoolOperators[operatorName]; !ok {
+		if !isBoolOperator(operatorName) {
+			return "", nil, fmt.Errorf("%w: unsupported filter operator %q for field %q", repository.ErrorInvalidListParams, filter.Operator, filter.Field)
+		}
+	case "string":
+		if !isStringOperator(operatorName) {
 			return "", nil, fmt.Errorf("%w: unsupported filter operator %q for field %q", repository.ErrorInvalidListParams, filter.Operator, filter.Field)
 		}
 	case "int_array":
-		if _, ok := supportedArrayOperators[operatorName]; !ok {
+		if !isArrayOperator(operatorName) {
 			return "", nil, fmt.Errorf("%w: unsupported filter operator %q for field %q", repository.ErrorInvalidListParams, filter.Operator, filter.Field)
 		}
 	default:
@@ -448,7 +393,7 @@ func buildConfigFilterClause(filter domain.Filter, startIndex int) (string, []an
 	}
 
 	operator := getOperator(operatorName)
-	value, err := convertConfigFilterValue(filter.Value, field.kind)
+	value, err := convertConfigFilterValue(filter.Value, field.kind, operatorName)
 	if err != nil {
 		return "", nil, err
 	}
@@ -456,7 +401,7 @@ func buildConfigFilterClause(filter domain.Filter, startIndex int) (string, []an
 	return fmt.Sprintf("%s %s $%d", field.column, operator, startIndex), []any{value}, nil
 }
 
-func convertConfigFilterValue(raw any, kind string) (any, error) {
+func convertConfigFilterValue(raw any, kind string, operator string) (any, error) {
 	text := strings.TrimSpace(fmt.Sprint(raw))
 	if text == "" {
 		return nil, fmt.Errorf("%w: filter value cannot be empty", repository.ErrorInvalidListParams)
@@ -475,6 +420,11 @@ func convertConfigFilterValue(raw any, kind string) (any, error) {
 			return nil, fmt.Errorf("%w: invalid boolean value %q", repository.ErrorInvalidListParams, text)
 		}
 		return value, nil
+	case "string":
+		if operator == "like" || operator == "not_like" {
+			return "%" + text + "%", nil
+		}
+		return text, nil
 	default:
 		return nil, fmt.Errorf("%w: unsupported filter field type", repository.ErrorInvalidListParams)
 	}
@@ -495,7 +445,7 @@ func convertConfigInValues(raw any, kind string) ([]any, error) {
 
 	values := make([]any, 0, len(parts))
 	for _, part := range parts {
-		value, err := convertConfigFilterValue(part, kind)
+		value, err := convertConfigFilterValue(part, kind, "")
 		if err != nil {
 			return nil, err
 		}
@@ -600,6 +550,9 @@ func scanConfig(row rowScanner) (*domain.Config, error) {
 		roundTime           int32
 		minUsers            int32
 		archivedAt          sql.NullTime
+		joinedGameID        int64
+		gameName            string
+		gameArchivedAt      sql.NullTime
 	)
 
 	if err := row.Scan(
@@ -616,6 +569,9 @@ func scanConfig(row rowScanner) (*domain.Config, error) {
 		&roundTime,
 		&minUsers,
 		&archivedAt,
+		&joinedGameID,
+		&gameName,
+		&gameArchivedAt,
 	); err != nil {
 		return nil, err
 	}
@@ -633,13 +589,48 @@ func scanConfig(row rowScanner) (*domain.Config, error) {
 		Commission:          int(commission),
 		Time:                int(roundTime),
 		MinUsers:            int(minUsers),
+		Game: &domain.Game{
+			ID:   int(joinedGameID),
+			Name: gameName,
+		},
 	}
 	if archivedAt.Valid {
 		archivedCopy := archivedAt.Time.UTC()
 		config.ArchivedAt = &archivedCopy
 	}
+	if gameArchivedAt.Valid && config.Game != nil {
+		archivedCopy := gameArchivedAt.Time.UTC()
+		config.Game.ArchivedAt = &archivedCopy
+	}
 
 	return config, nil
+}
+
+func getConfigByID(ctx context.Context, db queryRower, id int) (*domain.Config, error) {
+	const query = `
+		SELECT
+			c.config_id,
+			c.game_id,
+			c.capacity,
+			c.registration_price,
+			c.is_boost,
+			c.boost_price,
+			c.boost_power,
+			c.number_winners,
+			c.winning_distribution,
+			c.commission,
+			c.time,
+			c.min_users,
+			c.archived_at,
+			g.game_id,
+			g.name_game,
+			g.archived_at
+		FROM config c
+		JOIN games g ON g.game_id = c.game_id
+		WHERE c.config_id = $1
+	`
+
+	return scanConfig(db.QueryRow(ctx, query, id))
 }
 
 func wrapConfigMutationError(action string, err error) error {

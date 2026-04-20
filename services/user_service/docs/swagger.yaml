@@ -14,6 +14,8 @@ definitions:
         type: integer
       config_id:
         type: integer
+      game:
+        $ref: '#/definitions/presenters.GameResponse'
       game_id:
         type: integer
       is_boost:
@@ -76,6 +78,15 @@ definitions:
       error:
         type: string
     type: object
+  presenters.GameResponse:
+    properties:
+      archived_at:
+        type: string
+      game_id:
+        type: integer
+      name_game:
+        type: string
+    type: object
   presenters.GameServerResponse:
     properties:
       archived_at:
@@ -98,6 +109,24 @@ definitions:
       items:
         items:
           $ref: '#/definitions/presenters.GameServerResponse'
+        type: array
+      page:
+        type: integer
+      page_size:
+        type: integer
+      total:
+        type: integer
+    type: object
+  presenters.GameUpsertRequest:
+    properties:
+      name_game:
+        type: string
+    type: object
+  presenters.GamesResponse:
+    properties:
+      items:
+        items:
+          $ref: '#/definitions/presenters.GameResponse'
         type: array
       page:
         type: integer
@@ -451,6 +480,250 @@ paths:
       summary: List active configs
       tags:
       - Config
+  /admin/game:
+    post:
+      consumes:
+      - application/json
+      description: Creates a new game.
+      parameters:
+      - description: Authorization Token
+        in: header
+        name: Authorization
+        required: true
+        type: string
+      - description: Game payload
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/presenters.GameUpsertRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/presenters.GameResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/presenters.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/presenters.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/presenters.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/presenters.ErrorResponse'
+      summary: Create game
+      tags:
+      - Game
+  /admin/game/{game_id}:
+    delete:
+      consumes:
+      - application/json
+      description: Archives an active game by id.
+      parameters:
+      - description: Authorization Token
+        in: header
+        name: Authorization
+        required: true
+        type: string
+      - description: Game id
+        in: path
+        name: game_id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "204":
+          description: No Content
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/presenters.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/presenters.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/presenters.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/presenters.ErrorResponse'
+        "409":
+          description: Conflict
+          schema:
+            $ref: '#/definitions/presenters.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/presenters.ErrorResponse'
+      summary: Archive game
+      tags:
+      - Game
+    get:
+      consumes:
+      - application/json
+      description: Returns a single game by id.
+      parameters:
+      - description: Authorization Token
+        in: header
+        name: Authorization
+        required: true
+        type: string
+      - description: Game id
+        in: path
+        name: game_id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/presenters.GameResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/presenters.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/presenters.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/presenters.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/presenters.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/presenters.ErrorResponse'
+      summary: Get game by id
+      tags:
+      - Game
+    put:
+      consumes:
+      - application/json
+      description: Updates an active game by id.
+      parameters:
+      - description: Authorization Token
+        in: header
+        name: Authorization
+        required: true
+        type: string
+      - description: Game id
+        in: path
+        name: game_id
+        required: true
+        type: integer
+      - description: Game payload
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/presenters.GameUpsertRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/presenters.GameResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/presenters.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/presenters.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/presenters.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/presenters.ErrorResponse'
+        "409":
+          description: Conflict
+          schema:
+            $ref: '#/definitions/presenters.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/presenters.ErrorResponse'
+      summary: Update game by id
+      tags:
+      - Game
+  /admin/games:
+    get:
+      consumes:
+      - application/json
+      description: Returns non-archived games with pagination and sorting.
+      parameters:
+      - description: Authorization Token
+        in: header
+        name: Authorization
+        required: true
+        type: string
+      - description: Page number
+        in: query
+        name: page
+        type: integer
+      - description: Page size
+        in: query
+        name: page_size
+        type: integer
+      - description: Sort field
+        in: query
+        name: sort_field
+        type: string
+      - description: Sort direction (asc/desc)
+        in: query
+        name: sort_direction
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/presenters.GamesResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/presenters.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/presenters.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/presenters.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/presenters.ErrorResponse'
+      summary: List active games
+      tags:
+      - Game
   /admin/room:
     post:
       consumes:

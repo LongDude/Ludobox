@@ -10,6 +10,9 @@ var (
 	ErrorUserNotFound        = errors.New("user not found")
 	ErrorUserAlreadyExist    = errors.New("user already exist")
 	ErrorNegativeBalance     = errors.New("balance cannot be negative")
+	ErrorGameNotFound        = errors.New("game not found")
+	ErrorGameArchived        = errors.New("game is archived")
+	ErrorInvalidGame         = errors.New("game is invalid")
 	ErrorConfigNotFound      = errors.New("config not found")
 	ErrorConfigArchived      = errors.New("config is archived")
 	ErrorInvalidConfig       = errors.New("config is invalid")
@@ -32,6 +35,13 @@ type ConfigRepository interface {
 	CreateNewConfig(ctx context.Context, config *domain.Config) (*domain.Config, error)
 	UpdateConfigByID(ctx context.Context, id int, config *domain.Config) (*domain.Config, error)
 	DeleteConfigByID(ctx context.Context, id int) error
+}
+type GameRepository interface {
+	GetGames(ctx context.Context, params domain.ListParams) (domain.ListResponse[domain.Game], error)
+	GetGameByID(ctx context.Context, id int) (*domain.Game, error)
+	CreateGame(ctx context.Context, game *domain.Game) (*domain.Game, error)
+	UpdateGameByID(ctx context.Context, id int, game *domain.Game) (*domain.Game, error)
+	DeleteGameByID(ctx context.Context, id int) error
 }
 type RoomRepository interface {
 	CreateRoomByConfigID(ctx context.Context, configID int, serverID int) (*domain.Room, error)

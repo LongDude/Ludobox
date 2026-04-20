@@ -18,6 +18,11 @@ func MainRouter(r *gin.RouterGroup, a *app.App) {
 }
 func AdminRouter(r *gin.RouterGroup, a *app.App) {
 	admin := r.Group("", middlewares.AdminOnly(a))
+	admin.GET("/games", func(ctx *gin.Context) { handlers.GetGames(ctx, a) })
+	admin.GET("/game/:game_id", func(ctx *gin.Context) { handlers.GetGameByID(ctx, a) })
+	admin.POST("/game", func(ctx *gin.Context) { handlers.CreateGame(ctx, a) })
+	admin.PUT("/game/:game_id", func(ctx *gin.Context) { handlers.UpdateGameByID(ctx, a) })
+	admin.DELETE("/game/:game_id", func(ctx *gin.Context) { handlers.DeleteGameByID(ctx, a) })
 	admin.GET("/configs/used", func(ctx *gin.Context) { handlers.GetConfigsInUse(ctx, a) })
 	admin.GET("/config/:config_id", func(ctx *gin.Context) { handlers.GetConfigByID(ctx, a) })
 	admin.POST("/config", func(ctx *gin.Context) { handlers.CreateNewConfig(ctx, a) })

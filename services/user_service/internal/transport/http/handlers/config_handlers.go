@@ -32,6 +32,7 @@ func configToResponse(config *domain.Config) presenters.ConfigResponse {
 	return presenters.ConfigResponse{
 		ConfigID:            config.ID,
 		GameID:              config.GameID,
+		Game:                gameToResponse(config.Game),
 		Capacity:            config.Capacity,
 		RegistrationPrice:   config.RegistrationPrice,
 		IsBoost:             config.IsBoost,

@@ -5,6 +5,7 @@ import "time"
 type Config struct {
 	ID                  int        `json:"config_id"`
 	GameID              int        `json:"game_id"`
+	Game                *Game      `json:"game,omitempty"`
 	Capacity            int        `json:"capacity"`
 	RegistrationPrice   int        `json:"registration_price"`
 	IsBoost             bool       `json:"is_boost"`

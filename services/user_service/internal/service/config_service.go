@@ -98,6 +98,9 @@ func validateConfig(config *domain.Config) error {
 	if config == nil {
 		return fmt.Errorf("%w: request body is required", repository.ErrorInvalidConfig)
 	}
+	if config.GameID <= 0 && config.Game != nil {
+		config.GameID = config.Game.ID
+	}
 	if config.GameID <= 0 {
 		return fmt.Errorf("%w: game_id must be positive", repository.ErrorInvalidConfig)
 	}

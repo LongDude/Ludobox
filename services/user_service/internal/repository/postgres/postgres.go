@@ -22,6 +22,14 @@ func NewConfigRepository(db *pgxpool.Pool) repository.ConfigRepository {
 	return &configRepository{db: db}
 }
 
+type gameRepository struct {
+	db *pgxpool.Pool
+}
+
+func NewGameRepository(db *pgxpool.Pool) repository.GameRepository {
+	return &gameRepository{db: db}
+}
+
 type roomRepository struct {
 	db *pgxpool.Pool
 }
