@@ -32,24 +32,78 @@
                 }
             }
         },
-        "/ping": {
+        "/rooms/quick-match": {
             "get": {
-                "description": "ping pong",
-                "consumes": [
-                    "application/json"
-                ],
+                "description": "Finds the best available room for the authenticated user and immediately joins it.",
                 "produces": [
                     "application/json"
                 ],
                 "tags": [
-                    "Test"
+                    "Matchmaking"
                 ],
-                "summary": "ping pong",
+                "summary": "Quick match",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Bearer access token",
+                        "name": "Authorization",
+                        "in": "header",
+                        "required": true
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Game id",
+                        "name": "game_id",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Minimum registration price",
+                        "name": "min_registration_price",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Maximum registration price",
+                        "name": "max_registration_price",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Minimum room capacity",
+                        "name": "min_capacity",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Maximum room capacity",
+                        "name": "max_capacity",
+                        "in": "query"
+                    },
+                    {
+                        "type": "boolean",
+                        "description": "Filter by boost availability",
+                        "name": "is_boost",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Minimum boost power",
+                        "name": "min_boost_power",
+                        "in": "query"
+                    }
+                ],
                 "responses": {
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/presenters.TestResponse"
+                            "$ref": "#/definitions/presenters.QuickMatchResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/presenters.ErrorResponse"
                         }
                     },
                     "401": {
@@ -58,8 +112,109 @@
                             "$ref": "#/definitions/presenters.ErrorResponse"
                         }
                     },
-                    "403": {
-                        "description": "Forbidden",
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/presenters.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/presenters.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/rooms/recommendations": {
+            "get": {
+                "description": "Returns recommended open rooms for the authenticated user based on filters and play history.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Matchmaking"
+                ],
+                "summary": "Recommend rooms",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Bearer access token",
+                        "name": "Authorization",
+                        "in": "header",
+                        "required": true
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Game id",
+                        "name": "game_id",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Minimum registration price",
+                        "name": "min_registration_price",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Maximum registration price",
+                        "name": "max_registration_price",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Minimum room capacity",
+                        "name": "min_capacity",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Maximum room capacity",
+                        "name": "max_capacity",
+                        "in": "query"
+                    },
+                    {
+                        "type": "boolean",
+                        "description": "Filter by boost availability",
+                        "name": "is_boost",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Minimum boost power",
+                        "name": "min_boost_power",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Page number",
+                        "name": "page",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Page size",
+                        "name": "page_size",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/presenters.RecommendRoomsResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/presenters.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
                         "schema": {
                             "$ref": "#/definitions/presenters.ErrorResponse"
                         }
@@ -83,14 +238,98 @@
                 }
             }
         },
-        "presenters.TestResponse": {
+        "presenters.Pagination": {
             "type": "object",
-            "required": [
-                "pong"
-            ],
             "properties": {
-                "pong": {
+                "page": {
+                    "type": "integer"
+                },
+                "page_size": {
+                    "type": "integer"
+                },
+                "total": {
+                    "type": "integer"
+                }
+            }
+        },
+        "presenters.QuickMatchResponse": {
+            "type": "object",
+            "properties": {
+                "reused_existing_room": {
+                    "type": "boolean"
+                },
+                "room": {
+                    "$ref": "#/definitions/presenters.RoomRecommendationResponse"
+                },
+                "round_id": {
+                    "type": "integer"
+                },
+                "round_participant_id": {
+                    "type": "integer"
+                },
+                "seat_number": {
+                    "type": "integer"
+                }
+            }
+        },
+        "presenters.RecommendRoomsResponse": {
+            "type": "object",
+            "properties": {
+                "cached": {
+                    "type": "boolean"
+                },
+                "items": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/presenters.RoomRecommendationResponse"
+                    }
+                },
+                "pagination": {
+                    "$ref": "#/definitions/presenters.Pagination"
+                }
+            }
+        },
+        "presenters.RoomRecommendationResponse": {
+            "type": "object",
+            "properties": {
+                "boost_power": {
+                    "type": "integer"
+                },
+                "capacity": {
+                    "type": "integer"
+                },
+                "config_id": {
+                    "type": "integer"
+                },
+                "current_players": {
+                    "type": "integer"
+                },
+                "game_id": {
+                    "type": "integer"
+                },
+                "instance_key": {
                     "type": "string"
+                },
+                "is_boost": {
+                    "type": "boolean"
+                },
+                "min_users": {
+                    "type": "integer"
+                },
+                "redis_host": {
+                    "type": "string"
+                },
+                "registration_price": {
+                    "type": "integer"
+                },
+                "room_id": {
+                    "type": "integer"
+                },
+                "score": {
+                    "type": "number"
+                },
+                "server_id": {
+                    "type": "integer"
                 }
             }
         }

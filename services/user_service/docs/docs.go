@@ -842,47 +842,6 @@ const docTemplate = `{
                 }
             }
         },
-        "/ping": {
-            "get": {
-                "description": "ping pong",
-                "consumes": [
-                    "application/json"
-                ],
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "Test"
-                ],
-                "summary": "ping pong",
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "$ref": "#/definitions/presenters.TestResponse"
-                        }
-                    },
-                    "401": {
-                        "description": "Unauthorized",
-                        "schema": {
-                            "$ref": "#/definitions/presenters.ErrorResponse"
-                        }
-                    },
-                    "403": {
-                        "description": "Forbidden",
-                        "schema": {
-                            "$ref": "#/definitions/presenters.ErrorResponse"
-                        }
-                    },
-                    "500": {
-                        "description": "Internal Server Error",
-                        "schema": {
-                            "$ref": "#/definitions/presenters.ErrorResponse"
-                        }
-                    }
-                }
-            }
-        },
         "/user": {
             "get": {
                 "description": "Returns the current user profile. If the user is absent in user_service, it is created automatically with nickname user_{id} and zero balance.",
@@ -1371,17 +1330,6 @@ const docTemplate = `{
                 },
                 "total": {
                     "type": "integer"
-                }
-            }
-        },
-        "presenters.TestResponse": {
-            "type": "object",
-            "required": [
-                "pong"
-            ],
-            "properties": {
-                "pong": {
-                    "type": "string"
                 }
             }
         },

@@ -5,12 +5,67 @@ definitions:
       error:
         type: string
     type: object
-  presenters.TestResponse:
+  presenters.Pagination:
     properties:
-      pong:
+      page:
+        type: integer
+      page_size:
+        type: integer
+      total:
+        type: integer
+    type: object
+  presenters.QuickMatchResponse:
+    properties:
+      reused_existing_room:
+        type: boolean
+      room:
+        $ref: '#/definitions/presenters.RoomRecommendationResponse'
+      round_id:
+        type: integer
+      round_participant_id:
+        type: integer
+      seat_number:
+        type: integer
+    type: object
+  presenters.RecommendRoomsResponse:
+    properties:
+      cached:
+        type: boolean
+      items:
+        items:
+          $ref: '#/definitions/presenters.RoomRecommendationResponse'
+        type: array
+      pagination:
+        $ref: '#/definitions/presenters.Pagination'
+    type: object
+  presenters.RoomRecommendationResponse:
+    properties:
+      boost_power:
+        type: integer
+      capacity:
+        type: integer
+      config_id:
+        type: integer
+      current_players:
+        type: integer
+      game_id:
+        type: integer
+      instance_key:
         type: string
-    required:
-    - pong
+      is_boost:
+        type: boolean
+      min_users:
+        type: integer
+      redis_host:
+        type: string
+      registration_price:
+        type: integer
+      room_id:
+        type: integer
+      score:
+        type: number
+      server_id:
+        type: integer
     type: object
 host: localhost:8080
 info:
@@ -34,31 +89,136 @@ paths:
       summary: Service health
       tags:
       - System
-  /ping:
+  /rooms/quick-match:
     get:
-      consumes:
-      - application/json
-      description: ping pong
+      description: Finds the best available room for the authenticated user and immediately
+        joins it.
+      parameters:
+      - description: Bearer access token
+        in: header
+        name: Authorization
+        required: true
+        type: string
+      - description: Game id
+        in: query
+        name: game_id
+        type: integer
+      - description: Minimum registration price
+        in: query
+        name: min_registration_price
+        type: integer
+      - description: Maximum registration price
+        in: query
+        name: max_registration_price
+        type: integer
+      - description: Minimum room capacity
+        in: query
+        name: min_capacity
+        type: integer
+      - description: Maximum room capacity
+        in: query
+        name: max_capacity
+        type: integer
+      - description: Filter by boost availability
+        in: query
+        name: is_boost
+        type: boolean
+      - description: Minimum boost power
+        in: query
+        name: min_boost_power
+        type: integer
       produces:
       - application/json
       responses:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/presenters.TestResponse'
+            $ref: '#/definitions/presenters.QuickMatchResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/presenters.ErrorResponse'
         "401":
           description: Unauthorized
           schema:
             $ref: '#/definitions/presenters.ErrorResponse'
-        "403":
-          description: Forbidden
+        "404":
+          description: Not Found
           schema:
             $ref: '#/definitions/presenters.ErrorResponse'
         "500":
           description: Internal Server Error
           schema:
             $ref: '#/definitions/presenters.ErrorResponse'
-      summary: ping pong
+      summary: Quick match
       tags:
-      - Test
+      - Matchmaking
+  /rooms/recommendations:
+    get:
+      description: Returns recommended open rooms for the authenticated user based
+        on filters and play history.
+      parameters:
+      - description: Bearer access token
+        in: header
+        name: Authorization
+        required: true
+        type: string
+      - description: Game id
+        in: query
+        name: game_id
+        type: integer
+      - description: Minimum registration price
+        in: query
+        name: min_registration_price
+        type: integer
+      - description: Maximum registration price
+        in: query
+        name: max_registration_price
+        type: integer
+      - description: Minimum room capacity
+        in: query
+        name: min_capacity
+        type: integer
+      - description: Maximum room capacity
+        in: query
+        name: max_capacity
+        type: integer
+      - description: Filter by boost availability
+        in: query
+        name: is_boost
+        type: boolean
+      - description: Minimum boost power
+        in: query
+        name: min_boost_power
+        type: integer
+      - description: Page number
+        in: query
+        name: page
+        type: integer
+      - description: Page size
+        in: query
+        name: page_size
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/presenters.RecommendRoomsResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/presenters.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/presenters.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/presenters.ErrorResponse'
+      summary: Recommend rooms
+      tags:
+      - Matchmaking
 swagger: "2.0"
