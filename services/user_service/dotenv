@@ -2,6 +2,8 @@
 DOMAIN=localhost
 PUBLIC_URL=http://localhost
 SSO_AUTHENTICATE_URL=http://sso-core:8080/api/auth/authenticate
+MATCHMAKING_SELECT_SERVER_URL=http://haproxy:80/__internal/matchmaking/game-servers/next
+INTERNAL_PROXY_TOKEN=rooms-internal-token
 
 # Allowed origins (comma-separated)
 ALLOWED_REDIRECT_URLS=http://localhost:5173,http://localhost:8080,http://localhost

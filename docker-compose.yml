@@ -8,6 +8,7 @@ services:
     environment:
       HAPROXY_LOOPBACK_HOST: 127.0.0.1
       HAPROXY_LOOPBACK_PORT: "80"
+      INTERNAL_PROXY_TOKEN: ${INTERNAL_PROXY_TOKEN}
     depends_on:
       sso-core:
         condition: service_started

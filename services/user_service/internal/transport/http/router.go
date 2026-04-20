@@ -10,7 +10,6 @@ import (
 
 func MainRouter(r *gin.RouterGroup, a *app.App) {
 	r.GET("/healthz", func(ctx *gin.Context) { handlers.Healthz(ctx, a) })
-	r.GET("/ping", func(ctx *gin.Context) { handlers.PingPong(ctx, a) })
 	r.GET("/user", func(ctx *gin.Context) { handlers.GetUserByID(ctx, a) })
 	r.POST("/user", func(ctx *gin.Context) { handlers.CreateUserByID(ctx, a) })
 	r.PUT("/user", func(ctx *gin.Context) { handlers.UpdateUserByID(ctx, a) })
@@ -24,4 +23,9 @@ func AdminRouter(r *gin.RouterGroup, a *app.App) {
 	admin.POST("/config", func(ctx *gin.Context) { handlers.CreateNewConfig(ctx, a) })
 	admin.PUT("/config/:config_id", func(ctx *gin.Context) { handlers.UpdateConfigByID(ctx, a) })
 	admin.DELETE("/config/:config_id", func(ctx *gin.Context) { handlers.DeleteConfigByID(ctx, a) })
+	admin.GET("/rooms", func(ctx *gin.Context) { handlers.GetNotArchivedRooms(ctx, a) })
+	admin.GET("/room/:room_id", func(ctx *gin.Context) { handlers.GetRoomByID(ctx, a) })
+	admin.POST("/room", func(ctx *gin.Context) { handlers.CreateRoomByConfigID(ctx, a) })
+	admin.PUT("/room/:room_id", func(ctx *gin.Context) { handlers.UpdateRoomByID(ctx, a) })
+	admin.DELETE("/room/:room_id", func(ctx *gin.Context) { handlers.DeleteRoomByID(ctx, a) })
 }

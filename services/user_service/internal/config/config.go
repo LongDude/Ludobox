@@ -5,19 +5,21 @@ import (
 )
 
 type Config struct {
-	PostgresConfig      PostgresConfig
-	RedisConfig         RedisConfig
-	HttpServerConfig    HTTPServerConfig
-	Domain              string   `env:"DOMAIN" env-default:"localhost"`
-	PublicURL           string   `env:"PUBLIC_URL"`
-	SSOAuthenticateURL  string   `env:"SSO_AUTHENTICATE_URL" env-default:"http://sso-core:8080/api/auth/authenticate"`
-	SwaggerBasePath     string   `env:"SWAGGER_BASE_PATH" env-default:"/api"`
-	AllowedCORSOrigins  []string `env:"ALLOWED_CORS_ORIGINS" env-separator:","`
-	AllowedRedirectURLs []string `env:"ALLOWED_REDIRECT_URLS" env-separator:","`
-	DefaultAdminEmails  []string `env:"DEFAULT_ADMIN_EMAILS" env-separator:","`
-	SwaggerEnabled      bool     `env:"SWAGGER_ENABLED" env-default:"true"`
-	SwaggerUser         string   `env:"SWAGGER_USER"`
-	SwaggerPassword     string   `env:"SWAGGER_PASSWORD"`
+	PostgresConfig             PostgresConfig
+	RedisConfig                RedisConfig
+	HttpServerConfig           HTTPServerConfig
+	Domain                     string   `env:"DOMAIN" env-default:"localhost"`
+	PublicURL                  string   `env:"PUBLIC_URL"`
+	SSOAuthenticateURL         string   `env:"SSO_AUTHENTICATE_URL" env-default:"http://sso-core:8080/api/auth/authenticate"`
+	MatchmakingSelectServerURL string   `env:"MATCHMAKING_SELECT_SERVER_URL" env-default:"http://haproxy:80/__internal/matchmaking/game-servers/next"`
+	InternalProxyToken         string   `env:"INTERNAL_PROXY_TOKEN" env-default:"rooms-internal-token"`
+	SwaggerBasePath            string   `env:"SWAGGER_BASE_PATH" env-default:"/api"`
+	AllowedCORSOrigins         []string `env:"ALLOWED_CORS_ORIGINS" env-separator:","`
+	AllowedRedirectURLs        []string `env:"ALLOWED_REDIRECT_URLS" env-separator:","`
+	DefaultAdminEmails         []string `env:"DEFAULT_ADMIN_EMAILS" env-separator:","`
+	SwaggerEnabled             bool     `env:"SWAGGER_ENABLED" env-default:"true"`
+	SwaggerUser                string   `env:"SWAGGER_USER"`
+	SwaggerPassword            string   `env:"SWAGGER_PASSWORD"`
 }
 
 type PostgresConfig struct {

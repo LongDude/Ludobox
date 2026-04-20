@@ -93,6 +93,18 @@ core.register_action("validate_sso_access_token", { "http-req" }, function(txn)
     txn:set_var("txn.sso_validate_outage", status_code >= 500)
 end)
 
+core.register_action("authorize_internal_service", { "http-req" }, function(txn)
+    local provided = txn.sf:req_hdr("X-Internal-Proxy-Token") or ""
+    local expected = os.getenv("INTERNAL_PROXY_TOKEN") or ""
+
+    if expected == "" or provided == "" then
+        txn:set_var("txn.internal_service_ok", false)
+        return
+    end
+
+    txn:set_var("txn.internal_service_ok", provided == expected)
+end)
+
 core.register_action("resolve_game_room_owner", { "http-req" }, function(txn)
     local room_id = txn:get_var("txn.game_room_id")
     if not room_id or room_id == "" then

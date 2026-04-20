@@ -136,6 +136,12 @@ func (c *configRepository) CreateNewConfig(ctx context.Context, config *domain.C
 }
 
 func (c *configRepository) DeleteConfigByID(ctx context.Context, id int) error {
+	tx, err := c.db.BeginTx(ctx, pgx.TxOptions{})
+	if err != nil {
+		return fmt.Errorf("begin delete config transaction: %w", err)
+	}
+	defer tx.Rollback(ctx)
+
 	const archiveQuery = `
 		UPDATE config
 		SET archived_at = NOW()
@@ -143,26 +149,34 @@ func (c *configRepository) DeleteConfigByID(ctx context.Context, id int) error {
 		  AND archived_at IS NULL
 	`
 
-	result, err := c.db.Exec(ctx, archiveQuery, id)
+	result, err := tx.Exec(ctx, archiveQuery, id)
 	if err != nil {
 		return fmt.Errorf("archive config by id: %w", err)
 	}
-	if result.RowsAffected() > 0 {
-		return nil
-	}
+	if result.RowsAffected() == 0 {
+		found, archived, err := configPresence(ctx, tx, id)
+		if err != nil {
+			return fmt.Errorf("archive config by id: %w", err)
+		}
+		if !found {
+			return repository.ErrorConfigNotFound
+		}
+		if archived {
+			return repository.ErrorConfigArchived
+		}
 
-	found, archived, err := configPresence(ctx, c.db, id)
-	if err != nil {
-		return fmt.Errorf("archive config by id: %w", err)
-	}
-	if !found {
 		return repository.ErrorConfigNotFound
 	}
-	if archived {
-		return repository.ErrorConfigArchived
+
+	if err := archiveRoomsByConfigID(ctx, tx, id); err != nil {
+		return fmt.Errorf("archive rooms by config id: %w", err)
 	}
 
-	return repository.ErrorConfigNotFound
+	if err := tx.Commit(ctx); err != nil {
+		return fmt.Errorf("commit delete config transaction: %w", err)
+	}
+
+	return nil
 }
 
 func (c *configRepository) GetConfigByID(ctx context.Context, id int) (*domain.Config, error) {
@@ -357,6 +371,10 @@ func (c *configRepository) UpdateConfigByID(ctx context.Context, id int, config 
 		return nil, wrapConfigMutationError("replace config", err)
 	}
 
+	if err := replaceRoomsConfigID(ctx, tx, id, updated.ID); err != nil {
+		return nil, fmt.Errorf("replace rooms config id: %w", err)
+	}
+
 	if err := tx.Commit(ctx); err != nil {
 		return nil, fmt.Errorf("commit update config transaction: %w", err)
 	}
@@ -529,6 +547,42 @@ func configPresence(ctx context.Context, db queryRower, id int) (bool, bool, err
 	}
 
 	return true, archived, nil
+}
+
+func archiveRoomsByConfigID(ctx context.Context, tx pgx.Tx, configID int) error {
+	const query = `
+		UPDATE rooms
+		SET archived_at = NOW()
+		WHERE config_id = $1
+		  AND archived_at IS NULL
+	`
+
+	if _, err := tx.Exec(ctx, query, configID); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func replaceRoomsConfigID(ctx context.Context, tx pgx.Tx, oldConfigID int, newConfigID int) error {
+	const query = `
+		WITH archived_rooms AS (
+			UPDATE rooms
+			SET archived_at = NOW()
+			WHERE config_id = $1
+			  AND archived_at IS NULL
+			RETURNING server_id
+		)
+		INSERT INTO rooms (config_id, server_id, status)
+		SELECT $2, server_id, 'open'::room_status
+		FROM archived_rooms
+	`
+
+	if _, err := tx.Exec(ctx, query, oldConfigID, newConfigID); err != nil {
+		return err
+	}
+
+	return nil
 }
 
 func scanConfig(row rowScanner) (*domain.Config, error) {

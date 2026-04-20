@@ -7,13 +7,17 @@ import (
 )
 
 var (
-	ErrorUserNotFound      = errors.New("user not found")
-	ErrorUserAlreadyExist  = errors.New("user already exist")
-	ErrorNegativeBalance   = errors.New("balance cannot be negative")
-	ErrorConfigNotFound    = errors.New("config not found")
-	ErrorConfigArchived    = errors.New("config is archived")
-	ErrorInvalidConfig     = errors.New("config is invalid")
-	ErrorInvalidListParams = errors.New("invalid list params")
+	ErrorUserNotFound        = errors.New("user not found")
+	ErrorUserAlreadyExist    = errors.New("user already exist")
+	ErrorNegativeBalance     = errors.New("balance cannot be negative")
+	ErrorConfigNotFound      = errors.New("config not found")
+	ErrorConfigArchived      = errors.New("config is archived")
+	ErrorInvalidConfig       = errors.New("config is invalid")
+	ErrorInvalidListParams   = errors.New("invalid list params")
+	ErrorRoomNotFound        = errors.New("room not found")
+	ErrorRoomArchived        = errors.New("room is archived")
+	ErrorInvalidRoom         = errors.New("room is invalid")
+	ErrorNoActiveGameServers = errors.New("no active game servers")
 )
 
 type UserRepository interface {
@@ -28,6 +32,13 @@ type ConfigRepository interface {
 	CreateNewConfig(ctx context.Context, config *domain.Config) (*domain.Config, error)
 	UpdateConfigByID(ctx context.Context, id int, config *domain.Config) (*domain.Config, error)
 	DeleteConfigByID(ctx context.Context, id int) error
+}
+type RoomRepository interface {
+	CreateRoomByConfigID(ctx context.Context, configID int, serverID int) (*domain.Room, error)
+	GetRoomByID(ctx context.Context, id int) (*domain.Room, error)
+	GetNotArchivedRooms(ctx context.Context, params domain.ListParams) (domain.ListResponse[domain.Room], error)
+	UpdateRoomByID(ctx context.Context, id int, room *domain.Room) (*domain.Room, error)
+	DeleteRoomByID(ctx context.Context, id int) error
 }
 type SessionRepository interface {
 }
