@@ -1,7 +1,7 @@
 package postgres
 
 import (
-	"user_service/internal/repository"
+	"game_server/internal/repository"
 
 	"github.com/jackc/pgx/v5/pgxpool"
 )

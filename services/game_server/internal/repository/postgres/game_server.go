@@ -3,8 +3,8 @@ package postgres
 import (
 	"context"
 	"fmt"
-	"user_service/internal/domain"
-	"user_service/internal/repository"
+	"game_server/internal/domain"
+	"game_server/internal/repository"
 )
 
 func (ar *internalRepository) RegisterGameServer(ctx context.Context, params repository.GameServerRegistrationParams) (*domain.GameServer, error) {

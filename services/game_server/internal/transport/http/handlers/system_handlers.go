@@ -2,7 +2,7 @@ package handlers
 
 import (
 	"net/http"
-	"user_service/internal/app"
+	"game_server/internal/app"
 
 	"github.com/gin-gonic/gin"
 )

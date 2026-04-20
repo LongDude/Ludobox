@@ -7,14 +7,14 @@ import (
 	"sync"
 	"syscall"
 	"time"
-	"user_service/internal/app"
-	"user_service/internal/config"
-	"user_service/internal/repository"
-	"user_service/internal/repository/postgres"
-	"user_service/internal/transport/http"
-	"user_service/internal/validation"
-	"user_service/pkg/logger"
-	"user_service/pkg/storage"
+	"game_server/internal/app"
+	"game_server/internal/config"
+	"game_server/internal/repository"
+	"game_server/internal/repository/postgres"
+	"game_server/internal/transport/http"
+	"game_server/internal/validation"
+	"game_server/pkg/logger"
+	"game_server/pkg/storage"
 )
 
 // @title LudaBox API

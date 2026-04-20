@@ -1,8 +1,8 @@
 package http
 
 import (
-	"user_service/internal/app"
-	"user_service/internal/transport/http/handlers"
+	"game_server/internal/app"
+	"game_server/internal/transport/http/handlers"
 
 	"github.com/gin-gonic/gin"
 )

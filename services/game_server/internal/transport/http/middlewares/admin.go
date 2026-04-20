@@ -3,8 +3,8 @@ package middlewares
 import (
 	"fmt"
 	"strings"
-	"user_service/internal/app"
-	"user_service/internal/domain"
+	"game_server/internal/app"
+	"game_server/internal/domain"
 
 	"github.com/gin-gonic/gin"
 )

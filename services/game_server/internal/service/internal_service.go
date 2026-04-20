@@ -1,7 +1,7 @@
 package service
 
 import (
-	"user_service/internal/repository"
+	"game_server/internal/repository"
 
 	"github.com/sirupsen/logrus"
 )

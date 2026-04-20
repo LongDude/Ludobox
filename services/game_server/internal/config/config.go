@@ -1,7 +1,7 @@
 package config
 
 import (
-	"user_service/internal/types"
+	"game_server/internal/types"
 
 	"github.com/ilyakaznacheev/cleanenv"
 )

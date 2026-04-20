@@ -5,14 +5,14 @@ import (
 	"fmt"
 	"net/http"
 	"net/url"
-	"user_service/internal/app"
-	"user_service/internal/config"
-	"user_service/internal/transport/http/handlers"
+	"game_server/internal/app"
+	"game_server/internal/config"
+	"game_server/internal/transport/http/handlers"
 
 	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
 
-	docs "user_service/docs"
+	docs "game_server/docs"
 
 	swaggerFiles "github.com/swaggo/files"
 	ginSwagger "github.com/swaggo/gin-swagger"

@@ -1,8 +1,8 @@
 package redis
 
 import (
-	"user_service/internal/repository"
-	"user_service/pkg/storage"
+	"game_server/internal/repository"
+	"game_server/pkg/storage"
 )
 
 type sessionRepository struct {

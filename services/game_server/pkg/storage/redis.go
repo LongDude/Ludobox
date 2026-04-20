@@ -5,7 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"time"
-	"user_service/internal/config"
+	"game_server/internal/config"
 
 	"github.com/redis/go-redis/v9"
 )

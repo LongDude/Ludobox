@@ -4,7 +4,7 @@ import (
 	"context"
 	"fmt"
 	"time"
-	"user_service/internal/config"
+	"game_server/internal/config"
 
 	"github.com/jackc/pgx/v5/pgxpool"
 )

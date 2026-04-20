@@ -3,7 +3,7 @@ package repository
 import (
 	"context"
 	"errors"
-	"user_service/internal/domain"
+	"game_server/internal/domain"
 )
 
 var (

@@ -1,9 +1,9 @@
 package app
 
 import (
-	"user_service/internal/config"
-	"user_service/internal/repository"
-	"user_service/internal/service"
+	"game_server/internal/config"
+	"game_server/internal/repository"
+	"game_server/internal/service"
 
 	"github.com/sirupsen/logrus"
 )
