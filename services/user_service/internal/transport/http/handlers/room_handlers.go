@@ -36,13 +36,14 @@ func roomToResponse(room *domain.Room) presenters.RoomResponse {
 	}
 
 	return presenters.RoomResponse{
-		RoomID:     room.ID,
-		ConfigID:   room.ConfigID,
-		Config:     config,
-		ServerID:   room.GameServerID,
-		ServerName: room.ServerName,
-		Status:     string(room.Status),
-		ArchivedAt: room.ArchivedAt,
+		RoomID:         room.ID,
+		ConfigID:       room.ConfigID,
+		Config:         config,
+		ServerID:       room.GameServerID,
+		ServerName:     room.ServerName,
+		CurrentPlayers: room.CurrentPlayers,
+		Status:         string(room.Status),
+		ArchivedAt:     room.ArchivedAt,
 	}
 }
 
@@ -247,7 +248,7 @@ func DeleteRoomByID(ctx *gin.Context, a *app.App) {
 
 // Get non-archived rooms
 // @Summary Returns non-archived rooms
-// @Description Returns non-archived rooms. Filter fields: room_id, config_id, server_id, server_name, status, config_capacity, config_registration_price, config_is_boost, config_game_id, config_game_name.
+// @Description Returns non-archived rooms. Filter fields: room_id, config_id, server_id, server_name, current_players, status, config_capacity, config_registration_price, config_is_boost, config_game_id, config_game_name.
 // @Tags Room
 // @Accept json
 // @Produce json

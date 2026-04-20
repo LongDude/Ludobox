@@ -165,6 +165,7 @@ export interface RoomResponse {
   config?: ConfigResponse | null
   server_id: number
   server_name?: string | null
+  current_players: number
   status: RoomStatus
   archived_at?: string | null
 }
