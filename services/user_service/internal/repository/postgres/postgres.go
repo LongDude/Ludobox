@@ -29,3 +29,11 @@ type roomRepository struct {
 func NewRoomRepository(db *pgxpool.Pool) repository.RoomRepository {
 	return &roomRepository{db: db}
 }
+
+type gameServerRepository struct {
+	db *pgxpool.Pool
+}
+
+func NewGameServerRepository(db *pgxpool.Pool) repository.GameServerRepository {
+	return &gameServerRepository{db: db}
+}

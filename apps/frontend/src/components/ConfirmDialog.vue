@@ -1,5 +1,8 @@
 <script lang="ts" setup>
 import { computed, nextTick, onBeforeUnmount, ref, watch } from 'vue'
+import { useI18n } from '@/i18n'
+
+const { t } = useI18n()
 
 const props = withDefaults(
   defineProps<{
@@ -13,8 +16,6 @@ const props = withDefaults(
   {
     title: '',
     message: '',
-    confirmText: 'OK',
-    cancelText: 'Cancel',
     closeOnBackdrop: true,
   },
 )
@@ -88,6 +89,8 @@ onBeforeUnmount(() => {
 
 const titleId = computed(() => (props.title ? `confirm-dialog-title-${uid}` : undefined))
 const bodyId = computed(() => (props.message ? `confirm-dialog-body-${uid}` : undefined))
+const confirmLabel = computed(() => props.confirmText || t('common.confirm'))
+const cancelLabel = computed(() => props.cancelText || t('common.cancel'))
 </script>
 
 <template>
@@ -116,7 +119,7 @@ const bodyId = computed(() => (props.message ? `confirm-dialog-body-${uid}` : un
           </div>
           <footer class="confirm-actions">
             <button type="button" class="btn btn-secondary" @click="handleCancel">
-              {{ cancelText }}
+              {{ cancelLabel }}
             </button>
             <button
               ref="confirmButtonRef"
@@ -124,7 +127,7 @@ const bodyId = computed(() => (props.message ? `confirm-dialog-body-${uid}` : un
               class="btn btn-primary"
               @click="handleConfirm"
             >
-              {{ confirmText }}
+              {{ confirmLabel }}
             </button>
           </footer>
         </div>

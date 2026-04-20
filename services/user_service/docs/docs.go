@@ -819,6 +819,86 @@ const docTemplate = `{
                 }
             }
         },
+        "/admin/servers": {
+            "get": {
+                "description": "Returns all game servers with pagination and sorting.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Server"
+                ],
+                "summary": "List game servers",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Authorization Token",
+                        "name": "Authorization",
+                        "in": "header",
+                        "required": true
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Page number",
+                        "name": "page",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Page size",
+                        "name": "page_size",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Sort field",
+                        "name": "sort_field",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Sort direction (asc/desc)",
+                        "name": "sort_direction",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/presenters.GameServersResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/presenters.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/presenters.ErrorResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/presenters.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/presenters.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
         "/healthz": {
             "get": {
                 "description": "Lightweight liveness probe",
@@ -1271,6 +1351,52 @@ const docTemplate = `{
             "properties": {
                 "error": {
                     "type": "string"
+                }
+            }
+        },
+        "presenters.GameServerResponse": {
+            "type": "object",
+            "properties": {
+                "archived_at": {
+                    "type": "string"
+                },
+                "instance_key": {
+                    "type": "string"
+                },
+                "last_heartbeat_at": {
+                    "type": "string"
+                },
+                "redis_host": {
+                    "type": "string"
+                },
+                "server_id": {
+                    "type": "integer"
+                },
+                "started_at": {
+                    "type": "string"
+                },
+                "status": {
+                    "type": "string"
+                }
+            }
+        },
+        "presenters.GameServersResponse": {
+            "type": "object",
+            "properties": {
+                "items": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/presenters.GameServerResponse"
+                    }
+                },
+                "page": {
+                    "type": "integer"
+                },
+                "page_size": {
+                    "type": "integer"
+                },
+                "total": {
+                    "type": "integer"
                 }
             }
         },

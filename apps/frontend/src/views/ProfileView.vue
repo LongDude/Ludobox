@@ -34,6 +34,13 @@ const avatarLetter = computed(() => {
   return trimmed ? trimmed[0].toUpperCase() : 'U'
 })
 
+function displayRole(role: string) {
+  const normalized = role.toLowerCase()
+  if (normalized === 'admin') return t('roles.admin')
+  if (normalized === 'user') return t('roles.user')
+  return role
+}
+
 // Edit form state
 const form = reactive({
   email: '',
@@ -142,7 +149,7 @@ async function saveProfile() {
             <img
               v-if="avatarUrl"
               :src="avatarUrl"
-              :alt="fullName || auth.User?.email || 'User avatar'"
+              :alt="fullName || auth.User?.email || t('profile.avatarAlt')"
             />
             <span v-else>{{ avatarLetter }}</span>
           </div>
@@ -169,33 +176,49 @@ async function saveProfile() {
           <div class="row" v-if="auth.User?.roles?.length">
             <span class="label">{{ t('profile.roles') }}</span>
             <span class="value roles">
-              <span v-for="r in auth.User?.roles" :key="r" class="chip">{{ r }}</span>
+              <span v-for="r in auth.User?.roles" :key="r" class="chip">{{ displayRole(r) }}</span>
             </span>
           </div>
         </div>
 
         <div v-if="editing" class="editor">
-          <h3>Edit profile</h3>
+          <h3>{{ t('profile.editTitle') }}</h3>
           <div class="grid">
             <label>
-              <span>Email</span>
-              <input v-model="form.email" type="email" placeholder="Email" />
+              <span>{{ t('auth.email') }}</span>
+              <input v-model="form.email" type="email" :placeholder="t('auth.email')" />
             </label>
             <label>
               <span>{{ t('profile.form.firstName') }}</span>
-              <input v-model="form.first_name" type="text" :placeholder="t('profile.form.firstName')" />
+              <input
+                v-model="form.first_name"
+                type="text"
+                :placeholder="t('profile.form.firstName')"
+              />
             </label>
             <label>
               <span>{{ t('profile.form.lastName') }}</span>
-              <input v-model="form.last_name" type="text" :placeholder="t('profile.form.lastName')" />
+              <input
+                v-model="form.last_name"
+                type="text"
+                :placeholder="t('profile.form.lastName')"
+              />
             </label>
             <label>
               <span>{{ t('profile.form.locale') }}</span>
-              <input v-model="form.locale_type" type="text" :placeholder="t('profile.form.locale')" />
+              <input
+                v-model="form.locale_type"
+                type="text"
+                :placeholder="t('profile.form.locale')"
+              />
             </label>
             <label>
               <span>{{ t('profile.form.newPassword') }}</span>
-              <input v-model="form.password" type="password" :placeholder="t('profile.form.keepBlank')" />
+              <input
+                v-model="form.password"
+                type="password"
+                :placeholder="t('profile.form.keepBlank')"
+              />
             </label>
           </div>
           <div class="feedback">
@@ -203,7 +226,9 @@ async function saveProfile() {
             <span v-if="errorMsg" class="err">{{ errorMsg }}</span>
           </div>
           <div class="actions">
-            <button class="btn" :disabled="saving" @click="cancelEditing">{{ t('profile.btn.cancel') }}</button>
+            <button class="btn" :disabled="saving" @click="cancelEditing">
+              {{ t('profile.btn.cancel') }}
+            </button>
             <button class="btn btn--primary" :disabled="saving" @click="saveProfile">
               {{ saving ? t('profile.saving') : t('profile.btn.save') }}
             </button>
@@ -350,5 +375,14 @@ input[type='password'] {
   display: flex;
   gap: var(--space-3);
   justify-content: flex-end;
+}
+
+@media (max-width: 960px) {
+  .profile-area,
+  .profile-area.collapsed {
+    position: static;
+    inset: auto;
+    margin: calc(76px + 0.75rem) 1rem 5.75rem;
+  }
 }
 </style>

@@ -2,14 +2,12 @@
 import { computed, onMounted, ref } from 'vue'
 import UpTab from '@/components/UpTab.vue'
 import LeftTab from '@/components/LeftTab.vue'
-import { useSettingStore } from '@/stores/settingStore'
 import { useI18n } from '@/i18n'
 import { useLayoutInset } from '@/composables/useLayoutInset'
 
 type Theme = 'light' | 'dark'
 const THEME_KEY = 'theme'
 
-const setting = useSettingStore()
 const { LeftTabHidden: leftHidden, layoutInset } = useLayoutInset()
 const { locale, setLocale, t } = useI18n()
 
@@ -46,10 +44,6 @@ onMounted(() => {
   theme.value = current
 })
 
-function toggleLeftTab() {
-  setting.HideLeftTab()
-}
-
 const currentLang = computed(() => locale.value)
 function chooseLang(l: 'en' | 'ru') {
   setLocale(l)
@@ -58,7 +52,7 @@ function chooseLang(l: 'en' | 'ru') {
 
 <template>
   <UpTab :show-menu="false" :show-upload="false" />
-  <LeftTab :hidden="true" />
+  <LeftTab />
 
   <div
     class="settings-area"
@@ -269,5 +263,14 @@ input[type='radio'],
 input[type='checkbox'] {
   width: 16px;
   height: 16px;
+}
+
+@media (max-width: 960px) {
+  .settings-area,
+  .settings-area.collapsed {
+    position: static;
+    inset: auto;
+    margin: calc(76px + 0.75rem) 1rem 5.75rem;
+  }
 }
 </style>

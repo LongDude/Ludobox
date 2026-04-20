@@ -40,5 +40,8 @@ type RoomRepository interface {
 	UpdateRoomByID(ctx context.Context, id int, room *domain.Room) (*domain.Room, error)
 	DeleteRoomByID(ctx context.Context, id int) error
 }
+type GameServerRepository interface {
+	GetServers(ctx context.Context, params domain.ListParams) (domain.ListResponse[domain.GameServer], error)
+}
 type SessionRepository interface {
 }

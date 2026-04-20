@@ -51,8 +51,9 @@ func main() {
 	UserRepo := postgres.NewUserRepository(pgPool)
 	ConfigRepo := postgres.NewConfigRepository(pgPool)
 	RoomRepo := postgres.NewRoomRepository(pgPool)
+	GameServerRepo := postgres.NewGameServerRepository(pgPool)
 
-	usecase := app.NewApp(cfg, UserRepo, ConfigRepo, RoomRepo, logger)
+	usecase := app.NewApp(cfg, UserRepo, ConfigRepo, RoomRepo, GameServerRepo, logger)
 	// ! Init REST
 	server := http.NewHTTPServer(cfg, usecase)
 	logger.Info("Start HTTP server")

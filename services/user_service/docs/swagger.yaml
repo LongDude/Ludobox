@@ -76,6 +76,36 @@ definitions:
       error:
         type: string
     type: object
+  presenters.GameServerResponse:
+    properties:
+      archived_at:
+        type: string
+      instance_key:
+        type: string
+      last_heartbeat_at:
+        type: string
+      redis_host:
+        type: string
+      server_id:
+        type: integer
+      started_at:
+        type: string
+      status:
+        type: string
+    type: object
+  presenters.GameServersResponse:
+    properties:
+      items:
+        items:
+          $ref: '#/definitions/presenters.GameServerResponse'
+        type: array
+      page:
+        type: integer
+      page_size:
+        type: integer
+      total:
+        type: integer
+    type: object
   presenters.RoomCreateRequest:
     properties:
       config_id:
@@ -696,6 +726,59 @@ paths:
       summary: Returns non-archived rooms
       tags:
       - Room
+  /admin/servers:
+    get:
+      consumes:
+      - application/json
+      description: Returns all game servers with pagination and sorting.
+      parameters:
+      - description: Authorization Token
+        in: header
+        name: Authorization
+        required: true
+        type: string
+      - description: Page number
+        in: query
+        name: page
+        type: integer
+      - description: Page size
+        in: query
+        name: page_size
+        type: integer
+      - description: Sort field
+        in: query
+        name: sort_field
+        type: string
+      - description: Sort direction (asc/desc)
+        in: query
+        name: sort_direction
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/presenters.GameServersResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/presenters.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/presenters.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/presenters.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/presenters.ErrorResponse'
+      summary: List game servers
+      tags:
+      - Server
   /healthz:
     get:
       description: Lightweight liveness probe
