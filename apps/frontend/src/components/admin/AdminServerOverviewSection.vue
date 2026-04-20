@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
 import { UserApi } from '@/api/useUserApi'
-import type { ConfigResponse, GameServerResponse, RoomResponse } from '@/api/types'
+import type { GameServerResponse, RoomResponse } from '@/api/types'
 import { useI18n } from '@/i18n'
 
 interface ServerBucket {
@@ -16,10 +16,7 @@ const loading = ref(false)
 const errorMsg = ref('')
 const servers = ref<GameServerResponse[]>([])
 const rooms = ref<RoomResponse[]>([])
-const configs = ref<ConfigResponse[]>([])
 const { locale, t } = useI18n()
-
-const configById = computed(() => new Map(configs.value.map((config) => [config.config_id, config])))
 
 const roomsByServer = computed(() => {
   const byServer = new Map<number, RoomResponse[]>()
@@ -67,20 +64,10 @@ async function loadOverview() {
   errorMsg.value = ''
 
   try {
-    const [allServers, allRooms, configResponse] = await Promise.all([
-      loadAllServers(),
-      loadAllRooms(),
-      UserApi.listConfigs({
-        page: 1,
-        page_size: 100,
-        sort_field: 'config_id',
-        sort_direction: 'desc',
-      }),
-    ])
+    const [allServers, allRooms] = await Promise.all([loadAllServers(), loadAllRooms()])
 
     servers.value = allServers
     rooms.value = allRooms
-    configs.value = configResponse.items ?? []
   } catch (error: any) {
     errorMsg.value = error?.message || t('admin.overviewSection.error.load')
   } finally {
@@ -143,7 +130,7 @@ function isAvailableServer(server: GameServerResponse) {
 }
 
 function roomSummary(room: RoomResponse) {
-  const config = configById.value.get(room.config_id)
+  const config = room.config
   if (!config) return t('admin.roomsSection.configFallback', { id: room.config_id })
   return t('admin.overviewSection.roomSummary', {
     game: config.game?.name_game ?? t('admin.configsSection.gameLabel', { id: config.game_id }),

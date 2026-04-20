@@ -5,7 +5,9 @@ import "time"
 type Room struct {
 	ID           int        `json:"room_id"`
 	ConfigID     int        `json:"config_id"`
+	Config       *Config    `json:"config,omitempty"`
 	GameServerID int        `json:"server_id"`
+	ServerName   string     `json:"server_name,omitempty"`
 	Status       RoomStatus `json:"status"`
 	ArchivedAt   *time.Time `json:"archived_at,omitempty"`
 }

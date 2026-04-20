@@ -17,8 +17,8 @@ const { t } = useI18n()
 
 const filters = reactive({
   status: '' as '' | RoomStatus,
-  serverId: '',
-  configId: '',
+  serverName: '',
+  gameName: '',
 })
 
 const createConfigId = ref('')
@@ -68,8 +68,12 @@ async function loadRooms() {
       sort_direction: 'desc',
       filters: [
         filters.status ? { field: 'status', operator: 'eq', value: filters.status } : undefined,
-        filters.serverId ? { field: 'server_id', operator: 'eq', value: filters.serverId } : undefined,
-        filters.configId ? { field: 'config_id', operator: 'eq', value: filters.configId } : undefined,
+        filters.serverName
+          ? { field: 'server_name', operator: 'like', value: filters.serverName }
+          : undefined,
+        filters.gameName
+          ? { field: 'config_game_name', operator: 'like', value: filters.gameName }
+          : undefined,
       ].filter(Boolean) as NonNullable<Parameters<typeof UserApi.listRooms>[0]>['filters'],
     })
 
@@ -166,8 +170,8 @@ function applyFilters() {
 
 function resetFilters() {
   filters.status = ''
-  filters.serverId = ''
-  filters.configId = ''
+  filters.serverName = ''
+  filters.gameName = ''
   page.value = 1
   void loadRooms()
 }
@@ -207,6 +211,20 @@ function configLabel(configId: number) {
     game: config.game?.name_game ?? t('admin.configsSection.gameLabel', { id: config.game_id }),
     capacity: config.capacity,
   })
+}
+
+function roomConfigLabel(room: RoomResponse) {
+  const config = room.config ?? configById.value.get(room.config_id)
+  if (!config) return t('admin.roomsSection.configFallback', { id: room.config_id })
+  return t('admin.roomsSection.configSummary', {
+    id: config.config_id,
+    game: config.game?.name_game ?? t('admin.configsSection.gameLabel', { id: config.game_id }),
+    capacity: config.capacity,
+  })
+}
+
+function serverLabel(room: RoomResponse) {
+  return room.server_name?.trim() || t('admin.roomsSection.serverFallback', { id: room.server_id })
 }
 </script>
 
@@ -248,18 +266,16 @@ function configLabel(configId: number) {
           <option value="completed">{{ t('admin.status.completed') }}</option>
         </select>
         <input
-          v-model="filters.serverId"
+          v-model="filters.serverName"
           class="input"
-          type="number"
-          min="1"
-          :placeholder="t('admin.roomsSection.filters.serverId')"
+          type="text"
+          :placeholder="t('admin.roomsSection.filters.serverName')"
         />
         <input
-          v-model="filters.configId"
+          v-model="filters.gameName"
           class="input"
-          type="number"
-          min="1"
-          :placeholder="t('admin.roomsSection.filters.configId')"
+          type="text"
+          :placeholder="t('admin.roomsSection.filters.gameName')"
         />
       </div>
       <div class="toolbar-actions">
@@ -277,7 +293,7 @@ function configLabel(configId: number) {
         <div class="room-head">
           <div>
             <strong>{{ t('admin.roomsSection.roomTitle', { id: room.room_id }) }}</strong>
-            <p class="muted">{{ configLabel(room.config_id) }}</p>
+            <p class="muted">{{ roomConfigLabel(room) }}</p>
           </div>
           <span class="status-pill" :class="statusVariant(room.status)">
             {{ statusLabel(room.status) }}
@@ -286,12 +302,12 @@ function configLabel(configId: number) {
 
         <dl class="room-meta">
           <div>
-            <dt>{{ t('admin.roomsSection.meta.configId') }}</dt>
-            <dd>{{ room.config_id }}</dd>
+            <dt>{{ t('admin.roomsSection.meta.config') }}</dt>
+            <dd>{{ roomConfigLabel(room) }}</dd>
           </div>
           <div>
-            <dt>{{ t('admin.roomsSection.meta.serverId') }}</dt>
-            <dd v-if="editingRoomId !== room.room_id">{{ room.server_id }}</dd>
+            <dt>{{ t('admin.roomsSection.meta.server') }}</dt>
+            <dd v-if="editingRoomId !== room.room_id">{{ serverLabel(room) }}</dd>
             <div v-else class="inline-edit">
               <input
                 v-model="serverDrafts[room.room_id]"

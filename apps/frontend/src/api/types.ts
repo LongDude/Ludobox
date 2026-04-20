@@ -162,7 +162,9 @@ export type RoomStatus = 'open' | 'in_game' | 'completed'
 export interface RoomResponse {
   room_id: number
   config_id: number
+  config?: ConfigResponse | null
   server_id: number
+  server_name?: string | null
   status: RoomStatus
   archived_at?: string | null
 }

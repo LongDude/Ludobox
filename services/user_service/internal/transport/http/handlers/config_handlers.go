@@ -29,6 +29,10 @@ func configIDFromPath(ctx *gin.Context) (int, error) {
 }
 
 func configToResponse(config *domain.Config) presenters.ConfigResponse {
+	if config == nil {
+		return presenters.ConfigResponse{}
+	}
+
 	return presenters.ConfigResponse{
 		ConfigID:            config.ID,
 		GameID:              config.GameID,

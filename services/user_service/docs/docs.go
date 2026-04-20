@@ -1077,7 +1077,7 @@ const docTemplate = `{
         },
         "/admin/rooms": {
             "get": {
-                "description": "Returns non-archived rooms.",
+                "description": "Returns non-archived rooms. Filter fields: room_id, config_id, server_id, server_name, status, config_capacity, config_registration_price, config_is_boost, config_game_id, config_game_name.",
                 "consumes": [
                     "application/json"
                 ],
@@ -1825,6 +1825,9 @@ const docTemplate = `{
                 "archived_at": {
                     "type": "string"
                 },
+                "config": {
+                    "$ref": "#/definitions/presenters.ConfigResponse"
+                },
                 "config_id": {
                     "type": "integer"
                 },
@@ -1833,6 +1836,9 @@ const docTemplate = `{
                 },
                 "server_id": {
                     "type": "integer"
+                },
+                "server_name": {
+                    "type": "string"
                 },
                 "status": {
                     "type": "string"
