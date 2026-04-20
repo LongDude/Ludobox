@@ -38,6 +38,19 @@ func (s *internalService) QuickMatch(ctx context.Context, preferences domain.Mat
 
 	existingMembership, err := s.internalRepository.GetUserActiveRoom(ctx, normalizedPreferences.UserID)
 	if err == nil {
+		if _, resolveErr := s.ResolveRoomOwner(ctx, existingMembership.RoomID, normalizedPreferences.StaleAfter); resolveErr == nil {
+			s.invalidateRecommendationsCache(ctx)
+			return &domain.QuickMatchResult{
+				RoomMembership:     *existingMembership,
+				ReusedExistingRoom: true,
+			}, nil
+		} else if !errors.Is(resolveErr, domain.ErrorRoomNotFound) && !errors.Is(resolveErr, domain.ErrorGameServerUnavailable) {
+			return nil, resolveErr
+		}
+
+		existingMembership = nil
+	}
+	if err == nil && existingMembership != nil {
 		return &domain.QuickMatchResult{
 			RoomMembership:     *existingMembership,
 			ReusedExistingRoom: true,
@@ -56,8 +69,9 @@ func (s *internalService) QuickMatch(ctx context.Context, preferences domain.Mat
 	}
 
 	for _, recommendation := range recommendations {
-		membership, joinErr := s.internalRepository.JoinRoom(ctx, normalizedPreferences.UserID, recommendation.RoomID)
+		membership, joinErr := s.internalRepository.JoinRoom(ctx, normalizedPreferences.UserID, recommendation.RoomID, normalizedPreferences.StaleAfter)
 		if joinErr == nil {
+			s.invalidateRecommendationsCache(ctx)
 			return &domain.QuickMatchResult{
 				RoomMembership:     *membership,
 				ReusedExistingRoom: false,
@@ -73,6 +87,13 @@ func (s *internalService) QuickMatch(ctx context.Context, preferences domain.Mat
 			if activeErr != nil {
 				return nil, joinErr
 			}
+			if _, resolveErr := s.ResolveRoomOwner(ctx, activeMembership.RoomID, normalizedPreferences.StaleAfter); resolveErr != nil {
+				if errors.Is(resolveErr, domain.ErrorRoomNotFound) || errors.Is(resolveErr, domain.ErrorGameServerUnavailable) {
+					continue
+				}
+				return nil, resolveErr
+			}
+			s.invalidateRecommendationsCache(ctx)
 			return &domain.QuickMatchResult{
 				RoomMembership:     *activeMembership,
 				ReusedExistingRoom: true,
@@ -83,6 +104,16 @@ func (s *internalService) QuickMatch(ctx context.Context, preferences domain.Mat
 	}
 
 	return nil, domain.ErrorNoAvailableRooms
+}
+
+func (s *internalService) invalidateRecommendationsCache(ctx context.Context) {
+	if s.sessionRepository == nil {
+		return
+	}
+
+	if err := s.sessionRepository.DeleteByPrefix(ctx, "matchmaking:recommend:v1|"); err != nil {
+		s.logger.Warnf("failed to invalidate recommendation cache: %v", err)
+	}
 }
 
 func (s *internalService) recommendRooms(

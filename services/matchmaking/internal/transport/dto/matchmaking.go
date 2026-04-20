@@ -1,7 +1,6 @@
 package dto
 
 type RecommendRoomsRequest struct {
-	UserID               int64  `json:"user_id" binding:"required,min=1"`
 	GameID               *int64 `json:"game_id,omitempty"`
 	MinRegistrationPrice *int64 `json:"min_registration_price,omitempty"`
 	MaxRegistrationPrice *int64 `json:"max_registration_price,omitempty"`
@@ -13,7 +12,6 @@ type RecommendRoomsRequest struct {
 }
 
 type QuickMatchRequest struct {
-	UserID               int64  `json:"user_id" binding:"required,min=1"`
 	GameID               *int64 `json:"game_id,omitempty"`
 	MinRegistrationPrice *int64 `json:"min_registration_price,omitempty"`
 	MaxRegistrationPrice *int64 `json:"max_registration_price,omitempty"`

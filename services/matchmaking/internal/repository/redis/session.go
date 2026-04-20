@@ -31,3 +31,7 @@ func (s *sessionRepository) SetRoomRecommendations(ctx context.Context, key stri
 func (s *sessionRepository) DeleteKey(ctx context.Context, key string) error {
 	return s.redis.Delete(ctx, key)
 }
+
+func (s *sessionRepository) DeleteByPrefix(ctx context.Context, prefix string) error {
+	return s.redis.DeleteByPrefix(ctx, prefix)
+}

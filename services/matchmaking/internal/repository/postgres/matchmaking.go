@@ -203,7 +203,7 @@ func (ar *internalRepository) GetUserActiveRoom(ctx context.Context, userID int6
 	return membership, nil
 }
 
-func (ar *internalRepository) JoinRoom(ctx context.Context, userID int64, roomID int64) (*domain.RoomMembership, error) {
+func (ar *internalRepository) JoinRoom(ctx context.Context, userID int64, roomID int64, staleAfter time.Duration) (*domain.RoomMembership, error) {
 	tx, err := ar.db.Begin(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("begin join room tx: %w", err)
@@ -226,7 +226,7 @@ func (ar *internalRepository) JoinRoom(ctx context.Context, userID int64, roomID
 		return nil, fmt.Errorf("check user active room: %w", err)
 	}
 
-	recommendation, err := lockJoinableRoom(ctx, tx, roomID)
+	recommendation, err := lockJoinableRoom(ctx, tx, roomID, staleAfter)
 	if err != nil {
 		return nil, err
 	}
@@ -340,7 +340,9 @@ func loadUserActiveRoom(ctx context.Context, db queryRower, userID int64) (*doma
 	return &membership, nil
 }
 
-func lockJoinableRoom(ctx context.Context, tx pgx.Tx, roomID int64) (*domain.RoomRecommendation, error) {
+func lockJoinableRoom(ctx context.Context, tx pgx.Tx, roomID int64, staleAfter time.Duration) (*domain.RoomRecommendation, error) {
+	staleAfterSeconds := normalizeStaleAfterSeconds(staleAfter)
+
 	const query = `
 		SELECT
 			r.room_id,
@@ -361,11 +363,14 @@ func lockJoinableRoom(ctx context.Context, tx pgx.Tx, roomID int64) (*domain.Roo
 		  AND r.archived_at IS NULL
 		  AND r.status = 'open'
 		  AND c.archived_at IS NULL
+		  AND gs.status = 'up'
+		  AND gs.archived_at IS NULL
+		  AND gs.last_heartbeat_at >= NOW() - make_interval(secs => $2)
 		FOR UPDATE OF r;
 	`
 
 	var recommendation domain.RoomRecommendation
-	if err := tx.QueryRow(ctx, query, roomID).Scan(
+	if err := tx.QueryRow(ctx, query, roomID, staleAfterSeconds).Scan(
 		&recommendation.RoomID,
 		&recommendation.ConfigID,
 		&recommendation.ServerID,

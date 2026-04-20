@@ -3,6 +3,8 @@ package handlers
 import (
 	"errors"
 	"net/http"
+	"strconv"
+	"strings"
 	"user_service/internal/app"
 	"user_service/internal/domain"
 	"user_service/internal/transport/dto"
@@ -11,7 +13,26 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
+// RecommendRooms godoc
+// @Summary Recommend rooms
+// @Description Returns recommended open rooms for the authenticated user based on filters and play history.
+// @Tags Matchmaking
+// @Accept json
+// @Produce json
+// @Param Authorization header string true "Bearer access token"
+// @Param body body dto.RecommendRoomsRequest true "Recommendation filters"
+// @Success 200 {object} presenters.RecommendRoomsResponse
+// @Failure 400 {object} presenters.ErrorResponse
+// @Failure 401 {object} presenters.ErrorResponse
+// @Failure 500 {object} presenters.ErrorResponse
+// @Router /rooms/recommendations [post]
 func RecommendRooms(ctx *gin.Context, a *app.App) {
+	userID, ok := authenticatedUserID(ctx)
+	if !ok {
+		ctx.JSON(http.StatusUnauthorized, presenters.ErrorResponse{Error: "missing or invalid X-Authenticated-User"})
+		return
+	}
+
 	var req dto.RecommendRoomsRequest
 	if err := ctx.ShouldBindJSON(&req); err != nil {
 		ctx.JSON(http.StatusBadRequest, presenters.ErrorResponse{Error: err.Error()})
@@ -19,7 +40,7 @@ func RecommendRooms(ctx *gin.Context, a *app.App) {
 	}
 
 	preferences := domain.MatchmakingPreferences{
-		UserID:               req.UserID,
+		UserID:               userID,
 		GameID:               req.GameID,
 		MinRegistrationPrice: req.MinRegistrationPrice,
 		MaxRegistrationPrice: req.MaxRegistrationPrice,
@@ -54,7 +75,27 @@ func RecommendRooms(ctx *gin.Context, a *app.App) {
 	})
 }
 
+// QuickMatch godoc
+// @Summary Quick match
+// @Description Finds the best available room for the authenticated user and immediately joins it.
+// @Tags Matchmaking
+// @Accept json
+// @Produce json
+// @Param Authorization header string true "Bearer access token"
+// @Param body body dto.QuickMatchRequest true "Quick match filters"
+// @Success 200 {object} presenters.QuickMatchResponse
+// @Failure 400 {object} presenters.ErrorResponse
+// @Failure 401 {object} presenters.ErrorResponse
+// @Failure 404 {object} presenters.ErrorResponse
+// @Failure 500 {object} presenters.ErrorResponse
+// @Router /rooms/quick-match [post]
 func QuickMatch(ctx *gin.Context, a *app.App) {
+	userID, ok := authenticatedUserID(ctx)
+	if !ok {
+		ctx.JSON(http.StatusUnauthorized, presenters.ErrorResponse{Error: "missing or invalid X-Authenticated-User"})
+		return
+	}
+
 	var req dto.QuickMatchRequest
 	if err := ctx.ShouldBindJSON(&req); err != nil {
 		ctx.JSON(http.StatusBadRequest, presenters.ErrorResponse{Error: err.Error()})
@@ -62,7 +103,7 @@ func QuickMatch(ctx *gin.Context, a *app.App) {
 	}
 
 	preferences := domain.MatchmakingPreferences{
-		UserID:               req.UserID,
+		UserID:               userID,
 		GameID:               req.GameID,
 		MinRegistrationPrice: req.MinRegistrationPrice,
 		MaxRegistrationPrice: req.MaxRegistrationPrice,
@@ -114,4 +155,18 @@ func toRoomRecommendationResponse(recommendation domain.RoomRecommendation) pres
 		RedisHost:         recommendation.RedisHost,
 		Score:             recommendation.Score,
 	}
+}
+
+func authenticatedUserID(ctx *gin.Context) (int64, bool) {
+	headerValue := strings.TrimSpace(ctx.GetHeader("X-Authenticated-User"))
+	if headerValue == "" {
+		return 0, false
+	}
+
+	userID, err := strconv.ParseInt(headerValue, 10, 64)
+	if err != nil || userID <= 0 {
+		return 0, false
+	}
+
+	return userID, true
 }

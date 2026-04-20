@@ -31,6 +31,273 @@
                     }
                 }
             }
+        },
+        "/rooms/quick-match": {
+            "post": {
+                "description": "Finds the best available room for the authenticated user and immediately joins it.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Matchmaking"
+                ],
+                "summary": "Quick match",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Bearer access token",
+                        "name": "Authorization",
+                        "in": "header",
+                        "required": true
+                    },
+                    {
+                        "description": "Quick match filters",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/dto.QuickMatchRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/presenters.QuickMatchResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/presenters.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/presenters.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/presenters.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/presenters.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/rooms/recommendations": {
+            "post": {
+                "description": "Returns recommended open rooms for the authenticated user based on filters and play history.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Matchmaking"
+                ],
+                "summary": "Recommend rooms",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Bearer access token",
+                        "name": "Authorization",
+                        "in": "header",
+                        "required": true
+                    },
+                    {
+                        "description": "Recommendation filters",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/dto.RecommendRoomsRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/presenters.RecommendRoomsResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/presenters.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/presenters.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/presenters.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        }
+    },
+    "definitions": {
+        "dto.QuickMatchRequest": {
+            "type": "object",
+            "properties": {
+                "game_id": {
+                    "type": "integer"
+                },
+                "is_boost": {
+                    "type": "boolean"
+                },
+                "max_capacity": {
+                    "type": "integer"
+                },
+                "max_registration_price": {
+                    "type": "integer"
+                },
+                "min_boost_power": {
+                    "type": "integer"
+                },
+                "min_capacity": {
+                    "type": "integer"
+                },
+                "min_registration_price": {
+                    "type": "integer"
+                }
+            }
+        },
+        "dto.RecommendRoomsRequest": {
+            "type": "object",
+            "properties": {
+                "game_id": {
+                    "type": "integer"
+                },
+                "is_boost": {
+                    "type": "boolean"
+                },
+                "limit": {
+                    "type": "integer"
+                },
+                "max_capacity": {
+                    "type": "integer"
+                },
+                "max_registration_price": {
+                    "type": "integer"
+                },
+                "min_boost_power": {
+                    "type": "integer"
+                },
+                "min_capacity": {
+                    "type": "integer"
+                },
+                "min_registration_price": {
+                    "type": "integer"
+                }
+            }
+        },
+        "presenters.ErrorResponse": {
+            "type": "object",
+            "properties": {
+                "error": {
+                    "type": "string"
+                }
+            }
+        },
+        "presenters.QuickMatchResponse": {
+            "type": "object",
+            "properties": {
+                "reused_existing_room": {
+                    "type": "boolean"
+                },
+                "room": {
+                    "$ref": "#/definitions/presenters.RoomRecommendationResponse"
+                },
+                "round_id": {
+                    "type": "integer"
+                },
+                "round_participant_id": {
+                    "type": "integer"
+                },
+                "seat_number": {
+                    "type": "integer"
+                }
+            }
+        },
+        "presenters.RecommendRoomsResponse": {
+            "type": "object",
+            "properties": {
+                "cached": {
+                    "type": "boolean"
+                },
+                "items": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/presenters.RoomRecommendationResponse"
+                    }
+                }
+            }
+        },
+        "presenters.RoomRecommendationResponse": {
+            "type": "object",
+            "properties": {
+                "boost_power": {
+                    "type": "integer"
+                },
+                "capacity": {
+                    "type": "integer"
+                },
+                "config_id": {
+                    "type": "integer"
+                },
+                "current_players": {
+                    "type": "integer"
+                },
+                "game_id": {
+                    "type": "integer"
+                },
+                "instance_key": {
+                    "type": "string"
+                },
+                "is_boost": {
+                    "type": "boolean"
+                },
+                "min_users": {
+                    "type": "integer"
+                },
+                "redis_host": {
+                    "type": "string"
+                },
+                "registration_price": {
+                    "type": "integer"
+                },
+                "room_id": {
+                    "type": "integer"
+                },
+                "score": {
+                    "type": "number"
+                },
+                "server_id": {
+                    "type": "integer"
+                }
+            }
         }
     }
 }

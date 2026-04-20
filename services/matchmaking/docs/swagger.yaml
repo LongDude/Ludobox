@@ -1,4 +1,97 @@
 basePath: /api
+definitions:
+  dto.QuickMatchRequest:
+    properties:
+      game_id:
+        type: integer
+      is_boost:
+        type: boolean
+      max_capacity:
+        type: integer
+      max_registration_price:
+        type: integer
+      min_boost_power:
+        type: integer
+      min_capacity:
+        type: integer
+      min_registration_price:
+        type: integer
+    type: object
+  dto.RecommendRoomsRequest:
+    properties:
+      game_id:
+        type: integer
+      is_boost:
+        type: boolean
+      limit:
+        type: integer
+      max_capacity:
+        type: integer
+      max_registration_price:
+        type: integer
+      min_boost_power:
+        type: integer
+      min_capacity:
+        type: integer
+      min_registration_price:
+        type: integer
+    type: object
+  presenters.ErrorResponse:
+    properties:
+      error:
+        type: string
+    type: object
+  presenters.QuickMatchResponse:
+    properties:
+      reused_existing_room:
+        type: boolean
+      room:
+        $ref: '#/definitions/presenters.RoomRecommendationResponse'
+      round_id:
+        type: integer
+      round_participant_id:
+        type: integer
+      seat_number:
+        type: integer
+    type: object
+  presenters.RecommendRoomsResponse:
+    properties:
+      cached:
+        type: boolean
+      items:
+        items:
+          $ref: '#/definitions/presenters.RoomRecommendationResponse'
+        type: array
+    type: object
+  presenters.RoomRecommendationResponse:
+    properties:
+      boost_power:
+        type: integer
+      capacity:
+        type: integer
+      config_id:
+        type: integer
+      current_players:
+        type: integer
+      game_id:
+        type: integer
+      instance_key:
+        type: string
+      is_boost:
+        type: boolean
+      min_users:
+        type: integer
+      redis_host:
+        type: string
+      registration_price:
+        type: integer
+      room_id:
+        type: integer
+      score:
+        type: number
+      server_id:
+        type: integer
+    type: object
 host: localhost:8080
 info:
   contact: {}
@@ -21,4 +114,88 @@ paths:
       summary: Service health
       tags:
       - System
+  /rooms/quick-match:
+    post:
+      consumes:
+      - application/json
+      description: Finds the best available room for the authenticated user and immediately
+        joins it.
+      parameters:
+      - description: Bearer access token
+        in: header
+        name: Authorization
+        required: true
+        type: string
+      - description: Quick match filters
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/dto.QuickMatchRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/presenters.QuickMatchResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/presenters.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/presenters.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/presenters.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/presenters.ErrorResponse'
+      summary: Quick match
+      tags:
+      - Matchmaking
+  /rooms/recommendations:
+    post:
+      consumes:
+      - application/json
+      description: Returns recommended open rooms for the authenticated user based
+        on filters and play history.
+      parameters:
+      - description: Bearer access token
+        in: header
+        name: Authorization
+        required: true
+        type: string
+      - description: Recommendation filters
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/dto.RecommendRoomsRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/presenters.RecommendRoomsResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/presenters.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/presenters.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/presenters.ErrorResponse'
+      summary: Recommend rooms
+      tags:
+      - Matchmaking
 swagger: "2.0"

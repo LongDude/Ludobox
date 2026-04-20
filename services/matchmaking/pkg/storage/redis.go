@@ -62,6 +62,31 @@ func (r *RedisClient) Delete(ctx context.Context, key string) error {
 	return r.client.Del(ctx, key).Err()
 }
 
+func (r *RedisClient) DeleteByPrefix(ctx context.Context, prefix string) error {
+	var cursor uint64
+	pattern := prefix + "*"
+
+	for {
+		keys, nextCursor, err := r.client.Scan(ctx, cursor, pattern, 100).Result()
+		if err != nil {
+			return fmt.Errorf("failed to scan keys by prefix: %w", err)
+		}
+
+		if len(keys) > 0 {
+			if err := r.client.Del(ctx, keys...).Err(); err != nil {
+				return fmt.Errorf("failed to delete keys by prefix: %w", err)
+			}
+		}
+
+		cursor = nextCursor
+		if cursor == 0 {
+			break
+		}
+	}
+
+	return nil
+}
+
 func (r *RedisClient) SAdd(ctx context.Context, key string, members ...interface{}) error {
 	if len(members) == 0 {
 		return nil // No members to add
