@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, reactive, ref, watch } from 'vue'
 import { UserApi } from '@/api/useUserApi'
-import type { ConfigResponse, ConfigUpsertRequest } from '@/api/types'
+import type { ConfigResponse, ConfigUpsertRequest, GameResponse } from '@/api/types'
 import { useI18n } from '@/i18n'
 import {
   distributionToInput,
@@ -18,6 +18,7 @@ const loading = ref(false)
 const saving = ref(false)
 const errorMsg = ref('')
 const successMsg = ref('')
+const games = ref<GameResponse[]>([])
 const configs = ref<ConfigResponse[]>([])
 const total = ref(0)
 const page = ref(1)
@@ -32,6 +33,7 @@ const filters = reactive({
 
 const mode = ref<EditorMode>('create')
 const editingConfigId = ref<number | null>(null)
+const gameById = computed(() => new Map(games.value.map((game) => [game.game_id, game])))
 
 function makeDraft(): ConfigUpsertRequest {
   return {
@@ -95,7 +97,7 @@ watch(
 )
 
 onMounted(async () => {
-  await loadConfigs()
+  await Promise.all([loadConfigs(), loadAllGames()])
 })
 
 function toRequest(config: ConfigResponse): ConfigUpsertRequest {
@@ -169,6 +171,31 @@ async function loadConfigs() {
   } finally {
     loading.value = false
   }
+}
+
+async function loadAllGames() {
+  const collected: GameResponse[] = []
+  let currentPage = 1
+  let totalItems = 0
+
+  do {
+    const response = await UserApi.listGames({
+      page: currentPage,
+      page_size: 100,
+      sort_field: 'game_id',
+      sort_direction: 'asc',
+    })
+
+    totalItems = response.total ?? 0
+    collected.push(...(response.items ?? []))
+    currentPage += 1
+
+    if (!response.items?.length) {
+      break
+    }
+  } while (collected.length < totalItems && currentPage <= 20)
+
+  games.value = collected
 }
 
 async function saveConfig() {
@@ -250,8 +277,12 @@ function nextPage() {
   }
 }
 
-function gameLabel(gameId: number) {
-  return t('admin.configsSection.gameLabel', { id: gameId })
+function gameLabel(config: ConfigResponse) {
+  return (
+    config.game?.name_game ??
+    gameById.value.get(config.game_id)?.name_game ??
+    t('admin.configsSection.gameLabel', { id: config.game_id })
+  )
 }
 
 function boostLabel(config: ConfigResponse) {
@@ -300,7 +331,12 @@ function distributionLabel(value: number, index: number) {
         <div class="form-grid">
           <label>
             <span>{{ t('admin.configsSection.fields.gameId') }}</span>
-            <input v-model.number="form.game_id" class="input" type="number" min="1" />
+            <select v-if="games.length > 0" v-model.number="form.game_id" class="input">
+              <option v-for="game in games" :key="game.game_id" :value="game.game_id">
+                {{ game.name_game }}
+              </option>
+            </select>
+            <input v-else v-model.number="form.game_id" class="input" type="number" min="1" />
           </label>
           <label>
             <span>{{ t('admin.configsSection.fields.capacity') }}</span>
@@ -440,7 +476,14 @@ function distributionLabel(value: number, index: number) {
 
         <div class="toolbar">
           <div class="toolbar-grid">
+            <select v-if="games.length > 0" v-model="filters.gameId" class="input">
+              <option value="">{{ t('admin.configsSection.filters.gameAny') }}</option>
+              <option v-for="game in games" :key="game.game_id" :value="String(game.game_id)">
+                {{ game.name_game }}
+              </option>
+            </select>
             <input
+              v-else
               v-model="filters.gameId"
               class="input"
               type="number"
@@ -478,7 +521,7 @@ function distributionLabel(value: number, index: number) {
             <div class="config-topline">
               <div>
                 <strong>#{{ config.config_id }}</strong>
-                <p class="muted">{{ gameLabel(config.game_id) }}</p>
+                <p class="muted">{{ gameLabel(config) }}</p>
               </div>
               <span class="badge">{{ t('admin.configsSection.seats', { count: config.capacity }) }}</span>
             </div>

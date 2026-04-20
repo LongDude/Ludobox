@@ -146,7 +146,7 @@ function roomSummary(room: RoomResponse) {
   const config = configById.value.get(room.config_id)
   if (!config) return t('admin.roomsSection.configFallback', { id: room.config_id })
   return t('admin.overviewSection.roomSummary', {
-    gameId: config.game_id,
+    game: config.game?.name_game ?? t('admin.configsSection.gameLabel', { id: config.game_id }),
     capacity: config.capacity,
     price: config.registration_price,
   })

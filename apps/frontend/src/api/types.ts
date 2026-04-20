@@ -114,6 +114,22 @@ export interface AdminListRequest {
   filters?: AdminListFilter[]
 }
 
+export interface GameUpsertRequest {
+  name_game: string
+}
+
+export interface GameResponse extends GameUpsertRequest {
+  game_id: number
+  archived_at?: string | null
+}
+
+export interface GameListResponse {
+  items: GameResponse[]
+  total: number
+  page: number
+  page_size: number
+}
+
 export interface ConfigUpsertRequest {
   game_id: number
   capacity: number
@@ -130,6 +146,7 @@ export interface ConfigUpsertRequest {
 
 export interface ConfigResponse extends ConfigUpsertRequest {
   config_id: number
+  game?: GameResponse | null
   archived_at?: string | null
 }
 

@@ -6,11 +6,12 @@ import UpTab from '@/components/UpTab.vue'
 import { useLayoutInset } from '@/composables/useLayoutInset'
 import { useI18n } from '@/i18n'
 import AdminUsersSection from '@/components/admin/AdminUsersSection.vue'
+import AdminGamesSection from '@/components/admin/AdminGamesSection.vue'
 import AdminConfigsSection from '@/components/admin/AdminConfigsSection.vue'
 import AdminRoomsSection from '@/components/admin/AdminRoomsSection.vue'
 import AdminServerOverviewSection from '@/components/admin/AdminServerOverviewSection.vue'
 
-type AdminTab = 'overview' | 'users' | 'configs' | 'rooms'
+type AdminTab = 'overview' | 'games' | 'users' | 'configs' | 'rooms'
 
 interface TabMeta {
   key: AdminTab
@@ -35,6 +36,12 @@ const tabs = computed<TabMeta[]>(() => [
     description: t('admin.dashboard.tabs.overview.description'),
   },
   {
+    key: 'games',
+    label: t('admin.dashboard.tabs.games.label'),
+    title: t('admin.dashboard.tabs.games.title'),
+    description: t('admin.dashboard.tabs.games.description'),
+  },
+  {
     key: 'configs',
     label: t('admin.dashboard.tabs.configs.label'),
     title: t('admin.dashboard.tabs.configs.title'),
@@ -56,6 +63,7 @@ const tabs = computed<TabMeta[]>(() => [
 
 const componentMap: Record<AdminTab, typeof AdminUsersSection> = {
   overview: AdminServerOverviewSection,
+  games: AdminGamesSection,
   users: AdminUsersSection,
   configs: AdminConfigsSection,
   rooms: AdminRoomsSection,
@@ -63,7 +71,13 @@ const componentMap: Record<AdminTab, typeof AdminUsersSection> = {
 
 function normalizeTab(value: unknown): AdminTab {
   const candidate = Array.isArray(value) ? value[0] : value
-  if (candidate === 'overview' || candidate === 'users' || candidate === 'configs' || candidate === 'rooms') {
+  if (
+    candidate === 'overview' ||
+    candidate === 'games' ||
+    candidate === 'users' ||
+    candidate === 'configs' ||
+    candidate === 'rooms'
+  ) {
     return candidate
   }
   return 'overview'

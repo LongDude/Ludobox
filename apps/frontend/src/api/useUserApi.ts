@@ -4,6 +4,9 @@ import type {
   ConfigListResponse,
   ConfigResponse,
   ConfigUpsertRequest,
+  GameListResponse,
+  GameResponse,
+  GameUpsertRequest,
   GameServerListResponse,
   RoomCreateRequest,
   RoomListResponse,
@@ -34,6 +37,25 @@ function buildAdminParams(request?: AdminListRequest) {
 }
 
 export const UserApi = {
+  listGames(request?: AdminListRequest) {
+    return api
+      .get<GameListResponse>('/users/admin/games', { params: buildAdminParams(request) })
+      .then((response) => response.data)
+  },
+  getGame(gameId: number) {
+    return api.get<GameResponse>(`/users/admin/game/${gameId}`).then((response) => response.data)
+  },
+  createGame(payload: GameUpsertRequest) {
+    return api.post<GameResponse>('/users/admin/game', payload).then((response) => response.data)
+  },
+  updateGame(gameId: number, payload: GameUpsertRequest) {
+    return api
+      .put<GameResponse>(`/users/admin/game/${gameId}`, payload)
+      .then((response) => response.data)
+  },
+  deleteGame(gameId: number) {
+    return api.delete<void>(`/users/admin/game/${gameId}`).then((response) => response.data)
+  },
   listConfigs(request?: AdminListRequest) {
     return api
       .get<ConfigListResponse>('/users/admin/configs/used', { params: buildAdminParams(request) })

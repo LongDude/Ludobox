@@ -204,7 +204,7 @@ function configLabel(configId: number) {
   if (!config) return t('admin.roomsSection.configFallback', { id: configId })
   return t('admin.roomsSection.configSummary', {
     id: config.config_id,
-    gameId: config.game_id,
+    game: config.game?.name_game ?? t('admin.configsSection.gameLabel', { id: config.game_id }),
     capacity: config.capacity,
   })
 }
