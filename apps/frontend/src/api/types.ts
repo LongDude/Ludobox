@@ -22,6 +22,20 @@ export interface PasswordResetResponse {
   message?: string
 }
 
+export interface CurrentUserProfileResponse {
+  user_id: number
+  nickname: string
+  balance: number
+}
+
+export interface CurrentUserProfileUpdateRequest {
+  nickname: string
+}
+
+export interface CurrentUserBalanceUpdateRequest {
+  delta: number
+}
+
 export interface UserResponse {
   id?: number
   email: string
