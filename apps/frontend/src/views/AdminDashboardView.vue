@@ -1,148 +1,85 @@
 <script setup lang="ts">
-import { computed, onMounted, reactive, ref } from 'vue'
-import UpTab from '@/components/UpTab.vue'
+import { computed } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
 import LeftTab from '@/components/LeftTab.vue'
-import { SSOApi } from '@/api/useSSOApi'
-import type { UserResponse, UserListResponse, UserUpdateRequestWithRoles } from '@/api/types'
-import { useRouter } from 'vue-router'
-import { useAuthStore } from '@/stores/authStore'
-import { useI18n } from '@/i18n'
+import UpTab from '@/components/UpTab.vue'
 import { useLayoutInset } from '@/composables/useLayoutInset'
+import { useI18n } from '@/i18n'
+import AdminUsersSection from '@/components/admin/AdminUsersSection.vue'
+import AdminConfigsSection from '@/components/admin/AdminConfigsSection.vue'
+import AdminRoomsSection from '@/components/admin/AdminRoomsSection.vue'
+import AdminServerOverviewSection from '@/components/admin/AdminServerOverviewSection.vue'
 
-const auth = useAuthStore()
+type AdminTab = 'overview' | 'users' | 'configs' | 'rooms'
+
+interface TabMeta {
+  key: AdminTab
+  label: string
+  title: string
+  description: string
+}
+
+const route = useRoute()
 const router = useRouter()
 const { t } = useI18n()
-
-const loading = ref(false)
-const errorMsg = ref('')
-const users = reactive<UserResponse[]>([])
-const total = ref(0)
-const page = ref(1)
-const limit = ref(20)
-const { LeftTabHidden: leftHidden, layoutInset } = useLayoutInset()
-
-const filters = reactive({
-  q: '',
-  role: '',
-  locale: '',
-  email_confirmed: '' as '' | 'true' | 'false',
+const { LeftTabHidden: leftHidden, layoutInset } = useLayoutInset({
+  expanded: '92px 20px 20px 304px',
+  collapsed: '92px 20px 20px 120px',
 })
 
-const params = computed(() => ({
-  q: filters.q || undefined,
-  role: filters.role || undefined,
-  locale: filters.locale || undefined,
-  email_confirmed:
-    filters.email_confirmed === '' ? undefined : filters.email_confirmed === 'true' ? true : false,
-  page: page.value,
-  limit: limit.value,
-}))
+const tabs = computed<TabMeta[]>(() => [
+  {
+    key: 'overview',
+    label: t('admin.dashboard.tabs.overview.label'),
+    title: t('admin.dashboard.tabs.overview.title'),
+    description: t('admin.dashboard.tabs.overview.description'),
+  },
+  {
+    key: 'configs',
+    label: t('admin.dashboard.tabs.configs.label'),
+    title: t('admin.dashboard.tabs.configs.title'),
+    description: t('admin.dashboard.tabs.configs.description'),
+  },
+  {
+    key: 'rooms',
+    label: t('admin.dashboard.tabs.rooms.label'),
+    title: t('admin.dashboard.tabs.rooms.title'),
+    description: t('admin.dashboard.tabs.rooms.description'),
+  },
+  {
+    key: 'users',
+    label: t('admin.dashboard.tabs.users.label'),
+    title: t('admin.dashboard.tabs.users.title'),
+    description: t('admin.dashboard.tabs.users.description'),
+  },
+])
 
-onMounted(async () => {
-  await loadUsers()
-})
+const componentMap: Record<AdminTab, typeof AdminUsersSection> = {
+  overview: AdminServerOverviewSection,
+  users: AdminUsersSection,
+  configs: AdminConfigsSection,
+  rooms: AdminRoomsSection,
+}
 
-async function loadUsers() {
-  errorMsg.value = ''
-  loading.value = true
-  try {
-    const res = (await SSOApi.getUsers(params.value)) as UserListResponse
-    users.splice(0, users.length, ...((res?.items ?? []) as UserResponse[]))
-    total.value = res?.total ?? 0
-    page.value = res?.page ?? page.value
-    limit.value = res?.limit ?? limit.value
-  } catch (e: any) {
-    errorMsg.value = e?.message || t('admin.errFetch')
-  } finally {
-    loading.value = false
+function normalizeTab(value: unknown): AdminTab {
+  const candidate = Array.isArray(value) ? value[0] : value
+  if (candidate === 'overview' || candidate === 'users' || candidate === 'configs' || candidate === 'rooms') {
+    return candidate
   }
+  return 'overview'
 }
 
-function goModerator() {
-  router.push('/moderator')
-}
+const activeTab = computed<AdminTab>(() => normalizeTab(route.query.tab))
+const activeMeta = computed(
+  () => tabs.value.find((tab) => tab.key === activeTab.value) ?? tabs.value[0],
+)
+const activeComponent = computed(() => componentMap[activeTab.value])
 
-type UserEditing = UserResponse & {
-  _editing?: boolean
-  rolesString?: string
-  _password?: string
-  _saving?: boolean
-  _error?: string
-}
-
-function startEdit(u: UserEditing) {
-  u._editing = true
-  u.rolesString = u.roles?.join(', ') || ''
-  u._password = ''
-}
-function cancelEdit(u: UserEditing) {
-  u._editing = false
-}
-async function saveUser(u: UserEditing) {
-  u._error = ''
-  u._saving = true
-  try {
-    // roles editing stays local until backend supports it explicitly
-    if (typeof u.rolesString === 'string') {
-      u.roles = u.rolesString
-        .split(',')
-        .map((r) => r.trim())
-        .filter(Boolean)
-    }
-    // Always include roles to satisfy admin update schema
-    const payload: UserUpdateRequestWithRoles = { roles: u.roles ?? [] }
-    if (u.first_name) payload.first_name = u.first_name
-    if (u.last_name) payload.last_name = u.last_name
-    if (u.locale_type) payload.locale_type = u.locale_type
-    if (u._password) payload.password = u._password
-    const userId = u.id
-    if (typeof userId !== 'number') throw new Error('Missing user id')
-    // Call admin update endpoint with id
-    const updated = await SSOApi.updateUserwithRoles(userId, payload)
-    // reflect returned fields
-    u.first_name = updated.first_name
-    u.last_name = updated.last_name
-    u.locale_type = updated.locale_type
-    u.photo = updated.photo
-    u.email_confirmed = updated.email_confirmed
-    u.roles = updated.roles
-    u._editing = false
-  } catch (e: any) {
-    u._error = e?.message || 'Failed to save user'
-  } finally {
-    u._saving = false
-  }
-}
-
-function applyFilters() {
-  page.value = 1
-  loadUsers()
-}
-function resetFilters() {
-  filters.q = ''
-  filters.role = ''
-  filters.locale = ''
-  filters.email_confirmed = ''
-  page.value = 1
-  loadUsers()
-}
-function prevPage() {
-  if (page.value > 1) {
-    page.value -= 1
-    loadUsers()
-  }
-}
-function nextPage() {
-  const pages = Math.max(1, Math.ceil(total.value / limit.value))
-  if (page.value < pages) {
-    page.value += 1
-    loadUsers()
-  }
-}
-function changeLimit(val: number) {
-  limit.value = val
-  page.value = 1
-  loadUsers()
+function setTab(tab: AdminTab) {
+  router.replace({
+    path: '/admin',
+    query: tab === 'overview' ? {} : { tab },
+  })
 }
 </script>
 
@@ -150,269 +87,217 @@ function changeLimit(val: number) {
   <UpTab :show-menu="false" :show-upload="false" />
   <LeftTab />
 
-  <div class="area" :class="{ collapsed: leftHidden }" :style="{ '--layout-inset': layoutInset }">
-    <div class="container">
-      <div class="row">
-        <h2>{{ t('admin.title') }}</h2>
-        <button class="btn" @click="goModerator">{{ t('admin.toModerator') }}</button>
+  <div class="admin-shell" :class="{ collapsed: leftHidden }" :style="{ '--layout-inset': layoutInset }">
+    <section class="intro-card">
+      <div class="intro-copy">
+        <p class="eyebrow">{{ t('admin.dashboard.kicker') }}</p>
+        <h1>{{ t('admin.dashboard.title') }}</h1>
+        <p class="intro-text">{{ t('admin.dashboard.intro') }}</p>
       </div>
 
-      <div class="panel">
-        <div class="filters">
-          <input type="text" v-model="filters.q" :placeholder="t('admin.filters.search')" />
-          <input type="text" v-model="filters.role" :placeholder="t('admin.filters.role')" />
-          <input type="text" v-model="filters.locale" :placeholder="t('admin.filters.locale')" />
-          <select v-model="filters.email_confirmed">
-            <option value="">{{ t('common.no') }}/{{ t('common.yes') }} any</option>
-            <option value="true">{{ t('common.yes') }}</option>
-            <option value="false">{{ t('common.no') }}</option>
-          </select>
-          <select
-            :value="limit"
-            @change="changeLimit(parseInt(($event.target as HTMLSelectElement).value))"
-          >
-            <option :value="10">10</option>
-            <option :value="20">20</option>
-            <option :value="50">50</option>
-          </select>
-          <button class="btn" @click="applyFilters">{{ t('admin.filters.apply') }}</button>
-          <button class="btn" @click="resetFilters">{{ t('admin.filters.reset') }}</button>
-        </div>
-        <div class="row">
-          <h3>{{ t('admin.users') }}</h3>
-          <button class="btn" @click="loadUsers" :disabled="loading">
-            {{ t('common.refresh') }}
-          </button>
-        </div>
-        <p class="muted" v-if="loading">{{ t('common.loading') }}</p>
-        <p class="err" v-else-if="errorMsg">{{ errorMsg }}</p>
-        <div class="table" v-else>
-          <div class="thead">
-            <div>{{ t('admin.columns.email') }}</div>
-            <div>{{ t('admin.columns.first') }}</div>
-            <div>{{ t('admin.columns.last') }}</div>
-            <div>{{ t('admin.columns.locale') }}</div>
-            <div>{{ t('admin.columns.confirmed') }}</div>
-            <div>{{ t('admin.columns.roles') }}</div>
-            <div>{{ t('admin.columns.password') }}</div>
-            <div></div>
-          </div>
-          <div class="rowdata" v-for="u in users as UserEditing[]" :key="u.email">
-            <div>{{ u.email }}</div>
-            <div>
-              <template v-if="!u._editing">{{ u.first_name }}</template>
-              <input v-else type="text" v-model="u.first_name" />
-            </div>
-            <div>
-              <template v-if="!u._editing">{{ u.last_name }}</template>
-              <input v-else type="text" v-model="u.last_name" />
-            </div>
-            <div>
-              <template v-if="!u._editing">{{ u.locale_type }}</template>
-              <input v-else type="text" v-model="u.locale_type" />
-            </div>
-            <div>
-              <span :class="['chip', u.email_confirmed ? 'ok' : 'warn']">
-                {{ u.email_confirmed ? t('common.yes') : t('common.no') }}
-              </span>
-            </div>
-            <div>
-              <template v-if="!u._editing">{{ u.roles?.join(', ') }}</template>
-              <input
-                v-else
-                type="text"
-                v-model="u.rolesString"
-                placeholder="USER,MODERATOR,ADMIN"
-              />
-            </div>
-            <div>
-              <template v-if="!u._editing">-</template>
-              <input v-else type="password" v-model="(u as any)._password" placeholder="******" />
-            </div>
-            <div class="actions">
-              <button class="btn" v-if="!u._editing" @click="startEdit(u)">
-                {{ t('common.edit') }}
-              </button>
-              <template v-else>
-                <button class="btn" @click="cancelEdit(u)">{{ t('common.cancel') }}</button>
-                <button class="btn primary" @click="saveUser(u)">{{ t('common.save') }}</button>
-              </template>
-            </div>
-          </div>
-        </div>
-        <p class="muted" v-if="!loading && !errorMsg && users.length === 0">
-          {{ t('admin.noUsers') }}
-        </p>
-        <div class="pager" v-if="!loading && total > 0">
-          <button class="btn" @click="prevPage" :disabled="page <= 1">
-            {{ t('admin.pager.prev') }}
-          </button>
-          <span class="muted">
-            {{
-              t('admin.pager.pageOf')
-                .replace('{page}', String(page))
-                .replace('{pages}', String(Math.max(1, Math.ceil(total / limit))))
-            }}
-            {{ t('admin.pager.total').replace('{total}', String(total)) }}
-          </span>
-          <button
-            class="btn"
-            @click="nextPage"
-            :disabled="page >= Math.max(1, Math.ceil(total / limit))"
-          >
-            {{ t('admin.pager.next') }}
-          </button>
+      <div class="intro-metrics">
+        <article class="metric-tile">
+          <span>{{ t('admin.dashboard.scopeLabel') }}</span>
+          <strong>{{ t('admin.dashboard.scopeValue') }}</strong>
+          <small>{{ t('admin.dashboard.scopeHint') }}</small>
+        </article>
+        <article class="metric-tile">
+          <span>{{ t('admin.dashboard.visibilityLabel') }}</span>
+          <strong>{{ t('admin.dashboard.visibilityValue') }}</strong>
+          <small>{{ t('admin.dashboard.visibilityHint') }}</small>
+        </article>
+      </div>
+    </section>
+
+    <nav class="tab-strip" :aria-label="t('admin.dashboard.tabsAria')">
+      <button
+        v-for="tab in tabs"
+        :key="tab.key"
+        class="tab-pill"
+        :class="{ active: activeTab === tab.key }"
+        type="button"
+        @click="setTab(tab.key)"
+      >
+        <small>{{ tab.label }}</small>
+        <strong>{{ tab.title }}</strong>
+      </button>
+    </nav>
+
+    <section class="section-frame">
+      <div class="section-header">
+        <div>
+          <p class="eyebrow accent">{{ activeMeta.label }}</p>
+          <h2>{{ activeMeta.title }}</h2>
+          <p class="section-text">{{ activeMeta.description }}</p>
         </div>
       </div>
-    </div>
+
+      <KeepAlive>
+        <component :is="activeComponent" />
+      </KeepAlive>
+    </section>
   </div>
 </template>
 
 <style scoped>
-.area {
+.admin-shell {
   position: fixed;
-  inset: var(--layout-inset, 60px 20px 20px 310px);
+  inset: var(--layout-inset, 92px 20px 20px 304px);
+  display: grid;
+  gap: 1rem;
+  overflow: auto;
   transition: all var(--transition-slow) ease;
 }
-.area.collapsed {
-  --layout-inset: 60px 20px 20px 80px;
+
+.admin-shell.collapsed {
+  --layout-inset: 92px 20px 20px 120px;
 }
-.container {
-  max-width: 1100px;
-  margin: auto;
+
+.intro-card,
+.section-frame {
+  border-radius: 1.6rem;
+  border: 1px solid color-mix(in oklab, var(--color-border), transparent 8%);
+  box-shadow: var(--shadow-md);
+}
+
+.intro-card {
   display: grid;
-  gap: var(--space-5);
+  grid-template-columns: minmax(0, 1.5fr) minmax(18rem, 0.9fr);
+  gap: 1rem;
+  padding: 1.3rem;
+  background:
+    radial-gradient(circle at top left, rgba(245, 158, 11, 0.18), transparent 30%),
+    radial-gradient(circle at bottom right, rgba(14, 165, 233, 0.16), transparent 26%),
+    linear-gradient(
+      135deg,
+      color-mix(in oklab, var(--color-bg-secondary), white 16%),
+      color-mix(in oklab, var(--color-surface), transparent 4%)
+    );
 }
-.row {
-  display: flex;
-  gap: var(--space-2);
-  align-items: center;
-  justify-content: space-between;
-  flex-wrap: wrap;
+
+.eyebrow {
+  margin: 0 0 0.35rem;
+  text-transform: uppercase;
+  letter-spacing: 0.14em;
+  font-size: 0.72rem;
+  color: #b45309;
 }
-.panel {
-  display: grid;
-  gap: var(--space-3);
-  background: var(--color-bg);
-  border: 1px solid var(--color-border);
-  border-radius: 8px;
-  padding: var(--space-3);
+
+.eyebrow.accent {
+  color: #0f766e;
 }
-.filters {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
-  gap: 8px;
-  align-items: center;
-}
-.muted {
-  color: var(--color-muted);
+
+.intro-card h1,
+.section-frame h2 {
   margin: 0;
 }
-.err {
-  color: var(--color-danger);
-}
-.table {
-  display: grid;
-  gap: 8px;
-  overflow-x: auto;
-}
-.thead,
-.rowdata {
-  display: grid;
-  grid-template-columns: 2fr 1fr 1fr 0.8fr 0.8fr 0.8fr 1.5fr 1.2fr auto;
-  gap: 8px;
-  align-items: center;
-  min-width: 960px;
-}
-.thead {
-  font-weight: 600;
+
+.intro-text,
+.section-text {
+  margin: 0.7rem 0 0;
   color: var(--color-muted);
 }
-input[type='text'],
-input[type='password'],
-select {
-  width: 100%;
-  padding: 6px 10px;
-  border: 1px solid var(--color-border);
-  border-radius: 6px;
-  background: var(--color-surface);
-  color: var(--color-text);
+
+.intro-metrics {
+  display: grid;
+  gap: 0.8rem;
 }
-.avatar {
-  width: 28px;
-  height: 28px;
-  border-radius: 50%;
-  object-fit: cover;
-  border: 1px solid var(--color-border);
+
+.metric-tile {
+  display: grid;
+  gap: 0.35rem;
+  padding: 1rem;
+  border-radius: 1.2rem;
+  border: 1px solid color-mix(in oklab, var(--color-border), transparent 10%);
+  background: color-mix(in oklab, var(--color-surface), white 10%);
 }
-.chip {
-  display: inline-block;
-  padding: 2px 8px;
-  border-radius: 999px;
-  font-size: 0.8rem;
-  border: 1px solid var(--color-border);
+
+.metric-tile span,
+.metric-tile small {
+  color: var(--color-muted);
 }
-.chip.ok {
-  background: color-mix(in oklab, var(--color-success), var(--color-bg) 85%);
+
+.metric-tile strong {
+  font-size: 1.05rem;
 }
-.chip.warn {
-  background: color-mix(in oklab, var(--color-danger), var(--color-bg) 85%);
-}
-.actions {
-  display: inline-flex;
-  gap: 8px;
-  flex-wrap: wrap;
-  justify-content: flex-end;
-}
-.pager {
+
+.tab-strip {
   display: flex;
-  gap: 10px;
-  align-items: center;
-  justify-content: flex-end;
+  flex-wrap: wrap;
+  gap: 0.75rem;
 }
-/*
-@media (max-width: 1200px) {
-  .container {
-    max-width: 100%;
-    padding-inline: var(--space-3);
+
+.tab-pill {
+  min-width: 12rem;
+  display: grid;
+  gap: 0.2rem;
+  padding: 0.85rem 1rem;
+  text-align: left;
+  border-radius: 1.1rem;
+  border: 1px solid color-mix(in oklab, var(--color-border), transparent 10%);
+  background: color-mix(in oklab, var(--color-surface), white 10%);
+  color: var(--color-text);
+  cursor: pointer;
+  transition:
+    transform var(--transition-fast) ease,
+    border-color var(--transition-fast) ease,
+    box-shadow var(--transition-fast) ease;
+}
+
+.tab-pill:hover {
+  transform: translateY(-1px);
+  box-shadow: var(--shadow-sm);
+}
+
+.tab-pill.active {
+  border-color: color-mix(in oklab, #0f766e, white 46%);
+  background: color-mix(in oklab, #0f766e, transparent 88%);
+}
+
+.tab-pill small {
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  font-size: 0.68rem;
+  color: var(--color-muted);
+}
+
+.section-frame {
+  display: grid;
+  gap: 1rem;
+  padding: 1.15rem;
+  background:
+    linear-gradient(180deg, color-mix(in oklab, var(--color-surface), white 18%), var(--color-bg));
+}
+
+@media (max-width: 1100px) {
+  .intro-card {
+    grid-template-columns: 1fr;
   }
 }
 
-@media (max-width: 1024px) {
-  .area,
-  .area.collapsed {
+@media (max-width: 960px) {
+  .admin-shell,
+  .admin-shell.collapsed {
     position: static;
     inset: auto;
-    margin: calc(60px + var(--space-3)) var(--space-3) var(--space-4);
+    margin: calc(76px + 0.75rem) 1rem 5.75rem;
   }
 }
 
-@media (max-width: 768px) {
-  .row {
-    flex-direction: column;
-    align-items: stretch;
-    gap: var(--space-2);
+@media (max-width: 720px) {
+  .intro-card,
+  .section-frame {
+    padding: 1rem;
+    border-radius: 1.25rem;
   }
-  .filters {
-    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+
+  .tab-strip {
+    display: grid;
+    grid-template-columns: 1fr;
   }
-  .actions {
-    width: 100%;
-    justify-content: flex-start;
-  }
-  .pager {
-    justify-content: center;
-    flex-wrap: wrap;
+
+  .tab-pill {
+    min-width: 0;
   }
 }
-
-@media (max-width: 600px) {
-  .area,
-  .area.collapsed {
-    margin: calc(60px + var(--space-2)) var(--space-2) var(--space-3);
-  }
-  .panel {
-    padding: var(--space-2);
-  }
-}*/
 </style>

@@ -2,6 +2,8 @@ import { ref } from 'vue'
 
 export type Locale = 'en' | 'ru'
 
+type MessageParams = Record<string, string | number | boolean | null | undefined>
+
 const STORAGE_KEY = 'app.locale'
 
 function loadLocale(): Locale {
@@ -23,8 +25,28 @@ export function setLocale(next: Locale) {
 
 const messages: Record<Locale, Record<string, string>> = {
   en: {
+    'nav.home': 'Home',
+    'nav.primary': 'Primary navigation',
     'nav.adminPanel': 'Admin Panel',
     'nav.settings': 'Settings',
+
+    'layout.brandTagline': 'admin - arena - rooms',
+    'layout.sidebarTagline': 'Operations shell',
+    'layout.toggleSidebar': 'Toggle sidebar',
+    'layout.balanceDemo': 'Demo balance',
+    'layout.route.adminKicker': 'Admin workspace',
+    'layout.route.adminTitle': 'Configs, rooms, and server control',
+    'layout.route.settingsKicker': 'Settings',
+    'layout.route.settingsTitle': 'Theme, locale, and layout preferences',
+    'layout.route.profileKicker': 'Your profile',
+    'layout.route.profileTitle': 'Identity, roles, and account data',
+    'layout.route.searchKicker': 'Search View',
+    'layout.route.searchTitle': 'Search results and session context',
+    'layout.route.defaultKicker': 'Control center',
+    'layout.route.defaultTitle': 'Shared workspace for operations',
+
+    'roles.admin': 'ADMIN',
+    'roles.user': 'USER',
 
     'settings.title': 'Settings',
     'settings.appearance': 'Appearance',
@@ -39,15 +61,32 @@ const messages: Record<Locale, Record<string, string>> = {
     'common.add': 'Add',
     'common.remove': 'Remove',
     'common.submit': 'Submit',
-    'common.submitting': 'Submitting…',
+    'common.submitting': 'Submitting...',
     'common.refresh': 'Refresh',
-    'common.loading': 'Loading…',
+    'common.loading': 'Loading...',
     'common.edit': 'Edit',
     'common.cancel': 'Cancel',
+    'common.confirm': 'Confirm',
     'common.save': 'Save',
+    'common.saving': 'Saving...',
     'common.apply': 'Apply',
     'common.delete': 'Delete',
     'common.reset': 'Reset',
+    'common.create': 'Create',
+    'common.clear': 'Clear',
+    'common.new': 'New',
+    'common.archive': 'Archive',
+    'common.duplicate': 'Duplicate',
+    'common.prev': 'Prev',
+    'common.next': 'Next',
+    'common.yes': 'Yes',
+    'common.no': 'No',
+    'common.off': 'Off',
+    'common.optional': 'Optional',
+    'common.rows': '{count} rows',
+    'common.pageSummary': 'Page {page} of {pages} - {total} {entity}',
+
+    'chat.status.searching': 'Searching...',
 
     'admin.title': 'Admin Panel',
     'admin.toModerator': 'Moderator Panel',
@@ -62,6 +101,7 @@ const messages: Record<Locale, Record<string, string>> = {
     'admin.columns.photo': 'Photo',
     'admin.columns.roles': 'Roles',
     'admin.columns.password': 'Password',
+    'admin.columns.actions': 'Actions',
     'admin.filters.search': 'Search',
     'admin.filters.role': 'Role',
     'admin.filters.locale': 'Locale',
@@ -73,6 +113,230 @@ const messages: Record<Locale, Record<string, string>> = {
     'admin.pager.next': 'Next',
     'admin.pager.pageOf': 'Page {page} of {pages}',
     'admin.pager.total': 'Total: {total}',
+    'admin.status.open': 'Open',
+    'admin.status.inGame': 'In game',
+    'admin.status.completed': 'Completed',
+
+    'admin.dashboard.kicker': 'Admin control tower',
+    'admin.dashboard.title': 'Ludobox operations cockpit',
+    'admin.dashboard.intro':
+      'The frontend now treats admin work as one coherent workspace: configs, rooms, servers, and user access sit in the same shell and respect the shared theme.',
+    'admin.dashboard.scopeLabel': 'Scope',
+    'admin.dashboard.scopeValue': 'Configs + rooms',
+    'admin.dashboard.scopeHint': 'Revision control, room creation, room reassignment',
+    'admin.dashboard.visibilityLabel': 'Visibility',
+    'admin.dashboard.visibilityValue': 'Server buckets',
+    'admin.dashboard.visibilityHint': 'Grouped by server_id from the public admin API',
+    'admin.dashboard.tabsAria': 'Admin sections',
+    'admin.dashboard.tabs.overview.label': 'Servers',
+    'admin.dashboard.tabs.overview.title': 'Live room pressure',
+    'admin.dashboard.tabs.overview.description':
+      'See how active rooms are distributed across currently visible servers.',
+    'admin.dashboard.tabs.configs.label': 'Configs',
+    'admin.dashboard.tabs.configs.title': 'Economy and balancing',
+    'admin.dashboard.tabs.configs.description':
+      'Revise pricing, payout distribution, and timer rules before rooms are created.',
+    'admin.dashboard.tabs.rooms.label': 'Rooms',
+    'admin.dashboard.tabs.rooms.title': 'Lifecycle operations',
+    'admin.dashboard.tabs.rooms.description':
+      'Create, reassign, and archive rooms without leaving the admin workspace.',
+    'admin.dashboard.tabs.users.label': 'Users',
+    'admin.dashboard.tabs.users.title': 'Access management',
+    'admin.dashboard.tabs.users.description':
+      'Review elevated users and keep internal roles under control.',
+
+    'admin.users.entity': 'users',
+    'admin.usersSection.eyebrow': 'Identity',
+    'admin.usersSection.title': 'User access and roles',
+    'admin.usersSection.description':
+      'Review admin accounts, refine user roles, and adjust profile metadata without leaving the dashboard.',
+    'admin.usersSection.searchPlaceholder': 'Search by email or name',
+    'admin.usersSection.rolePlaceholder': 'Role',
+    'admin.usersSection.localePlaceholder': 'Locale',
+    'admin.usersSection.emailAny': 'Email confirmation: any',
+    'admin.usersSection.emailConfirmed': 'Confirmed only',
+    'admin.usersSection.emailUnconfirmed': 'Unconfirmed only',
+    'admin.usersSection.loading': 'Loading users...',
+    'admin.usersSection.noMatches': 'No users matched the current filters.',
+    'admin.usersSection.passwordPlaceholder': 'Optional',
+    'admin.usersSection.userIdMissing': 'User id is missing.',
+
+    'admin.configs.entity': 'configs',
+    'admin.configsSection.eyebrow': 'Economy engine',
+    'admin.configsSection.title': 'Room configuration designer',
+    'admin.configsSection.description':
+      'Create, revise, and archive gameplay configs while checking player-facing economics before the request hits the backend.',
+    'admin.configsSection.newConfig': 'New config',
+    'admin.configsSection.createTitle': 'Create new config',
+    'admin.configsSection.editTitle': 'Editing config #{id}',
+    'admin.configsSection.editorHint':
+      'Updating a config creates a fresh revision and archives the currently active one.',
+    'admin.configsSection.revisionMode': 'Revision mode',
+    'admin.configsSection.draftMode': 'Draft mode',
+    'admin.configsSection.fields.gameId': 'Game ID',
+    'admin.configsSection.fields.capacity': 'Capacity',
+    'admin.configsSection.fields.registrationPrice': 'Registration price',
+    'admin.configsSection.fields.roundTimer': 'Round timer (seconds)',
+    'admin.configsSection.fields.minimumUsers': 'Minimum users',
+    'admin.configsSection.fields.commission': 'Commission (%)',
+    'admin.configsSection.fields.numberWinners': 'Number of winners',
+    'admin.configsSection.fields.boostEnabled': 'Boost enabled',
+    'admin.configsSection.fields.boostPrice': 'Boost price',
+    'admin.configsSection.fields.boostPower': 'Boost power (%)',
+    'admin.configsSection.fields.winningDistribution': 'Winning distribution',
+    'admin.configsSection.distributionPlaceholder': 'Example: 70, 20, 10',
+    'admin.configsSection.distributionHelp': 'Comma-separated percentages, one value per winner.',
+    'admin.configsSection.cleanChecks': 'Client-side checks look clean.',
+    'admin.configsSection.metrics.winner': 'Winner',
+    'admin.configsSection.metrics.share': 'Share',
+    'admin.configsSection.metrics.projectedPayout': 'Projected payout',
+    'admin.configsSection.clearForm': 'Clear form',
+    'admin.configsSection.saveRevision': 'Save revision',
+    'admin.configsSection.createConfig': 'Create config',
+    'admin.configsSection.listTitle': 'Active config list',
+    'admin.configsSection.listHint':
+      'Only non-archived configs are returned by the current public admin API.',
+    'admin.configsSection.filters.gameId': 'Filter by game id',
+    'admin.configsSection.filters.capacity': 'Filter by capacity',
+    'admin.configsSection.filters.boostAny': 'Boost: any',
+    'admin.configsSection.filters.boostEnabled': 'Boost enabled',
+    'admin.configsSection.filters.boostDisabled': 'Boost disabled',
+    'admin.configsSection.loading': 'Loading configs...',
+    'admin.configsSection.gameLabel': 'Game {id}',
+    'admin.configsSection.seats': '{count} seats',
+    'admin.configsSection.meta.entry': 'Entry',
+    'admin.configsSection.meta.winners': 'Winners',
+    'admin.configsSection.meta.commission': 'Commission',
+    'admin.configsSection.meta.timer': 'Timer',
+    'admin.configsSection.meta.minUsers': 'Min users',
+    'admin.configsSection.meta.boost': 'Boost',
+    'admin.configsSection.boostSummary': '{price} / {power}%',
+    'admin.configsSection.distributionChip': '#{place} - {value}%',
+    'admin.configsSection.noMatches': 'No active configs matched the current filters.',
+    'admin.configsSection.confirmArchive':
+      'Archive config #{id}? Active rooms using it will no longer receive this revision.',
+    'admin.configsSection.error.validation': 'Resolve validation errors before saving the config.',
+    'admin.configsSection.error.load': 'Failed to load configs.',
+    'admin.configsSection.error.save': 'Failed to save config.',
+    'admin.configsSection.error.archive': 'Failed to archive config.',
+    'admin.configsSection.success.updated':
+      'Config updated successfully. The previous revision was archived and replaced.',
+    'admin.configsSection.success.created': 'Config created successfully.',
+    'admin.configsSection.success.archived': 'Config #{id} archived.',
+
+    'admin.configsSection.validation.gameIdPositive': 'Game ID must be a positive integer.',
+    'admin.configsSection.validation.capacityRange': 'Capacity must stay between 2 and 20.',
+    'admin.configsSection.validation.capacityWarning':
+      'The product brief recommends rooms up to 10 seats for faster rounds.',
+    'admin.configsSection.validation.registrationPriceNegative':
+      'Registration price cannot be negative.',
+    'admin.configsSection.validation.winnersRange':
+      'Number of winners must stay between 1 and 20.',
+    'admin.configsSection.validation.winnersCapacity':
+      'Number of winners cannot exceed capacity.',
+    'admin.configsSection.validation.distributionLength':
+      'Winning distribution length must match the number of winners.',
+    'admin.configsSection.validation.distributionRange':
+      'Each winning distribution value must stay between 0 and 100.',
+    'admin.configsSection.validation.distributionSum':
+      'Winning distribution must sum up to exactly 100.',
+    'admin.configsSection.validation.commissionRange': 'Commission must stay between 0 and 100.',
+    'admin.configsSection.validation.commissionWarning':
+      'Commission above 40% may make the room feel unattractive to players.',
+    'admin.configsSection.validation.timerPositive': 'Round timer must be greater than zero.',
+    'admin.configsSection.validation.timerWarning':
+      'A timer above 180 seconds increases waiting time for a quick-match flow.',
+    'admin.configsSection.validation.minUsersMin': 'Minimum users must be at least 1.',
+    'admin.configsSection.validation.minUsersCapacity':
+      'Minimum users cannot exceed capacity.',
+    'admin.configsSection.validation.minUsersWarning':
+      'High start threshold can slow down room activation during low traffic.',
+    'admin.configsSection.validation.boostPriceNegative': 'Boost price cannot be negative.',
+    'admin.configsSection.validation.boostPowerRange':
+      'Boost power must stay between 0 and 100.',
+    'admin.configsSection.validation.boostPowerZero':
+      'Boost is enabled but its power is zero, so it adds cost without advantage.',
+    'admin.configsSection.validation.boostPriceWarning':
+      'Boost price is more than twice the entry price, which can depress usage.',
+    'admin.configsSection.validation.boostDisabled':
+      'Boost price and power must be zero while boost is disabled.',
+
+    'admin.configsSection.metrics.fullRoomBank.label': 'Full room bank',
+    'admin.configsSection.metrics.fullRoomBank.hint': '{capacity} seats x {price}',
+    'admin.configsSection.metrics.prizePool.label': 'Prize pool',
+    'admin.configsSection.metrics.prizePool.hint':
+      '{percent}% of the gross bank after commission',
+    'admin.configsSection.metrics.operatorShare.label': 'Operator share',
+    'admin.configsSection.metrics.operatorShare.hint':
+      '{commission}% commission at full room capacity',
+    'admin.configsSection.metrics.startThresholdBank.label': 'Start threshold bank',
+    'admin.configsSection.metrics.startThresholdBank.hint':
+      '{minUsers} minimum users before bot fill and round start',
+    'admin.configsSection.metrics.maxBoostRevenue.label': 'Max boost revenue',
+    'admin.configsSection.metrics.maxBoostRevenue.hint':
+      '{capacity} potential boosts x {price}',
+    'admin.configsSection.metrics.maxBoostRevenue.disabled':
+      'Boost is disabled for this room',
+
+    'admin.rooms.entity': 'rooms',
+    'admin.roomsSection.eyebrow': 'Operations',
+    'admin.roomsSection.title': 'Room lifecycle control',
+    'admin.roomsSection.description':
+      'Create rooms from a config revision, reassign them across servers when needed, and archive stale entries from the active pool.',
+    'admin.roomsSection.createTitle': 'Create a room',
+    'admin.roomsSection.createDescription':
+      'Selects the least busy active game server automatically when the room is created.',
+    'admin.roomsSection.chooseConfig': 'Choose config',
+    'admin.roomsSection.createRoom': 'Create room',
+    'admin.roomsSection.creating': 'Creating...',
+    'admin.roomsSection.filters.statusAny': 'Status: any',
+    'admin.roomsSection.filters.serverId': 'Filter by server id',
+    'admin.roomsSection.filters.configId': 'Filter by config id',
+    'admin.roomsSection.loading': 'Loading rooms...',
+    'admin.roomsSection.meta.configId': 'Config id',
+    'admin.roomsSection.meta.serverId': 'Server id',
+    'admin.roomsSection.meta.status': 'Status',
+    'admin.roomsSection.changeServer': 'Change server',
+    'admin.roomsSection.saveServer': 'Save server',
+    'admin.roomsSection.loadingSave': 'Saving...',
+    'admin.roomsSection.noMatches': 'No active rooms matched the current filters.',
+    'admin.roomsSection.confirmArchive': 'Archive room #{id}?',
+    'admin.roomsSection.serverInputPlaceholder': 'Server id',
+    'admin.roomsSection.error.load': 'Failed to load rooms.',
+    'admin.roomsSection.error.create': 'Failed to create room.',
+    'admin.roomsSection.error.update': 'Failed to update room.',
+    'admin.roomsSection.error.archive': 'Failed to archive room.',
+    'admin.roomsSection.error.selectConfig': 'Select a config before creating a room.',
+    'admin.roomsSection.error.serverPositive': 'Server id must be a positive integer.',
+    'admin.roomsSection.success.created':
+      'Room #{id} created and assigned to the least busy active server.',
+    'admin.roomsSection.success.moved': 'Room #{id} moved to server {serverId}.',
+    'admin.roomsSection.success.archived': 'Room #{id} archived.',
+    'admin.roomsSection.configFallback': 'Config #{id}',
+    'admin.roomsSection.configSummary': '#{id} - Game {gameId} - {capacity} seats',
+    'admin.roomsSection.roomTitle': 'Room #{id}',
+
+    'admin.overviewSection.eyebrow': 'Fleet view',
+    'admin.overviewSection.title': 'Active room distribution by server',
+    'admin.overviewSection.description':
+      'Shows the current status of servers and rooms on them.',
+    'admin.overviewSection.stats.servers': 'Servers observed',
+    'admin.overviewSection.stats.rooms': 'Active rooms',
+    'admin.overviewSection.stats.openRooms': 'Open rooms',
+    'admin.overviewSection.stats.liveRounds': 'Rounds in game',
+    'admin.overviewSection.loading': 'Loading server overview...',
+    'admin.overviewSection.error.load': 'Failed to build the server overview.',
+    'admin.overviewSection.serverTitle': 'Server {id}',
+    'admin.overviewSection.serverRooms': '{count} rooms currently assigned',
+    'admin.overviewSection.live': '{count} live',
+    'admin.overviewSection.open': '{count} open',
+    'admin.overviewSection.inGame': '{count} in game',
+    'admin.overviewSection.completed': '{count} completed',
+    'admin.overviewSection.roomTitle': 'Room #{id}',
+    'admin.overviewSection.roomSummary':
+      'Game {gameId} - {capacity} seats - entry {price}',
+    'admin.overviewSection.noRooms':
+      'No active rooms are currently visible through the public admin API.',
 
     'auth.login': 'Log in',
     'auth.signup': 'Sign up',
@@ -108,6 +372,7 @@ const messages: Record<Locale, Record<string, string>> = {
     'search.placeholder': 'This is a placeholder page.',
 
     'profile.title': 'Your profile',
+    'profile.avatarAlt': 'Profile avatar',
     'profile.emailConfirmed': 'Email confirmed',
     'profile.locale': 'Locale',
     'profile.roles': 'Roles',
@@ -124,12 +389,31 @@ const messages: Record<Locale, Record<string, string>> = {
     'profile.msg.nothing': 'Nothing to update',
     'profile.msg.updated': 'Profile updated',
     'profile.msg.failed': 'Failed to update profile',
-    'common.yes': 'Yes',
-    'common.no': 'No',
+    'profile.editTitle': 'Edit profile',
   },
   ru: {
+    'nav.home': 'Главная',
+    'nav.primary': 'Основная навигация',
     'nav.adminPanel': 'Админ-панель',
     'nav.settings': 'Настройки',
+
+    'layout.brandTagline': 'админка - арена - комнаты',
+    'layout.sidebarTagline': 'Панель управления',
+    'layout.toggleSidebar': 'Свернуть или развернуть боковую панель',
+    'layout.balanceDemo': 'Демо-баланс',
+    'layout.route.adminKicker': 'Админ-пространство',
+    'layout.route.adminTitle': 'Конфиги, комнаты и управление серверами',
+    'layout.route.settingsKicker': 'Настройки',
+    'layout.route.settingsTitle': 'Тема, язык и параметры интерфейса',
+    'layout.route.profileKicker': 'Ваш профиль',
+    'layout.route.profileTitle': 'Данные аккаунта, роли и идентичность',
+    'layout.route.searchKicker': 'Поиск',
+    'layout.route.searchTitle': 'Результаты поиска и контекст сессии',
+    'layout.route.defaultKicker': 'Центр управления',
+    'layout.route.defaultTitle': 'Общее рабочее пространство',
+
+    'roles.admin': 'ADMIN',
+    'roles.user': 'USER',
 
     'settings.title': 'Настройки',
     'settings.appearance': 'Оформление',
@@ -144,15 +428,32 @@ const messages: Record<Locale, Record<string, string>> = {
     'common.add': 'Добавить',
     'common.remove': 'Удалить',
     'common.submit': 'Отправить',
-    'common.submitting': 'Отправка…',
+    'common.submitting': 'Отправка...',
     'common.refresh': 'Обновить',
-    'common.loading': 'Загрузка…',
+    'common.loading': 'Загрузка...',
     'common.edit': 'Редактировать',
     'common.cancel': 'Отмена',
+    'common.confirm': 'Подтвердить',
     'common.save': 'Сохранить',
+    'common.saving': 'Сохранение...',
     'common.apply': 'Применить',
     'common.delete': 'Удалить',
     'common.reset': 'Сбросить',
+    'common.create': 'Создать',
+    'common.clear': 'Очистить',
+    'common.new': 'Новый',
+    'common.archive': 'Архивировать',
+    'common.duplicate': 'Дублировать',
+    'common.prev': 'Назад',
+    'common.next': 'Вперёд',
+    'common.yes': 'Да',
+    'common.no': 'Нет',
+    'common.off': 'Выключено',
+    'common.optional': 'Необязательно',
+    'common.rows': '{count} строк',
+    'common.pageSummary': 'Страница {page} из {pages} - {total} {entity}',
+
+    'chat.status.searching': 'Поиск...',
 
     'admin.title': 'Панель администратора',
     'admin.toModerator': 'Панель модератора',
@@ -163,10 +464,11 @@ const messages: Record<Locale, Record<string, string>> = {
     'admin.columns.first': 'Имя',
     'admin.columns.last': 'Фамилия',
     'admin.columns.locale': 'Язык',
-    'admin.columns.confirmed': 'Подтв. email',
+    'admin.columns.confirmed': 'Подтверждён',
     'admin.columns.photo': 'Фото',
     'admin.columns.roles': 'Роли',
     'admin.columns.password': 'Пароль',
+    'admin.columns.actions': 'Действия',
     'admin.filters.search': 'Поиск',
     'admin.filters.role': 'Роль',
     'admin.filters.locale': 'Язык',
@@ -176,8 +478,242 @@ const messages: Record<Locale, Record<string, string>> = {
     'admin.filters.reset': 'Сбросить',
     'admin.pager.prev': 'Назад',
     'admin.pager.next': 'Вперёд',
-    'admin.pager.pageOf': 'Стр. {page} из {pages}',
+    'admin.pager.pageOf': 'Страница {page} из {pages}',
     'admin.pager.total': 'Всего: {total}',
+    'admin.status.open': 'Открыта',
+    'admin.status.inGame': 'В игре',
+    'admin.status.completed': 'Завершена',
+
+    'admin.dashboard.kicker': 'Центр администрирования',
+    'admin.dashboard.title': 'Операционный пульт Ludobox',
+    'admin.dashboard.intro':
+      'Теперь админская работа собрана в единое пространство: конфиги, комнаты, серверы и доступ пользователей находятся в одном shell и подчиняются общей теме интерфейса.',
+    'admin.dashboard.scopeLabel': 'Область',
+    'admin.dashboard.scopeValue': 'Конфиги и комнаты',
+    'admin.dashboard.scopeHint': 'Ревизии, создание комнат и перенос по серверам',
+    'admin.dashboard.visibilityLabel': 'Наблюдение',
+    'admin.dashboard.visibilityValue': 'Серверные группы',
+    'admin.dashboard.visibilityHint': 'Группировка по server_id из публичного admin API',
+    'admin.dashboard.tabsAria': 'Разделы админки',
+    'admin.dashboard.tabs.overview.label': 'Серверы',
+    'admin.dashboard.tabs.overview.title': 'Нагрузка по комнатам',
+    'admin.dashboard.tabs.overview.description':
+      'Показывает, как активные комнаты распределены по доступным серверам.',
+    'admin.dashboard.tabs.configs.label': 'Конфиги',
+    'admin.dashboard.tabs.configs.title': 'Экономика и баланс',
+    'admin.dashboard.tabs.configs.description':
+      'Позволяет менять цены, выплаты и таймеры до создания комнат.',
+    'admin.dashboard.tabs.rooms.label': 'Комнаты',
+    'admin.dashboard.tabs.rooms.title': 'Жизненный цикл',
+    'admin.dashboard.tabs.rooms.description':
+      'Создание, перенос и архивирование комнат из одного рабочего места.',
+    'admin.dashboard.tabs.users.label': 'Пользователи',
+    'admin.dashboard.tabs.users.title': 'Управление доступом',
+    'admin.dashboard.tabs.users.description':
+      'Просмотр и корректировка прав повышенных пользователей.',
+
+    'admin.users.entity': 'пользователей',
+    'admin.usersSection.eyebrow': 'Доступ',
+    'admin.usersSection.title': 'Пользователи и роли',
+    'admin.usersSection.description':
+      'Просматривайте администраторские аккаунты, обновляйте роли и правьте профильные данные, не покидая дашборд.',
+    'admin.usersSection.searchPlaceholder': 'Поиск по email или имени',
+    'admin.usersSection.rolePlaceholder': 'Роль',
+    'admin.usersSection.localePlaceholder': 'Язык',
+    'admin.usersSection.emailAny': 'Подтверждение email: любое',
+    'admin.usersSection.emailConfirmed': 'Только подтверждённые',
+    'admin.usersSection.emailUnconfirmed': 'Только неподтверждённые',
+    'admin.usersSection.loading': 'Загрузка пользователей...',
+    'admin.usersSection.noMatches': 'Пользователи по текущим фильтрам не найдены.',
+    'admin.usersSection.passwordPlaceholder': 'Необязательно',
+    'admin.usersSection.userIdMissing': 'Не указан идентификатор пользователя.',
+
+    'admin.configs.entity': 'конфигов',
+    'admin.configsSection.eyebrow': 'Экономика',
+    'admin.configsSection.title': 'Конструктор конфигов комнат',
+    'admin.configsSection.description':
+      'Создавайте, обновляйте и архивируйте игровые конфиги, заранее проверяя экономику комнаты до отправки на backend.',
+    'admin.configsSection.newConfig': 'Новый конфиг',
+    'admin.configsSection.createTitle': 'Создать новый конфиг',
+    'admin.configsSection.editTitle': 'Редактирование конфига #{id}',
+    'admin.configsSection.editorHint':
+      'Обновление конфига создаёт новую ревизию и архивирует текущую активную версию.',
+    'admin.configsSection.revisionMode': 'Режим ревизии',
+    'admin.configsSection.draftMode': 'Черновик',
+    'admin.configsSection.fields.gameId': 'ID игры',
+    'admin.configsSection.fields.capacity': 'Вместимость',
+    'admin.configsSection.fields.registrationPrice': 'Цена входа',
+    'admin.configsSection.fields.roundTimer': 'Таймер раунда (секунды)',
+    'admin.configsSection.fields.minimumUsers': 'Минимум игроков',
+    'admin.configsSection.fields.commission': 'Комиссия (%)',
+    'admin.configsSection.fields.numberWinners': 'Количество победителей',
+    'admin.configsSection.fields.boostEnabled': 'Буст включён',
+    'admin.configsSection.fields.boostPrice': 'Цена буста',
+    'admin.configsSection.fields.boostPower': 'Сила буста (%)',
+    'admin.configsSection.fields.winningDistribution': 'Распределение выигрыша',
+    'admin.configsSection.distributionPlaceholder': 'Например: 70, 20, 10',
+    'admin.configsSection.distributionHelp':
+      'Проценты через запятую, по одному значению на каждого победителя.',
+    'admin.configsSection.cleanChecks': 'Клиентская проверка прошла без замечаний.',
+    'admin.configsSection.metrics.winner': 'Победитель',
+    'admin.configsSection.metrics.share': 'Доля',
+    'admin.configsSection.metrics.projectedPayout': 'Прогноз выплаты',
+    'admin.configsSection.clearForm': 'Очистить форму',
+    'admin.configsSection.saveRevision': 'Сохранить ревизию',
+    'admin.configsSection.createConfig': 'Создать конфиг',
+    'admin.configsSection.listTitle': 'Список активных конфигов',
+    'admin.configsSection.listHint':
+      'Текущий публичный admin API возвращает только неархивированные конфиги.',
+    'admin.configsSection.filters.gameId': 'Фильтр по ID игры',
+    'admin.configsSection.filters.capacity': 'Фильтр по вместимости',
+    'admin.configsSection.filters.boostAny': 'Буст: любой',
+    'admin.configsSection.filters.boostEnabled': 'Буст включён',
+    'admin.configsSection.filters.boostDisabled': 'Буст выключен',
+    'admin.configsSection.loading': 'Загрузка конфигов...',
+    'admin.configsSection.gameLabel': 'Игра {id}',
+    'admin.configsSection.seats': '{count} мест',
+    'admin.configsSection.meta.entry': 'Вход',
+    'admin.configsSection.meta.winners': 'Победители',
+    'admin.configsSection.meta.commission': 'Комиссия',
+    'admin.configsSection.meta.timer': 'Таймер',
+    'admin.configsSection.meta.minUsers': 'Мин. игроков',
+    'admin.configsSection.meta.boost': 'Буст',
+    'admin.configsSection.boostSummary': '{price} / {power}%',
+    'admin.configsSection.distributionChip': '#{place} - {value}%',
+    'admin.configsSection.noMatches': 'Активные конфиги по текущим фильтрам не найдены.',
+    'admin.configsSection.confirmArchive':
+      'Архивировать конфиг #{id}? Активные комнаты больше не будут получать эту ревизию.',
+    'admin.configsSection.error.validation':
+      'Сначала устраните ошибки валидации перед сохранением конфига.',
+    'admin.configsSection.error.load': 'Не удалось загрузить конфиги.',
+    'admin.configsSection.error.save': 'Не удалось сохранить конфиг.',
+    'admin.configsSection.error.archive': 'Не удалось архивировать конфиг.',
+    'admin.configsSection.success.updated':
+      'Конфиг успешно обновлён. Предыдущая ревизия была архивирована и заменена.',
+    'admin.configsSection.success.created': 'Конфиг успешно создан.',
+    'admin.configsSection.success.archived': 'Конфиг #{id} архивирован.',
+
+    'admin.configsSection.validation.gameIdPositive':
+      'ID игры должен быть положительным целым числом.',
+    'admin.configsSection.validation.capacityRange':
+      'Вместимость должна оставаться в диапазоне от 2 до 20.',
+    'admin.configsSection.validation.capacityWarning':
+      'В продуктовых требованиях рекомендуются комнаты до 10 мест для более быстрых раундов.',
+    'admin.configsSection.validation.registrationPriceNegative':
+      'Цена входа не может быть отрицательной.',
+    'admin.configsSection.validation.winnersRange':
+      'Количество победителей должно быть в диапазоне от 1 до 20.',
+    'admin.configsSection.validation.winnersCapacity':
+      'Количество победителей не может превышать вместимость.',
+    'admin.configsSection.validation.distributionLength':
+      'Длина распределения выигрыша должна совпадать с числом победителей.',
+    'admin.configsSection.validation.distributionRange':
+      'Каждое значение распределения выигрыша должно быть в диапазоне от 0 до 100.',
+    'admin.configsSection.validation.distributionSum':
+      'Сумма распределения выигрыша должна быть ровно 100.',
+    'admin.configsSection.validation.commissionRange':
+      'Комиссия должна оставаться в диапазоне от 0 до 100.',
+    'admin.configsSection.validation.commissionWarning':
+      'Комиссия выше 40% может сделать комнату менее привлекательной для игроков.',
+    'admin.configsSection.validation.timerPositive':
+      'Таймер раунда должен быть больше нуля.',
+    'admin.configsSection.validation.timerWarning':
+      'Таймер выше 180 секунд увеличивает время ожидания в быстром матчмейкинге.',
+    'admin.configsSection.validation.minUsersMin':
+      'Минимальное число игроков должно быть не меньше 1.',
+    'admin.configsSection.validation.minUsersCapacity':
+      'Минимальное число игроков не может превышать вместимость.',
+    'admin.configsSection.validation.minUsersWarning':
+      'Высокий порог запуска может замедлить активацию комнат при низком трафике.',
+    'admin.configsSection.validation.boostPriceNegative':
+      'Цена буста не может быть отрицательной.',
+    'admin.configsSection.validation.boostPowerRange':
+      'Сила буста должна быть в диапазоне от 0 до 100.',
+    'admin.configsSection.validation.boostPowerZero':
+      'Буст включён, но его сила равна нулю, поэтому он добавляет стоимость без преимущества.',
+    'admin.configsSection.validation.boostPriceWarning':
+      'Цена буста более чем вдвое выше цены входа, это может снижать использование.',
+    'admin.configsSection.validation.boostDisabled':
+      'Цена и сила буста должны быть равны нулю, пока буст выключен.',
+
+    'admin.configsSection.metrics.fullRoomBank.label': 'Банк полной комнаты',
+    'admin.configsSection.metrics.fullRoomBank.hint': '{capacity} мест x {price}',
+    'admin.configsSection.metrics.prizePool.label': 'Призовой фонд',
+    'admin.configsSection.metrics.prizePool.hint':
+      '{percent}% от общего банка после комиссии',
+    'admin.configsSection.metrics.operatorShare.label': 'Доля оператора',
+    'admin.configsSection.metrics.operatorShare.hint':
+      '{commission}% комиссии при полной загрузке комнаты',
+    'admin.configsSection.metrics.startThresholdBank.label': 'Банк порога запуска',
+    'admin.configsSection.metrics.startThresholdBank.hint':
+      '{minUsers} минимум игроков перед добивкой ботами и стартом раунда',
+    'admin.configsSection.metrics.maxBoostRevenue.label': 'Макс. доход от буста',
+    'admin.configsSection.metrics.maxBoostRevenue.hint':
+      '{capacity} потенциальных бустов x {price}',
+    'admin.configsSection.metrics.maxBoostRevenue.disabled':
+      'Для этой комнаты буст выключен',
+
+    'admin.rooms.entity': 'комнат',
+    'admin.roomsSection.eyebrow': 'Операции',
+    'admin.roomsSection.title': 'Управление жизненным циклом комнат',
+    'admin.roomsSection.description':
+      'Создавайте комнаты из ревизии конфига, переносите их между серверами и архивируйте устаревшие записи активного пула.',
+    'admin.roomsSection.createTitle': 'Создать комнату',
+    'admin.roomsSection.createDescription':
+      'При создании комнаты автоматически выбирает наименее загруженный активный игровой сервер.',
+    'admin.roomsSection.chooseConfig': 'Выберите конфиг',
+    'admin.roomsSection.createRoom': 'Создать комнату',
+    'admin.roomsSection.creating': 'Создание...',
+    'admin.roomsSection.filters.statusAny': 'Статус: любой',
+    'admin.roomsSection.filters.serverId': 'Фильтр по ID сервера',
+    'admin.roomsSection.filters.configId': 'Фильтр по ID конфига',
+    'admin.roomsSection.loading': 'Загрузка комнат...',
+    'admin.roomsSection.meta.configId': 'ID конфига',
+    'admin.roomsSection.meta.serverId': 'ID сервера',
+    'admin.roomsSection.meta.status': 'Статус',
+    'admin.roomsSection.changeServer': 'Сменить сервер',
+    'admin.roomsSection.saveServer': 'Сохранить сервер',
+    'admin.roomsSection.loadingSave': 'Сохранение...',
+    'admin.roomsSection.noMatches': 'Активные комнаты по текущим фильтрам не найдены.',
+    'admin.roomsSection.confirmArchive': 'Архивировать комнату #{id}?',
+    'admin.roomsSection.serverInputPlaceholder': 'ID сервера',
+    'admin.roomsSection.error.load': 'Не удалось загрузить комнаты.',
+    'admin.roomsSection.error.create': 'Не удалось создать комнату.',
+    'admin.roomsSection.error.update': 'Не удалось обновить комнату.',
+    'admin.roomsSection.error.archive': 'Не удалось архивировать комнату.',
+    'admin.roomsSection.error.selectConfig':
+      'Перед созданием комнаты выберите конфиг.',
+    'admin.roomsSection.error.serverPositive':
+      'ID сервера должен быть положительным целым числом.',
+    'admin.roomsSection.success.created':
+      'Комната #{id} создана и назначена на наименее загруженный активный сервер.',
+    'admin.roomsSection.success.moved': 'Комната #{id} перенесена на сервер {serverId}.',
+    'admin.roomsSection.success.archived': 'Комната #{id} архивирована.',
+    'admin.roomsSection.configFallback': 'Конфиг #{id}',
+    'admin.roomsSection.configSummary': '#{id} - Игра {gameId} - {capacity} мест',
+    'admin.roomsSection.roomTitle': 'Комната #{id}',
+
+    'admin.overviewSection.eyebrow': 'Серверный обзор',
+    'admin.overviewSection.title': 'Распределение активных комнат по серверам',
+    'admin.overviewSection.description':
+      'Показывает текущее состояние серверов и комнат на них.',
+    'admin.overviewSection.stats.servers': 'Наблюдаемых серверов',
+    'admin.overviewSection.stats.rooms': 'Активных комнат',
+    'admin.overviewSection.stats.openRooms': 'Открытых комнат',
+    'admin.overviewSection.stats.liveRounds': 'Раундов в игре',
+    'admin.overviewSection.loading': 'Загрузка обзора серверов...',
+    'admin.overviewSection.error.load': 'Не удалось собрать обзор серверов.',
+    'admin.overviewSection.serverTitle': 'Сервер {id}',
+    'admin.overviewSection.serverRooms': 'Сейчас назначено комнат: {count}',
+    'admin.overviewSection.live': 'В игре: {count}',
+    'admin.overviewSection.open': 'Открыто: {count}',
+    'admin.overviewSection.inGame': 'В игре: {count}',
+    'admin.overviewSection.completed': 'Завершено: {count}',
+    'admin.overviewSection.roomTitle': 'Комната #{id}',
+    'admin.overviewSection.roomSummary':
+      'Игра {gameId} - {capacity} мест - вход {price}',
+    'admin.overviewSection.noRooms':
+      'Через публичный admin API сейчас не видно активных комнат.',
 
     'auth.login': 'Войти',
     'auth.signup': 'Зарегистрироваться',
@@ -188,7 +724,8 @@ const messages: Record<Locale, Record<string, string>> = {
     'auth.lastname': 'Фамилия',
     'auth.forgot': 'Забыли пароль?',
     'auth.resetEmailRequired': 'Введите email, чтобы сбросить пароль.',
-    'auth.resetSuccess': 'Если такой email существует, мы отправили инструкции по восстановлению.',
+    'auth.resetSuccess':
+      'Если такой email существует, мы отправили инструкции по восстановлению.',
     'auth.resetFailed': 'Не удалось отправить письмо. Попробуйте позже.',
     'auth.resetTitle': 'Восстановление пароля',
     'auth.resetDescription':
@@ -213,6 +750,7 @@ const messages: Record<Locale, Record<string, string>> = {
     'search.placeholder': 'Временная страница-заглушка.',
 
     'profile.title': 'Ваш профиль',
+    'profile.avatarAlt': 'Аватар профиля',
     'profile.emailConfirmed': 'Email подтверждён',
     'profile.locale': 'Язык',
     'profile.roles': 'Роли',
@@ -223,20 +761,28 @@ const messages: Record<Locale, Record<string, string>> = {
     'profile.form.keepBlank': 'Оставьте пустым, чтобы не менять',
     'profile.btn.cancel': 'Отмена',
     'profile.btn.save': 'Сохранить изменения',
-    'profile.saving': 'Сохранение…',
+    'profile.saving': 'Сохранение...',
     'profile.btn.edit': 'Редактировать профиль',
     'profile.btn.logout': 'Выйти',
-    'profile.msg.nothing': 'Нечего обновлять',
+    'profile.msg.nothing': 'Нет изменений для обновления',
     'profile.msg.updated': 'Профиль обновлён',
     'profile.msg.failed': 'Не удалось обновить профиль',
-    'common.yes': 'Да',
-    'common.no': 'Нет',
+    'profile.editTitle': 'Редактирование профиля',
   },
 }
 
-export function t(key: string): string {
-  const l = locale.value
-  return (messages[l] && messages[l][key]) ?? messages.en[key] ?? key
+function formatMessage(message: string, params?: MessageParams) {
+  if (!params) return message
+
+  return Object.entries(params).reduce((result, [key, value]) => {
+    return result.replace(new RegExp(`\\{${key}\\}`, 'g'), String(value ?? ''))
+  }, message)
+}
+
+export function t(key: string, params?: MessageParams): string {
+  const activeLocale = locale.value
+  const message = messages[activeLocale]?.[key] ?? messages.en[key] ?? key
+  return formatMessage(message, params)
 }
 
 export function useI18n() {

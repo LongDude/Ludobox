@@ -13,8 +13,8 @@ const { t } = useI18n()
 .footer {
   position: fixed;
   bottom: 0;
-  left: 310px;
-  right: 60px;
+  left: 304px;
+  right: 20px;
   height: 20px;
   font-size: x-small;
   display: flex;
@@ -28,5 +28,13 @@ const { t } = useI18n()
 p {
   margin: 0;
 }
-</style>
 
+@media (max-width: 960px) {
+  .footer,
+  .footer.collapsed {
+    left: 1rem;
+    right: 1rem;
+    bottom: 5rem;
+  }
+}
+</style>

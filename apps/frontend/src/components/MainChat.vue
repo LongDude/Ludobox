@@ -25,9 +25,9 @@ const errorMsg = ref('')
 <style lang="css" scoped>
 .chat {
   position: fixed;
-  top: 80px;
-  left: 310px;
-  right: 60px;
+  top: 92px;
+  left: 304px;
+  right: 20px;
   bottom: 20px;
   background-color: var(--color-bg-secondary);
   border-radius: 15px;
@@ -282,6 +282,13 @@ const errorMsg = ref('')
 }
 
 @media (max-width: 960px) {
+  .chat,
+  .chat.collapsed {
+    position: static;
+    inset: auto;
+    margin: calc(76px + 0.75rem) 1rem 5.75rem;
+  }
+
   .main-chat {
     grid-template-rows: auto 1fr;
   }
