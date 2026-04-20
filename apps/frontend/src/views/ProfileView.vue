@@ -34,7 +34,7 @@ const identityForm = reactive({
 
 const gameForm = reactive({
   nickname: '',
-  delta: '',
+  delta: '' as string | number,
 })
 
 onMounted(async () => {
@@ -206,7 +206,7 @@ async function applyBalanceDelta() {
   gameSuccessMsg.value = ''
   gameErrorMsg.value = ''
 
-  const rawDelta = gameForm.delta.trim()
+  const rawDelta = String(gameForm.delta ?? '').trim()
   const delta = Number(rawDelta)
   if (!rawDelta || !Number.isInteger(delta) || delta === 0) {
     gameErrorMsg.value = t('profile.game.msg.deltaRequired')
