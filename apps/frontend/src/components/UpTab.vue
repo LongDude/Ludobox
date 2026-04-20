@@ -45,6 +45,27 @@ const balanceValue = computed(() => {
 })
 
 const routeMeta = computed(() => {
+  if (route.path === '/') {
+    return {
+      eyebrow: t('layout.route.homeKicker'),
+      title: t('layout.route.homeTitle'),
+    }
+  }
+
+  if (route.path === '/rooms') {
+    return {
+      eyebrow: t('layout.route.roomsKicker'),
+      title: t('layout.route.roomsTitle'),
+    }
+  }
+
+  if (route.path.startsWith('/play/')) {
+    return {
+      eyebrow: t('layout.route.playKicker'),
+      title: t('layout.route.playTitle'),
+    }
+  }
+
   if (route.path === '/admin') {
     return {
       eyebrow: t('layout.route.adminKicker'),
@@ -63,13 +84,6 @@ const routeMeta = computed(() => {
     return {
       eyebrow: t('layout.route.profileKicker'),
       title: t('layout.route.profileTitle'),
-    }
-  }
-
-  if (route.path.startsWith('/search')) {
-    return {
-      eyebrow: t('layout.route.searchKicker'),
-      title: t('layout.route.searchTitle'),
     }
   }
 

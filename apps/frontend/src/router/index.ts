@@ -6,6 +6,7 @@ const AuthView = () => import('@/views/AuthView.vue')
 const ProfileView = () => import('@/views/ProfileView.vue')
 const SettingsView = () => import('@/views/SettingsView.vue')
 const SearchView = () => import('@/views/SearchView.vue')
+const PlayView = () => import('@/views/PlayView.vue')
 const NotFoundView = () => import('@/views/NotFoundView.vue')
 const AdminDashboardView = () => import('@/views/AdminDashboardView.vue')
 
@@ -14,9 +15,10 @@ const router = createRouter({
   routes: [
     { path: '/', component: Homeview },
     { path: '/auth', component: AuthView },
+    { path: '/rooms', component: SearchView },
+    { path: '/play/:roomId', component: PlayView, meta: { requiresAuth: true } },
     { path: '/profile', component: ProfileView, meta: { requiresAuth: true } },
     { path: '/settings', component: SettingsView, meta: { requiresAuth: true } },
-    { path: '/search/:uid', component: SearchView },
     {
       path: '/admin',
       component: AdminDashboardView,
