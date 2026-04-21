@@ -254,8 +254,8 @@ async function logout() {
 }
 
 .brand-logo {
-  width: 1.75rem;
-  height: 1.75rem;
+  width: 2.75rem;
+  height: 2.75rem;
   display: block;
 }
 

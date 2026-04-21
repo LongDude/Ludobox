@@ -373,8 +373,8 @@ function isActive(path: string) {
 }
 
 .brand-logo {
-  width: 1.8rem;
-  height: 1.8rem;
+  width: 2.8rem;
+  height: 2.8rem;
   display: block;
 }
 
