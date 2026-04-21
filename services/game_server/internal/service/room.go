@@ -833,7 +833,7 @@ func (s *RoomService) requestWinningPositions(ctx context.Context, config *domai
 	sumProbabilities := 0.0
 	probabilities := make([]float64, countPlayers)
 	for _, participant := range participants {
-		weight := float64(winnersCount) / float64(countPlayers)
+		weight := 1.0 / float64(winnersCount)
 		if participant.Boost > 0 {
 			weight += float64(boostPower) / 100.0
 		}
