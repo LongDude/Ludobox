@@ -6,6 +6,7 @@ import type {
   GameJoinRoomWithSeatRequest,
   GameLeaveRoomResponse,
   GamePurchaseBoostResponse,
+  GameRoomStateResponse,
   GameRoundEvent,
   GameRoundStatusResponse,
 } from './types'
@@ -102,6 +103,12 @@ export const GameApi = {
   joinRoomWithSeat(roomId: number, payload: GameJoinRoomWithSeatRequest) {
     return api
       .post<GameJoinRoomResponse>(`/game/rooms/${roomId}/join-seat`, payload)
+      .then((response) => response.data)
+  },
+
+  getRoomState(roomId: number) {
+    return api
+      .get<GameRoomStateResponse>(`/game/rooms/${roomId}`)
       .then((response) => response.data)
   },
 

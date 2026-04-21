@@ -115,7 +115,7 @@ func (ts *TimerService) StartTimer(ctx context.Context, roundID int64, roomID in
 				if len(participants) < minUsers {
 					if countdownActive {
 						countdownActive = false
-						ts.setWaitingCountdown(roundID, time.Time{}, nil)
+						ts.setPhase(roundID, "waiting_for_players", time.Time{}, nil)
 						ts.logger.Infof("Round %d dropped below min_users, resetting countdown", roundID)
 					}
 
@@ -135,7 +135,7 @@ func (ts *TimerService) StartTimer(ctx context.Context, roundID int64, roomID in
 					countdownActive = true
 					startedAt := now
 					countdownDeadline = startedAt.Add(time.Duration(configTimeSeconds) * time.Second)
-					ts.setWaitingCountdown(roundID, countdownDeadline, &startedAt)
+					ts.setPhase(roundID, "waiting", countdownDeadline, &startedAt)
 					ts.logger.Infof("Round %d reached min_users (%d), starting waiting countdown", roundID, len(participants))
 				}
 
@@ -153,16 +153,36 @@ func (ts *TimerService) StartTimer(ctx context.Context, roundID int64, roomID in
 					}
 				}
 
-				ts.clearDeadline(roundID, "active")
+				activeStartedAt := time.Now()
+				activeDeadline := activeStartedAt.Add(time.Duration(configTimeSeconds) * time.Second)
+				ts.setPhase(roundID, "active", activeDeadline, &activeStartedAt)
 				participants, _ = ts.roomRepo.GetParticipantsByRoundID(timerCtx, roundID)
 				ts.eventsService.PublishRoundStarted(timerCtx, roundID, len(participants), configTimeSeconds)
 
-				if ts.onGameFinalize != nil {
-					if err := ts.onGameFinalize(timerCtx, roundID); err != nil {
-						ts.logger.Errorf("Error finalizing round %d: %v", roundID, err)
+				activeTicker := time.NewTicker(1 * time.Second)
+				defer activeTicker.Stop()
+
+				for {
+					select {
+					case <-timerCtx.Done():
+						ts.logger.Infof("Round %d active timer cancelled", roundID)
+						return
+					case <-activeTicker.C:
+						secondsLeft = secondsUntil(activeDeadline)
+						ts.eventsService.PublishRoundTimer(timerCtx, roundID, "active", secondsLeft)
+						if time.Now().Before(activeDeadline) {
+							continue
+						}
+
+						ts.clearDeadline(roundID, "finished")
+						if ts.onGameFinalize != nil {
+							if err := ts.onGameFinalize(timerCtx, roundID); err != nil {
+								ts.logger.Errorf("Error finalizing round %d: %v", roundID, err)
+							}
+						}
+						return
 					}
 				}
-				return
 			}
 		}
 	}()
@@ -219,12 +239,12 @@ func (ts *TimerService) GetTimerInfo(roundID int64) (bool, TimerInfo) {
 	return true, info
 }
 
-func (ts *TimerService) setWaitingCountdown(roundID int64, deadline time.Time, startedAt *time.Time) {
+func (ts *TimerService) setPhase(roundID int64, status string, deadline time.Time, startedAt *time.Time) {
 	ts.mu.Lock()
 	defer ts.mu.Unlock()
 
 	if state, exists := ts.timers[roundID]; exists {
-		state.status = "waiting"
+		state.status = status
 		state.deadline = deadline
 		if startedAt == nil {
 			state.startedAt = nil

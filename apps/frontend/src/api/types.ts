@@ -99,6 +99,20 @@ export interface GameJoinRoomResponse {
   timer_starts_at?: string | null
 }
 
+export interface GameRoomStateResponse {
+  room_id: number
+  round_id: number
+  room_capacity: number
+  current_players: number
+  min_players: number
+  entry_price: number
+  round_status: string
+  is_boost: boolean
+  boost_power: number
+  boost_price: number
+  timer_starts_at?: string | null
+}
+
 export interface GameParticipantInfo {
   participant_id: number
   user_id?: number | null

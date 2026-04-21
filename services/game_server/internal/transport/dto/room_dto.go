@@ -18,6 +18,20 @@ type JoinRoomResponse struct {
 	TimerStartsAt  *time.Time `json:"timer_starts_at,omitempty"`
 }
 
+type RoomStateResponse struct {
+	RoomID         int64      `json:"room_id"`
+	RoundID        int64      `json:"round_id"`
+	RoomCapacity   int        `json:"room_capacity"`
+	CurrentPlayers int        `json:"current_players"`
+	MinPlayers     int        `json:"min_players"`
+	EntryPrice     int64      `json:"entry_price"`
+	RoundStatus    string     `json:"round_status"`
+	IsBoost        bool       `json:"is_boost"`
+	BoostPower     int        `json:"boost_power"`
+	BoostPrice     int64      `json:"boost_price"`
+	TimerStartsAt  *time.Time `json:"timer_starts_at,omitempty"`
+}
+
 type PurchaseBoostResponse struct {
 	Success    bool   `json:"success"`
 	BoostPower int    `json:"boost_power"`

@@ -8,6 +8,7 @@ import { GameApi } from '@/api/useMatchApi'
 import type {
   GameJoinRoomResponse,
   GameParticipantInfo,
+  GameRoomStateResponse,
   GameRoundEvent,
   GameRoundStatusResponse,
 } from '@/api/types'
@@ -30,6 +31,7 @@ type LiveRoundEvent = GameRoundEvent & { id: number }
 const roomId = computed(() => Number(route.params.roomId))
 
 const joinResult = ref<GameJoinRoomResponse | null>(null)
+const roomState = ref<GameRoomStateResponse | null>(null)
 const roundStatus = ref<GameRoundStatusResponse | null>(null)
 const joining = ref(false)
 const statusLoading = ref(false)
@@ -63,33 +65,35 @@ const sourceLabel = computed(() => {
 })
 
 const activeRoundId = computed(() => {
-  const roundId = joinResult.value?.round_id || quickMatchMeta.value?.round_id || 0
+  const roundId = roomState.value?.round_id || joinResult.value?.round_id || quickMatchMeta.value?.round_id || 0
   return roundId > 0 ? roundId : null
 })
 
-const activeParticipantId = computed(() => {
+const initialParticipantId = computed(() => {
   const participantId =
     joinResult.value?.participant_id || quickMatchMeta.value?.round_participant_id || 0
   return participantId > 0 ? participantId : null
 })
 
-const mySeat = computed(() => {
-  const seat = joinResult.value?.number_in_room || quickMatchMeta.value?.seat_number || 0
-  return seat > 0 ? seat : null
+const initialParticipantRoundId = computed(() => {
+  const roundId = joinResult.value?.round_id || quickMatchMeta.value?.round_id || 0
+  return roundId > 0 ? roundId : null
 })
 
-const roomCapacity = computed(() => joinResult.value?.room_capacity || room.value?.capacity || 0)
-const entryPrice = computed(() => joinResult.value?.entry_price ?? room.value?.registration_price ?? '-')
-const minPlayers = computed(() => joinResult.value?.min_players ?? room.value?.min_users ?? '-')
+const currentUserId = computed(() => auth.User?.id ?? null)
+
+const roomCapacity = computed(() => roomState.value?.room_capacity || joinResult.value?.room_capacity || room.value?.capacity || 0)
+const entryPrice = computed(() => roomState.value?.entry_price ?? joinResult.value?.entry_price ?? room.value?.registration_price ?? '-')
+const minPlayers = computed(() => roomState.value?.min_players ?? joinResult.value?.min_players ?? room.value?.min_users ?? '-')
 const currentPlayers = computed(() => {
   if (roundStatus.value?.participants?.length) {
     return roundStatus.value.participants.filter((participant) => !participant.exited_at).length
   }
 
-  return joinResult.value?.current_players ?? room.value?.current_players ?? 0
+  return roomState.value?.current_players ?? joinResult.value?.current_players ?? room.value?.current_players ?? 0
 })
 
-const statusLabel = computed(() => roundStatus.value?.status || joinResult.value?.round_status || '-')
+const statusLabel = computed(() => roundStatus.value?.status || roomState.value?.round_status || joinResult.value?.round_status || '-')
 const roundPhase = computed(() => normalizeRoundPhase(statusLabel.value))
 const roundPhases = computed(() =>
   [
@@ -138,13 +142,27 @@ const participants = computed(() =>
 )
 
 const winners = computed(() => roundStatus.value?.winners ?? [])
-const isJoined = computed(() => Boolean(activeParticipantId.value && activeRoundId.value))
+const joinedParticipants = computed(() => {
+  const userId = currentUserId.value
+  if (!userId) return []
+  return participants.value.filter((participant) => participant.user_id === userId && !participant.exited_at)
+})
 const activeParticipant = computed(() => {
-  const participantId = activeParticipantId.value
-  if (!participantId) return null
+  if (joinedParticipants.value.length > 0) {
+    return joinedParticipants.value[0] ?? null
+  }
+
+  const participantId = initialParticipantId.value
+  if (!participantId || initialParticipantRoundId.value !== activeRoundId.value) return null
   return participants.value.find((participant) => participant.participant_id === participantId) ?? null
 })
-const activeUserId = computed(() => auth.User?.id ?? activeParticipant.value?.user_id ?? null)
+const activeParticipantId = computed(() => activeParticipant.value?.participant_id ?? null)
+const mySeat = computed(() => activeParticipant.value?.number_in_room ?? null)
+const isJoined = computed(() => {
+  if (roundStatus.value) return joinedParticipants.value.length > 0
+  return Boolean(initialParticipantId.value && initialParticipantRoundId.value === activeRoundId.value)
+})
+const activeUserId = computed(() => currentUserId.value ?? activeParticipant.value?.user_id ?? null)
 const hasOwnedBoost = computed(() => {
   const userId = activeUserId.value
   if (userId) {
@@ -154,7 +172,7 @@ const hasOwnedBoost = computed(() => {
   return Boolean(activeParticipant.value?.boost && activeParticipant.value.boost > 0)
 })
 const hasActiveParticipantBoost = computed(() => Boolean(activeParticipant.value?.boost && activeParticipant.value.boost > 0))
-const canBoost = computed(() => isJoined.value && room.value?.is_boost === true && !hasOwnedBoost.value)
+const canBoost = computed(() => isJoined.value && (roomState.value?.is_boost ?? room.value?.is_boost) === true && !hasOwnedBoost.value)
 const boostHint = computed(() => {
   if (hasOwnedBoost.value) return t('gameRoom.controls.boostAlreadyActive')
   return canBoost.value ? t('gameRoom.controls.boostHint') : t('gameRoom.controls.boostDisabled')
@@ -177,7 +195,16 @@ watch(
     }
 
     successMsg.value = t('gameRoom.messages.quickSessionRestored')
+    void loadRoomState(true)
     void loadRoundStatus(true)
+  },
+  { immediate: true },
+)
+
+watch(
+  () => roomId.value,
+  () => {
+    void loadRoomState(true)
   },
   { immediate: true },
 )
@@ -208,9 +235,10 @@ function openRooms() {
 }
 
 function formatBoost() {
-  if (!room.value) return t('common.off')
-  if (!room.value.is_boost) return t('common.off')
-  return t('matchmaking.results.boostValue', { value: room.value.boost_power })
+  const isBoost = roomState.value?.is_boost ?? room.value?.is_boost
+  const boostPower = roomState.value?.boost_power ?? room.value?.boost_power
+  if (!isBoost) return t('common.off')
+  return t('matchmaking.results.boostValue', { value: boostPower ?? 0 })
 }
 
 function formatScore() {
@@ -288,6 +316,7 @@ function restartRoundEvents() {
     onOpen: () => {
       sseConnected.value = true
       sseError.value = ''
+      void loadRoomState(true)
       void loadRoundStatus(true)
     },
     onEvent: handleRoundEvent,
@@ -320,6 +349,9 @@ function handleRoundEvent(event: GameRoundEvent) {
   ].slice(0, 5)
 
   void loadRoundStatus(true)
+  if (['player_joined', 'player_left', 'round_finalized'].includes(event.type)) {
+    void loadRoomState(true)
+  }
   if (['boost_purchased', 'boost_cancelled', 'player_left', 'round_finalized'].includes(event.type)) {
     refreshCabinetBalance()
   }
@@ -389,13 +421,22 @@ function eventDescription(event: GameRoundEvent) {
   }
 
   if (event.type === 'round_timer') {
-    return t('gameRoom.events.roundStartedDetails', {
-      players: '-',
-      seconds: Number(data.seconds_left ?? 0) || 0,
-    })
+    return `${String(data.status || 'waiting')} • ${Number(data.seconds_left ?? 0) || 0}s`
   }
 
   return t('gameRoom.events.genericDetails')
+}
+
+async function loadRoomState(silent = false) {
+  if (!roomId.value) return
+
+  try {
+    roomState.value = await GameApi.getRoomState(roomId.value)
+  } catch (error: any) {
+    if (!silent) {
+      errorMsg.value = normalizeError(error, t('gameRoom.errors.status'))
+    }
+  }
 }
 
 async function loadRoundStatus(silent = false) {
@@ -427,6 +468,7 @@ async function joinRoom() {
     joinResult.value = await GameApi.joinRoom(roomId.value)
     successMsg.value = t('gameRoom.messages.joined', { seat: joinResult.value.number_in_room })
     refreshCabinetBalance()
+    await loadRoomState(true)
     await loadRoundStatus()
   } catch (error: any) {
     errorMsg.value = normalizeError(error, t('gameRoom.errors.join'))
@@ -455,6 +497,7 @@ async function joinRoomWithSeat() {
     joinResult.value = await GameApi.joinRoomWithSeat(roomId.value, { number_in_room: seat })
     successMsg.value = t('gameRoom.messages.joined', { seat: joinResult.value.number_in_room })
     refreshCabinetBalance()
+    await loadRoomState(true)
     await loadRoundStatus()
   } catch (error: any) {
     errorMsg.value = normalizeError(error, t('gameRoom.errors.joinSeat'))
@@ -533,9 +576,14 @@ async function leaveRoom() {
     const response = await GameApi.leaveRoom(roomId.value)
     successMsg.value = t('gameRoom.messages.left', { refund: response.refund ?? 0 })
     joinResult.value = null
-    roundStatus.value = null
-    stopStatusPolling()
-    stopRoundEvents()
+    await loadRoomState(true)
+    if (activeRoundId.value) {
+      await loadRoundStatus(true)
+    } else {
+      roundStatus.value = null
+      stopStatusPolling()
+      stopRoundEvents()
+    }
     refreshCabinetBalance()
   } catch (error: any) {
     errorMsg.value = normalizeError(error, t('gameRoom.errors.leave'))

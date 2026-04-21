@@ -424,7 +424,7 @@ func (s *RoomService) LeaveRoomByUser(ctx context.Context, userID, roomID int64)
 			return repository.ErrWrongGameServer
 		}
 		if roomInfo.CurrentRoundID == nil {
-			return repository.ErrParticipantNotFound
+			return nil
 		}
 
 		roundID = *roomInfo.CurrentRoundID
@@ -451,7 +451,7 @@ func (s *RoomService) LeaveRoomByUser(ctx context.Context, userID, roomID int64)
 			}
 		}
 		if len(leavingParticipants) == 0 {
-			return repository.ErrParticipantNotFound
+			return nil
 		}
 
 		for _, participant := range leavingParticipants {

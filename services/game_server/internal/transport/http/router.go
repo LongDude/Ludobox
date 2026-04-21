@@ -15,6 +15,7 @@ func MainRouter(r *gin.RouterGroup, a *app.App) {
 	{
 		roomScoped := rooms.Group("/:roomID")
 		{
+			roomScoped.GET("", func(ctx *gin.Context) { handlers.GetRoomState(ctx, a) })
 			roomScoped.POST("/join", func(ctx *gin.Context) { handlers.JoinRoom(ctx, a) })
 			roomScoped.POST("/join-seat", func(ctx *gin.Context) { handlers.JoinRoomWithSeat(ctx, a) })
 			roomScoped.POST("/leave", func(ctx *gin.Context) { handlers.LeaveRoomByUser(ctx, a) })

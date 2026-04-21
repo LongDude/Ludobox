@@ -11,6 +11,7 @@ import (
 	"game_server/internal/app"
 	"game_server/internal/domain"
 	"game_server/internal/repository"
+	"game_server/internal/service"
 	"game_server/internal/transport/dto"
 
 	"github.com/gin-gonic/gin"
@@ -79,6 +80,54 @@ func routeRoomID(ctx *gin.Context) (int64, error) {
 
 func roomInfoMatchesRouteRoom(roomInfo *domain.RoomInfo, roomID int64) bool {
 	return roomInfo != nil && roomInfo.Room != nil && roomInfo.Room.RoomID == roomID
+}
+
+func roomStateResponse(roomInfo *domain.RoomInfo, timerService *service.TimerService) dto.RoomStateResponse {
+	response := dto.RoomStateResponse{
+		RoomID:         roomInfo.Room.RoomID,
+		RoomCapacity:   roomInfo.Config.Capacity,
+		CurrentPlayers: roomInfo.ActiveParticipantsCount,
+		MinPlayers:     roomInfo.Config.MinUsers,
+		EntryPrice:     roomInfo.Config.RegistrationPrice,
+		IsBoost:        roomInfo.Config.IsBoost,
+		BoostPower:     roomInfo.Config.BoostPower,
+		BoostPrice:     roomInfo.Config.BoostPrice,
+	}
+	if roomInfo.CurrentRoundID != nil {
+		response.RoundID = *roomInfo.CurrentRoundID
+	}
+	if roomInfo.CurrentRoundStatus != nil {
+		response.RoundStatus = *roomInfo.CurrentRoundStatus
+	}
+	if roomInfo.CurrentRoundID != nil && timerService != nil {
+		if ok, timerInfo := timerService.GetTimerInfo(*roomInfo.CurrentRoundID); ok {
+			response.TimerStartsAt = timerInfo.StartedAt
+			if response.RoundStatus == "" && timerInfo.Status != "" {
+				response.RoundStatus = timerInfo.Status
+			}
+		}
+	}
+	return response
+}
+
+func GetRoomState(ctx *gin.Context, a *app.App) {
+	roomID, err := routeRoomID(ctx)
+	if err != nil {
+		ctx.JSON(http.StatusBadRequest, dto.ErrorResponse{Error: err.Error()})
+		return
+	}
+
+	roomInfo, err := a.RoomService.GetRoomInfo(ctx.Request.Context(), roomID)
+	if err != nil {
+		ctx.JSON(http.StatusInternalServerError, dto.ErrorResponse{Error: err.Error()})
+		return
+	}
+	if roomInfo == nil || roomInfo.Room == nil || roomInfo.Config == nil {
+		ctx.JSON(http.StatusNotFound, dto.ErrorResponse{Error: "Room not found", Code: "ROOM_NOT_FOUND"})
+		return
+	}
+
+	ctx.JSON(http.StatusOK, roomStateResponse(roomInfo, a.TimerService))
 }
 
 // JoinRoom godoc
