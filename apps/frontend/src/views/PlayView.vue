@@ -47,6 +47,7 @@ const liveEvents = ref<LiveRoundEvent[]>([])
 const displayedRoundId = ref<number | null>(null)
 const pendingNextRoundId = ref<number | null>(null)
 const pendingNextRoundCountdown = ref(0)
+const pendingNextRoundAt = ref<number | null>(null)
 let statusTimer: number | null = null
 let roundEventsStop: (() => void) | null = null
 let nextRoundTimer: number | null = null
@@ -256,6 +257,9 @@ const boostHint = computed(() => {
 const nextRoundAvailable = computed(
   () => Boolean(pendingNextRoundId.value && pendingNextRoundId.value !== activeRoundId.value),
 )
+const showNextRoundCountdown = computed(
+  () => autoAdvanceNextRound.value && nextRoundAvailable.value && pendingNextRoundCountdown.value > 0,
+)
 const roundTimerValue = computed(() => roundStatus.value?.time_left_seconds ?? '-')
 
 watch(
@@ -310,9 +314,22 @@ watch(
 watch(
   () => autoAdvanceNextRound.value,
   (enabled) => {
-    if (enabled && nextRoundAvailable.value && pendingNextRoundCountdown.value === 0) {
-      void goToNextRound()
+    if (!pendingNextRoundId.value) return
+
+    if (!enabled) {
+      stopNextRoundCountdown()
+      pendingNextRoundCountdown.value = 0
+      return
     }
+
+    if (pendingNextRoundAt.value === null) {
+      if (nextRoundAvailable.value) {
+        void goToNextRound()
+      }
+      return
+    }
+
+    startNextRoundCountdown()
   },
 )
 
@@ -387,6 +404,7 @@ function clearPendingNextRound() {
   stopNextRoundCountdown()
   pendingNextRoundId.value = null
   pendingNextRoundCountdown.value = 0
+  pendingNextRoundAt.value = null
 }
 
 function stopStatusPolling() {
@@ -459,6 +477,13 @@ function handleRoundEvent(event: GameRoundEvent) {
   if (event.type === 'round_finalized') {
     const data = eventData(event)
     const finalizedRoundId = Number(data.round_id ?? activeRoundId.value ?? 0) || 0
+    if (roundStatus.value && roundStatus.value.round_id === finalizedRoundId) {
+      roundStatus.value = {
+        ...roundStatus.value,
+        status: 'finished',
+        time_left_seconds: 0,
+      }
+    }
     if (finalizedRoundId > 0) {
       displayedRoundId.value = finalizedRoundId
     }
@@ -801,6 +826,35 @@ function syncPendingNextRoundFromState() {
   )
 }
 
+function startNextRoundCountdown() {
+  stopNextRoundCountdown()
+
+  if (!autoAdvanceNextRound.value || !pendingNextRoundId.value || pendingNextRoundAt.value === null) {
+    pendingNextRoundCountdown.value = 0
+    return
+  }
+
+  const tick = () => {
+    if (pendingNextRoundAt.value === null) {
+      stopNextRoundCountdown()
+      pendingNextRoundCountdown.value = 0
+      return
+    }
+
+    const secondsLeft = Math.max(0, Math.ceil((pendingNextRoundAt.value - Date.now()) / 1000))
+    pendingNextRoundCountdown.value = secondsLeft
+    if (secondsLeft > 0) return
+
+    stopNextRoundCountdown()
+    void goToNextRound()
+  }
+
+  tick()
+  if (pendingNextRoundAt.value > Date.now()) {
+    nextRoundTimer = window.setInterval(tick, 1000)
+  }
+}
+
 function scheduleNextRoundTransition(nextRoundId: number | null, nextRoundDelay: number, timestamp: string) {
   clearPendingNextRound()
 
@@ -810,23 +864,8 @@ function scheduleNextRoundTransition(nextRoundId: number | null, nextRoundDelay:
 
   const finalizedAt = new Date(timestamp).getTime()
   const baseTime = Number.isFinite(finalizedAt) ? finalizedAt : Date.now()
-  const targetAt = baseTime + Math.max(0, nextRoundDelay) * 1000
-
-  const tick = () => {
-    const secondsLeft = Math.max(0, Math.ceil((targetAt - Date.now()) / 1000))
-    pendingNextRoundCountdown.value = secondsLeft
-    if (secondsLeft > 0) return
-
-    stopNextRoundCountdown()
-    if (autoAdvanceNextRound.value) {
-      void goToNextRound()
-    }
-  }
-
-  tick()
-  if (targetAt > Date.now()) {
-    nextRoundTimer = window.setInterval(tick, 1000)
-  }
+  pendingNextRoundAt.value = baseTime + Math.max(0, nextRoundDelay) * 1000
+  startNextRoundCountdown()
 }
 </script>
 
@@ -986,7 +1025,7 @@ function scheduleNextRoundTransition(nextRoundId: number | null, nextRoundDelay:
               {{ sseConnected ? t('gameRoom.round.liveConnected') : t('gameRoom.round.liveDisconnected') }}
             </strong>
           </div>
-          <div v-if="nextRoundAvailable" class="meta-item">
+          <div v-if="showNextRoundCountdown" class="meta-item">
             <span>{{ t('gameRoom.round.nextRoundTimer') }}</span>
             <strong>{{ pendingNextRoundCountdown }}s</strong>
           </div>
@@ -1046,8 +1085,11 @@ function scheduleNextRoundTransition(nextRoundId: number | null, nextRoundDelay:
         <div v-if="nextRoundAvailable" class="next-round-box">
           <div>
             <h3>{{ t('gameRoom.round.nextRoundTitle') }}</h3>
-            <p class="description">
+            <p class="description" v-if="showNextRoundCountdown">
               {{ t('gameRoom.round.nextRoundHint', { seconds: pendingNextRoundCountdown }) }}
+            </p>
+            <p class="description" v-else>
+              {{ t('gameRoom.round.nextRoundManualHint') }}
             </p>
           </div>
           <button class="btn btn--primary" type="button" @click="goToNextRound">

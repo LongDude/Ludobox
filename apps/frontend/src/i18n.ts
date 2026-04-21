@@ -695,6 +695,8 @@ const messages: Record<Locale, Record<string, string>> = {
     'gameRoom.round.nextRoundTitle': 'Next round is ready',
     'gameRoom.round.nextRoundHint':
       'You can review the results now. The next round opens in {seconds}s.',
+    'gameRoom.round.nextRoundManualHint':
+      'You can review the results and switch to the next round manually when ready.',
     'gameRoom.round.goToNextRound': 'Go to next round',
     'gameRoom.participant.active': 'Active',
     'gameRoom.participant.bot': 'Bot',
@@ -822,6 +824,8 @@ const messages: Record<Locale, Record<string, string>> = {
     'gameRoom.round.nextRoundTitle': 'Следующий раунд готов',
     'gameRoom.round.nextRoundHint':
       'Можно посмотреть результаты текущего матча. Следующий раунд откроется через {seconds}с.',
+    'gameRoom.round.nextRoundManualHint':
+      'Можно изучить результаты и перейти к следующему раунду вручную, когда будете готовы.',
     'gameRoom.round.goToNextRound': 'Перейти к следующему раунду',
     'gameRoom.participant.active': 'Активен',
     'gameRoom.participant.bot': 'Бот',
