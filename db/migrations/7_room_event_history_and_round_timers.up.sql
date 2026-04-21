@@ -2,9 +2,13 @@ ALTER TABLE config
     ADD COLUMN IF NOT EXISTS round_time INT NOT NULL DEFAULT 60 CHECK (round_time > 0),
     ADD COLUMN IF NOT EXISTS next_round_delay INT NOT NULL DEFAULT 0 CHECK (next_round_delay >= 0);
 
+ALTER TABLE config DISABLE TRIGGER trg_config_append_only;
+
 UPDATE config
 SET round_time = time
 WHERE round_time = 60;
+
+ALTER TABLE config ENABLE TRIGGER trg_config_append_only;
 
 CREATE TABLE IF NOT EXISTS room_events
 (
