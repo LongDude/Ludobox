@@ -260,7 +260,7 @@ func (s *RoomService) PurchaseBoost(ctx context.Context, participantID, userID i
 		if err != nil {
 			return fmt.Errorf("get round status: %w", err)
 		}
-		if status != "waiting" {
+		if !canChangeBoost(status) {
 			return repository.ErrGameAlreadyStarted
 		}
 
@@ -313,7 +313,7 @@ func (s *RoomService) CancelBoost(ctx context.Context, participantID, userID int
 		if err != nil {
 			return fmt.Errorf("get round status: %w", err)
 		}
-		if status != "waiting" {
+		if !canChangeBoost(status) {
 			return repository.ErrGameAlreadyStarted
 		}
 
@@ -329,6 +329,10 @@ func (s *RoomService) CancelBoost(ctx context.Context, participantID, userID int
 
 		return ts.UpdateParticipantBoost(ctx, participantID, 0)
 	})
+}
+
+func canChangeBoost(roundStatus string) bool {
+	return roundStatus == "waiting" || roundStatus == "active"
 }
 
 // LeaveRoom atomically releases all reservations, refunds the participant, and frees the seat.

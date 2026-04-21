@@ -507,6 +507,31 @@ func TestPurchaseBoostAllowsOnlyOneBoostPerUser(t *testing.T) {
 	}
 }
 
+func TestPurchaseBoostAllowedDuringActiveTimer(t *testing.T) {
+	ctx := context.Background()
+	scope := newMockTransactionScope()
+	repo := &mockRoomRepository{scope: scope}
+	service := NewRoomService(repo, nil, 1, nil, "")
+
+	participantID, err := service.JoinRoomWithSeat(ctx, 100, 1, 1)
+	if err != nil {
+		t.Fatalf("JoinRoomWithSeat failed: %v", err)
+	}
+	if err := scope.UpdateRoundStatus(ctx, 1, "active"); err != nil {
+		t.Fatalf("UpdateRoundStatus failed: %v", err)
+	}
+
+	if err := service.PurchaseBoost(ctx, participantID, 100, 25, 50); err != nil {
+		t.Fatalf("PurchaseBoost during active timer failed: %v", err)
+	}
+	if scope.participants[participantID].Boost != 25 {
+		t.Fatalf("unexpected boost: got %d want 25", scope.participants[participantID].Boost)
+	}
+	if scope.balances[100] != 850 {
+		t.Fatalf("unexpected balance: got %d want 850", scope.balances[100])
+	}
+}
+
 func TestLeaveRoomByUserReleasesAllUserSeats(t *testing.T) {
 	ctx := context.Background()
 	scope := newMockTransactionScope()

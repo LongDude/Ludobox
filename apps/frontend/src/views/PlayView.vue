@@ -6,6 +6,7 @@ import UpTab from '@/components/UpTab.vue'
 import FooterTab from '@/components/FooterTab.vue'
 import { GameApi } from '@/api/useMatchApi'
 import type { GameJoinRoomResponse, GameParticipantInfo, GameRoundEvent, GameRoundStatusResponse } from '@/api/types'
+import { useAuthStore } from '@/stores/authStore'
 import { useMatchSessionStore } from '@/stores/matchSessionStore'
 import { useUserCabinetStore } from '@/stores/userCabinetStore'
 import { useI18n } from '@/i18n'
@@ -13,6 +14,7 @@ import { useLayoutInset } from '@/composables/useLayoutInset'
 
 const route = useRoute()
 const router = useRouter()
+const auth = useAuthStore()
 const session = useMatchSessionStore()
 const cabinet = useUserCabinetStore()
 const { t } = useI18n()
@@ -102,8 +104,27 @@ const participants = computed(() =>
 )
 
 const winners = computed(() => roundStatus.value?.winners ?? [])
-const canBoost = computed(() => Boolean(activeParticipantId.value) && room.value?.is_boost !== false)
 const isJoined = computed(() => Boolean(activeParticipantId.value && activeRoundId.value))
+const activeParticipant = computed(() => {
+  const participantId = activeParticipantId.value
+  if (!participantId) return null
+  return participants.value.find((participant) => participant.participant_id === participantId) ?? null
+})
+const activeUserId = computed(() => auth.User?.id ?? activeParticipant.value?.user_id ?? null)
+const hasOwnedBoost = computed(() => {
+  const userId = activeUserId.value
+  if (userId) {
+    return participants.value.some((participant) => participant.user_id === userId && participant.boost > 0)
+  }
+
+  return Boolean(activeParticipant.value?.boost && activeParticipant.value.boost > 0)
+})
+const hasActiveParticipantBoost = computed(() => Boolean(activeParticipant.value?.boost && activeParticipant.value.boost > 0))
+const canBoost = computed(() => isJoined.value && room.value?.is_boost === true && !hasOwnedBoost.value)
+const boostHint = computed(() => {
+  if (hasOwnedBoost.value) return t('gameRoom.controls.boostAlreadyActive')
+  return canBoost.value ? t('gameRoom.controls.boostHint') : t('gameRoom.controls.boostDisabled')
+})
 
 watch(
   () => [quickMatchMeta.value, room.value] as const,
@@ -164,6 +185,10 @@ function formatScore() {
 }
 
 function normalizeError(error: any, fallback: string) {
+  const code = error?.details?.code
+  if (code === 'BOOST_ALREADY_PURCHASED') return t('gameRoom.errors.boostAlreadyPurchased')
+  if (code === 'BOOST_DISABLED') return t('gameRoom.errors.boostDisabled')
+  if (code === 'GAME_STARTED') return t('gameRoom.errors.gameStarted')
   return error?.message || error?.details?.message || error?.details?.error || fallback
 }
 
@@ -319,6 +344,10 @@ async function purchaseBoost() {
   const participantId = activeParticipantId.value
   if (!participantId) {
     errorMsg.value = t('gameRoom.errors.joinFirst')
+    return
+  }
+  if (hasOwnedBoost.value) {
+    errorMsg.value = t('gameRoom.errors.boostAlreadyPurchased')
     return
   }
 
@@ -596,7 +625,7 @@ async function leaveRoom() {
         <div class="control-block">
           <h3>{{ t('gameRoom.controls.boostTitle') }}</h3>
           <p class="description">
-            {{ canBoost ? t('gameRoom.controls.boostHint') : t('gameRoom.controls.boostDisabled') }}
+            {{ boostHint }}
           </p>
           <p class="boost-value">
             <span>{{ t('gameRoom.controls.boostValue') }}</span>
@@ -614,7 +643,7 @@ async function leaveRoom() {
             <button
               class="btn"
               type="button"
-              :disabled="!activeParticipantId || actionLoading === 'cancel-boost'"
+              :disabled="!hasActiveParticipantBoost || actionLoading === 'cancel-boost'"
               @click="cancelBoost"
             >
               {{ actionLoading === 'cancel-boost' ? t('common.loading') : t('gameRoom.controls.cancelBoost') }}

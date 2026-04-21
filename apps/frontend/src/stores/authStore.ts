@@ -33,6 +33,7 @@ export const useAuthStore = defineStore('auth', () => {
     try {
       const userRes = await SSOApi.authenticate()
       User.value = <User>{
+        id: userRes.id,
         email: userRes.email,
         email_confirmed: userRes.email_confirmed,
         first_name: userRes.first_name,
@@ -99,6 +100,7 @@ export const useAuthStore = defineStore('auth', () => {
   async function updateUser(payload: UserUpdateRequest) {
     const updated = await SSOApi.updateUser(payload)
     User.value = <User>{
+      id: updated.id,
       email: updated.email,
       email_confirmed: updated.email_confirmed,
       first_name: updated.first_name,
