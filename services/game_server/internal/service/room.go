@@ -651,21 +651,21 @@ func (s *RoomService) finalizeRoundAndCreateNext(ctx context.Context, roundID in
 			}
 		}
 
-		roomInfo, err := s.GetRoomInfoByRound(ctx, roundID)
-		if err != nil {
-			return err
-		}
-		if roomInfo == nil || roomInfo.Config == nil {
-			return repository.ErrRoomNotFound
-		}
+		// roomInfo, err := s.GetRoomInfoByRound(ctx, roundID)
+		// if err != nil {
+		// 	return err
+		// }
+		// if roomInfo == nil || roomInfo.Config == nil {
+		// 	return repository.ErrRoomNotFound
+		// }
 
 		for _, participant := range participants {
 			if _, err := ts.CommitReservations(ctx, participant.RoundParticipantID); err != nil && !errors.Is(err, repository.ErrActiveReservationNotFound) {
 				return fmt.Errorf("commit reservations for participant %d: %w", participant.RoundParticipantID, err)
 			}
 
-			winAmount := (roomInfo.Config.RegistrationPrice * int64(roomInfo.Config.Capacity)) / int64(len(winners))
-			// winAmount := winners[participant.RoundParticipantID]
+			// winAmount := (roomInfo.Config.RegistrationPrice * int64(roomInfo.Config.Capacity)) / int64(len(winners))
+			winAmount := winners[participant.RoundParticipantID]
 			if winAmount > 0 {
 				if err := ts.UpdateBalance(ctx, participant.UserID, winAmount); err != nil {
 					return fmt.Errorf("credit winner %d: %w", participant.RoundParticipantID, err)
@@ -777,7 +777,7 @@ func (s *RoomService) FinalizeGameRound(ctx context.Context, roundID int64) ([]d
 		return nil, err
 	}
 
-	payouts := buildPayouts(roomInfo.Config, len(participants), len(winningPositions))
+	payouts := buildPayouts(roomInfo.Config, len(winningPositions))
 	payoutsByParticipant := make(map[int64]int64, len(winningPositions))
 	winners := make([]domain.RoundParticipant, 0, len(winningPositions))
 	participantsBySeat := make(map[int]domain.RoundParticipant, len(participants))
@@ -949,12 +949,12 @@ func (s *RoomService) requestWinningPositions(ctx context.Context, config *domai
 	return rngResponse.WinningPositions, nil
 }
 
-func buildPayouts(config *domain.RoomConfig, participantsCount int, winnersCount int) []int64 {
+func buildPayouts(config *domain.RoomConfig, winnersCount int) []int64 {
 	if winnersCount == 0 {
 		return nil
 	}
 
-	grossBank := config.RegistrationPrice * int64(participantsCount)
+	grossBank := config.RegistrationPrice * int64(config.Capacity)
 	commission := grossBank * int64(config.Commission) / 100
 	prizePool := grossBank - commission
 	payouts := make([]int64, winnersCount)
