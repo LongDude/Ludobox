@@ -897,19 +897,22 @@ func (s *RoomService) requestWinningPositions(ctx context.Context, config *domai
 		winnersCount = countPlayers
 	}
 
-	sumProbabilities := 0.0
+	coefBoost := (100 + float64(boostPower)) / 100.0
+	sumProbabilities := 1.0
+	weight := 1.0 / float64(winnersCount)
 	probabilities := make([]float64, countPlayers)
+	for i := range countPlayers {
+		probabilities[i] = weight
+	}
 	for _, participant := range participants {
-		weight := 1.0 / float64(winnersCount)
 		if participant.Boost > 0 {
-			weight = weight * (100 + float64(boostPower)) / 100.0
+			probabilities[participant.NumberInRoom-1] *= coefBoost
+			sumProbabilities += coefBoost
 		}
-		probabilities[participant.NumberInRoom-1] = weight
-		sumProbabilities += weight
 	}
 
-	for _, participant := range participants {
-		probabilities[participant.NumberInRoom-1] /= sumProbabilities
+	for i := range countPlayers {
+		probabilities[i] /= sumProbabilities
 	}
 
 	payload := rngDistributeRequest{
