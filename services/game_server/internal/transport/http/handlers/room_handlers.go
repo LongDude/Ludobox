@@ -241,14 +241,12 @@ func JoinRoomWithSeat(ctx *gin.Context, a *app.App) {
 
 // PurchaseBoost godoc
 // @Summary Purchase boost
-// @Description User purchases a boost for their seat
+// @Description User purchases the configured room boost for their seat
 // @Tags Rooms
-// @Accept json
 // @Produce json
 // @Param Authorization header string true "Bearer access token"
 // @Param roomID path int64 true "Room ID"
 // @Param roundParticipantID path int64 true "Round participant ID"
-// @Param request body dto.PurchaseBoostRequest true "Purchase boost request"
 // @Success 200 {object} dto.PurchaseBoostResponse
 // @Failure 400 {object} dto.ErrorResponse
 // @Failure 409 {object} dto.ErrorResponse
@@ -268,12 +266,6 @@ func PurchaseBoost(ctx *gin.Context, a *app.App) {
 
 	roomID, err := routeRoomID(ctx)
 	if err != nil {
-		ctx.JSON(http.StatusBadRequest, dto.ErrorResponse{Error: err.Error()})
-		return
-	}
-
-	var req dto.PurchaseBoostRequest
-	if err := ctx.ShouldBindJSON(&req); err != nil {
 		ctx.JSON(http.StatusBadRequest, dto.ErrorResponse{Error: err.Error()})
 		return
 	}
@@ -301,12 +293,13 @@ func PurchaseBoost(ctx *gin.Context, a *app.App) {
 		ctx.JSON(http.StatusConflict, dto.ErrorResponse{Error: "Boost is disabled for room", Code: "BOOST_DISABLED"})
 		return
 	}
+	boostPower := int64(roomInfo.Config.BoostPower)
 
 	err = a.RoomService.PurchaseBoost(
 		ctx.Request.Context(),
 		participantID,
 		userID,
-		req.BoostValue,
+		boostPower,
 		roomInfo.Config.BoostPrice,
 	)
 	if err != nil {
@@ -319,12 +312,12 @@ func PurchaseBoost(ctx *gin.Context, a *app.App) {
 		ctx.Request.Context(),
 		participant.RoundsID,
 		participantID,
-		int(req.BoostValue),
+		roomInfo.Config.BoostPower,
 	)
 
 	ctx.JSON(http.StatusOK, dto.PurchaseBoostResponse{
 		Success:    true,
-		BoostPower: int(req.BoostValue),
+		BoostPower: roomInfo.Config.BoostPower,
 		BoostCost:  roomInfo.Config.BoostPrice,
 	})
 }
@@ -459,6 +452,74 @@ func LeaveRoom(ctx *gin.Context, a *app.App) {
 	})
 }
 
+// LeaveRoomByUser godoc
+// @Summary Leave room completely
+// @Description User leaves the room completely and releases all active seats before game starts
+// @Tags Rooms
+// @Accept json
+// @Produce json
+// @Param Authorization header string true "Bearer access token"
+// @Param roomID path int64 true "Room ID"
+// @Success 200 {object} dto.LeaveRoomResponse
+// @Failure 400 {object} dto.ErrorResponse
+// @Failure 404 {object} dto.ErrorResponse
+// @Failure 409 {object} dto.ErrorResponse
+// @Router /rooms/{roomID}/leave [post]
+func LeaveRoomByUser(ctx *gin.Context, a *app.App) {
+	userID, err := authenticatedUserID(ctx)
+	if err != nil {
+		ctx.JSON(http.StatusBadRequest, dto.ErrorResponse{Error: err.Error()})
+		return
+	}
+
+	roomID, err := routeRoomID(ctx)
+	if err != nil {
+		ctx.JSON(http.StatusBadRequest, dto.ErrorResponse{Error: err.Error()})
+		return
+	}
+
+	var roundID int64
+	leavingParticipants := make([]domain.RoundParticipant, 0)
+	roomInfo, err := a.RoomService.GetRoomInfo(ctx.Request.Context(), roomID)
+	if err == nil && roomInfo != nil && roomInfo.CurrentRoundID != nil {
+		roundID = *roomInfo.CurrentRoundID
+		participants, participantsErr := a.RoomService.GetParticipantsByRound(ctx.Request.Context(), roundID)
+		if participantsErr == nil {
+			for _, participant := range participants {
+				if participant.UserID == userID && participant.ExitRoomAt == nil {
+					leavingParticipants = append(leavingParticipants, participant)
+				}
+			}
+		}
+	}
+
+	refund, err := a.RoomService.LeaveRoomByUser(ctx.Request.Context(), userID, roomID)
+	if err != nil {
+		renderRoomError(ctx, err)
+		return
+	}
+
+	currentPlayers := 0
+	roomInfo, err = a.RoomService.GetRoomInfo(ctx.Request.Context(), roomID)
+	if err == nil && roomInfo != nil {
+		currentPlayers = roomInfo.ActiveParticipantsCount
+	}
+	for _, participant := range leavingParticipants {
+		a.EventsService.PublishPlayerLeft(
+			ctx.Request.Context(),
+			participant.RoundsID,
+			participant.RoundParticipantID,
+			participant.NumberInRoom,
+			currentPlayers,
+		)
+	}
+
+	ctx.JSON(http.StatusOK, dto.LeaveRoomResponse{
+		Success: true,
+		Refund:  refund,
+	})
+}
+
 // GetRoundStatus godoc
 // @Summary Get round status
 // @Description Get current status of a round
@@ -585,8 +646,7 @@ func SubscribeToRoundEvents(ctx *gin.Context, a *app.App) {
 	w.Header().Set("Content-Type", "text/event-stream")
 	w.Header().Set("Cache-Control", "no-cache")
 	w.Header().Set("Connection", "keep-alive")
-	w.Header().Set("Access-Control-Allow-Origin", "*")
-	w.Header().Set("Access-Control-Allow-Headers", "Content-Type")
+	w.Header().Set("X-Accel-Buffering", "no")
 
 	ctx.Status(http.StatusOK)
 	w.(http.Flusher).Flush()
@@ -724,8 +784,14 @@ func renderRoomError(ctx *gin.Context, err error) {
 		ctx.JSON(http.StatusForbidden, dto.ErrorResponse{Error: "Participant does not belong to user", Code: "PARTICIPANT_ACCESS_DENIED"})
 	case errors.Is(err, repository.ErrGameAlreadyStarted):
 		ctx.JSON(http.StatusConflict, dto.ErrorResponse{Error: "Cannot change room after game start", Code: "GAME_STARTED"})
+	case errors.Is(err, repository.ErrRoundNotJoinable):
+		ctx.JSON(http.StatusConflict, dto.ErrorResponse{Error: "Round is not joinable", Code: "ROUND_NOT_JOINABLE"})
 	case errors.Is(err, repository.ErrBoostDisabled):
 		ctx.JSON(http.StatusConflict, dto.ErrorResponse{Error: "Boost is disabled for room", Code: "BOOST_DISABLED"})
+	case errors.Is(err, repository.ErrBoostAlreadyPurchased):
+		ctx.JSON(http.StatusConflict, dto.ErrorResponse{Error: "Boost already purchased", Code: "BOOST_ALREADY_PURCHASED"})
+	case errors.Is(err, repository.ErrInvalidAmount):
+		ctx.JSON(http.StatusBadRequest, dto.ErrorResponse{Error: "Invalid amount", Code: "INVALID_AMOUNT"})
 	case errors.Is(err, repository.ErrInvalidSeatNumber):
 		ctx.JSON(http.StatusBadRequest, dto.ErrorResponse{Error: "Invalid seat number", Code: "INVALID_SEAT"})
 	default:

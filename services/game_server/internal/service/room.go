@@ -235,9 +235,9 @@ func (s *RoomService) joinRoom(ctx context.Context, userID, roomID int64, reques
 	return participantID, nil
 }
 
-// PurchaseBoost atomically replaces an existing boost reservation with a new one.
-func (s *RoomService) PurchaseBoost(ctx context.Context, participantID, userID int64, boostValue, boostCost int64) error {
-	if boostValue <= 0 {
+// PurchaseBoost atomically purchases the configured boost once for the user in a round.
+func (s *RoomService) PurchaseBoost(ctx context.Context, participantID, userID int64, boostPower, boostCost int64) error {
+	if boostPower <= 0 {
 		return repository.ErrInvalidAmount
 	}
 	if boostCost <= 0 {
@@ -264,22 +264,22 @@ func (s *RoomService) PurchaseBoost(ctx context.Context, participantID, userID i
 			return repository.ErrGameAlreadyStarted
 		}
 
+		participants, err := ts.GetParticipantsByRoundID(ctx, participant.RoundsID)
+		if err != nil {
+			return fmt.Errorf("get participants by round: %w", err)
+		}
+		for _, roundParticipant := range participants {
+			if roundParticipant.UserID == userID && roundParticipant.Boost > 0 {
+				return repository.ErrBoostAlreadyPurchased
+			}
+		}
+
 		balance, err := ts.GetBalanceLocked(ctx, userID)
 		if err != nil {
 			return fmt.Errorf("lock balance: %w", err)
 		}
 
-		oldRefund, err := ts.ReleaseBoostReservations(ctx, participantID)
-		if err != nil && !errors.Is(err, repository.ErrActiveReservationNotFound) {
-			return fmt.Errorf("release previous boost: %w", err)
-		}
-		if oldRefund > 0 {
-			if err := ts.UpdateBalance(ctx, userID, oldRefund); err != nil {
-				return fmt.Errorf("refund previous boost: %w", err)
-			}
-		}
-
-		if balance+oldRefund < boostCost {
+		if balance < boostCost {
 			return repository.ErrInsufficientBalance
 		}
 
@@ -291,7 +291,7 @@ func (s *RoomService) PurchaseBoost(ctx context.Context, participantID, userID i
 			return fmt.Errorf("deduct boost cost: %w", err)
 		}
 
-		return ts.UpdateParticipantBoost(ctx, participantID, int(boostValue))
+		return ts.UpdateParticipantBoost(ctx, participantID, int(boostPower))
 	})
 }
 
@@ -400,6 +400,98 @@ func (s *RoomService) LeaveRoom(ctx context.Context, participantID, userID int64
 		s.refreshRoomCache(ctx, roomID)
 	}
 	return nil
+}
+
+// LeaveRoomByUser releases all active seats owned by the user in the room.
+func (s *RoomService) LeaveRoomByUser(ctx context.Context, userID, roomID int64) (int64, error) {
+	var roundID int64
+	totalRefund := int64(0)
+	roundCancelled := false
+
+	err := s.repo.InTransaction(ctx, func(ts repository.TransactionScope) error {
+		roomInfo, err := ts.GetRoomForUpdate(ctx, roomID)
+		if err != nil {
+			return err
+		}
+		if roomInfo == nil || roomInfo.Room == nil {
+			return repository.ErrRoomNotFound
+		}
+		if roomInfo.Room.ServerID != s.serverID {
+			return repository.ErrWrongGameServer
+		}
+		if roomInfo.CurrentRoundID == nil {
+			return repository.ErrParticipantNotFound
+		}
+
+		roundID = *roomInfo.CurrentRoundID
+		roundInfo, err := ts.GetRoundInfo(ctx, roundID)
+		if err != nil {
+			return fmt.Errorf("get round info: %w", err)
+		}
+		if roundInfo.Status == "active" {
+			return repository.ErrGameAlreadyStarted
+		}
+		if roundInfo.Status == "finished" || roundInfo.Status == "cancelled" {
+			return repository.ErrRoundNotJoinable
+		}
+
+		participants, err := ts.GetParticipantsByRoundID(ctx, roundID)
+		if err != nil {
+			return fmt.Errorf("get participants by round: %w", err)
+		}
+
+		leavingParticipants := make([]domain.RoundParticipant, 0)
+		for _, participant := range participants {
+			if participant.UserID == userID && participant.ExitRoomAt == nil {
+				leavingParticipants = append(leavingParticipants, participant)
+			}
+		}
+		if len(leavingParticipants) == 0 {
+			return repository.ErrParticipantNotFound
+		}
+
+		for _, participant := range leavingParticipants {
+			refund, err := ts.ReleaseAllReservations(ctx, participant.RoundParticipantID)
+			if err != nil {
+				return fmt.Errorf("release all reservations: %w", err)
+			}
+			if refund > 0 {
+				if err := ts.UpdateBalance(ctx, userID, refund); err != nil {
+					return fmt.Errorf("refund balance: %w", err)
+				}
+				totalRefund += refund
+			}
+
+			if err := ts.MarkParticipantExited(ctx, participant.RoundParticipantID); err != nil {
+				return fmt.Errorf("mark participant exited: %w", err)
+			}
+		}
+
+		activeCount, err := ts.GetActiveParticipantsCount(ctx, roundID)
+		if err != nil {
+			return fmt.Errorf("get active participants count: %w", err)
+		}
+		if activeCount == 0 {
+			if err := ts.UpdateRoundStatus(ctx, roundID, "cancelled"); err != nil {
+				return fmt.Errorf("set round status cancelled: %w", err)
+			}
+			if err := ts.ArchiveRound(ctx, roundID); err != nil {
+				return fmt.Errorf("archive round: %w", err)
+			}
+			roundCancelled = true
+		}
+
+		return nil
+	})
+	if err != nil {
+		return 0, err
+	}
+
+	if roundCancelled && s.timerService != nil {
+		s.timerService.StopTimer(roundID)
+	}
+	s.refreshRoomCache(ctx, roomID)
+	return totalRefund, nil
 }
 
 // CancelWaitingRound releases every waiting participant reservation and archives the round.

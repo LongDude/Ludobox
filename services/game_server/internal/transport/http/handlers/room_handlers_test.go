@@ -31,7 +31,7 @@ func TestRouteRoomID(t *testing.T) {
 			wantRoomID: 123,
 		},
 		{
-			name:       "matching path header query and body",
+			name:       "matching path header and query",
 			route:      "/rooms/:roomID/probe",
 			path:       "/rooms/123/probe?room_id=123",
 			headers:    map[string]string{"X-Game-Room-ID": "123", "X-Room-ID": "123"},

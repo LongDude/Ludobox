@@ -20,6 +20,7 @@ func TestMainRouterRegistersRoomScopedRoutesOnly(t *testing.T) {
 	want := []string{
 		"POST /api/rooms/:roomID/join",
 		"POST /api/rooms/:roomID/join-seat",
+		"POST /api/rooms/:roomID/leave",
 		"POST /api/rooms/:roomID/participants/:participantID/boost",
 		"DELETE /api/rooms/:roomID/participants/:participantID/boost",
 		"POST /api/rooms/:roomID/participants/:participantID/leave",
@@ -37,6 +38,7 @@ func TestMainRouterRegistersRoomScopedRoutesOnly(t *testing.T) {
 	legacy := []string{
 		"POST /api/rooms/join",
 		"POST /api/rooms/join-seat",
+		"POST /api/rooms/leave",
 		"POST /api/rooms/participants/:participantID/boost",
 		"DELETE /api/rooms/participants/:participantID/boost",
 		"POST /api/rooms/participants/:participantID/leave",

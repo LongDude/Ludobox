@@ -18,5 +18,6 @@ var (
 	ErrRoundAlreadyFinalized     = errors.New("round already finalized")
 	ErrRoundNotJoinable          = errors.New("round is not joinable")
 	ErrBoostDisabled             = errors.New("boost is disabled for room")
+	ErrBoostAlreadyPurchased     = errors.New("boost already purchased")
 	ErrInvalidSeatNumber         = errors.New("invalid seat number")
 )

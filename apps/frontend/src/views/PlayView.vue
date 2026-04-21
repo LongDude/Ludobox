@@ -5,7 +5,7 @@ import LeftTab from '@/components/LeftTab.vue'
 import UpTab from '@/components/UpTab.vue'
 import FooterTab from '@/components/FooterTab.vue'
 import { GameApi } from '@/api/useMatchApi'
-import type { GameJoinRoomResponse, GameParticipantInfo, GameRoundStatusResponse } from '@/api/types'
+import type { GameJoinRoomResponse, GameParticipantInfo, GameRoundEvent, GameRoundStatusResponse } from '@/api/types'
 import { useMatchSessionStore } from '@/stores/matchSessionStore'
 import { useUserCabinetStore } from '@/stores/userCabinetStore'
 import { useI18n } from '@/i18n'
@@ -28,9 +28,13 @@ const actionLoading = ref('')
 const errorMsg = ref('')
 const successMsg = ref('')
 const selectedSeat = ref('')
-const boostValue = ref('')
 const autoRefresh = ref(true)
+const sseConnected = ref(false)
+const sseError = ref('')
+const liveEvents = ref<{ id: number; type: string; timestamp: string }[]>([])
 let statusTimer: number | null = null
+let roundEventsStop: (() => void) | null = null
+let liveEventId = 0
 
 const room = computed(() => {
   const candidate = session.selectedRoom
@@ -123,22 +127,21 @@ watch(
   { immediate: true },
 )
 
-watch(
-  () => room.value,
-  (nextRoom) => {
-    if (!boostValue.value && nextRoom?.boost_power) {
-      boostValue.value = String(nextRoom.boost_power)
-    }
-  },
-  { immediate: true },
-)
-
 watch([activeRoundId, autoRefresh], () => {
   restartStatusPolling()
 })
 
+watch(
+  () => [roomId.value, activeRoundId.value] as const,
+  () => {
+    restartRoundEvents()
+  },
+  { immediate: true },
+)
+
 onBeforeUnmount(() => {
   stopStatusPolling()
+  stopRoundEvents()
 })
 
 function backToHome() {
@@ -194,6 +197,55 @@ function restartStatusPolling() {
   statusTimer = window.setInterval(() => {
     void loadRoundStatus(true)
   }, 5000)
+}
+
+function stopRoundEvents() {
+  if (roundEventsStop) {
+    roundEventsStop()
+    roundEventsStop = null
+  }
+  sseConnected.value = false
+}
+
+function restartRoundEvents() {
+  stopRoundEvents()
+  liveEvents.value = []
+  sseError.value = ''
+
+  if (!activeRoundId.value) return
+
+  roundEventsStop = GameApi.subscribeRoundEvents(roomId.value, activeRoundId.value, {
+    onOpen: () => {
+      sseConnected.value = true
+      sseError.value = ''
+    },
+    onEvent: handleRoundEvent,
+    onError: (error) => {
+      sseConnected.value = false
+      sseError.value = normalizeError(error, t('gameRoom.errors.events'))
+    },
+    onClose: () => {
+      sseConnected.value = false
+    },
+  })
+}
+
+function handleRoundEvent(event: GameRoundEvent) {
+  liveEvents.value = [
+    { id: ++liveEventId, type: event.type, timestamp: event.timestamp },
+    ...liveEvents.value,
+  ].slice(0, 5)
+
+  void loadRoundStatus(true)
+  if (['boost_purchased', 'boost_cancelled', 'player_left', 'round_finalized'].includes(event.type)) {
+    refreshCabinetBalance()
+  }
+}
+
+function formatEventTime(timestamp: string) {
+  const date = new Date(timestamp)
+  if (Number.isNaN(date.getTime())) return ''
+  return date.toLocaleTimeString()
 }
 
 async function loadRoundStatus(silent = false) {
@@ -265,20 +317,15 @@ async function purchaseBoost() {
   clearFeedback()
 
   const participantId = activeParticipantId.value
-  const value = Number(boostValue.value)
   if (!participantId) {
     errorMsg.value = t('gameRoom.errors.joinFirst')
-    return
-  }
-  if (!Number.isInteger(value) || value <= 0) {
-    errorMsg.value = t('gameRoom.errors.boostRequired')
     return
   }
 
   actionLoading.value = 'boost'
 
   try {
-    const response = await GameApi.purchaseBoost(roomId.value, participantId, { boost_value: value })
+    const response = await GameApi.purchaseBoost(roomId.value, participantId)
     successMsg.value = t('gameRoom.messages.boostPurchased', {
       power: response.boost_power,
       cost: response.boost_cost,
@@ -318,8 +365,7 @@ async function cancelBoost() {
 async function leaveRoom() {
   clearFeedback()
 
-  const participantId = activeParticipantId.value
-  if (!participantId) {
+  if (!isJoined.value) {
     errorMsg.value = t('gameRoom.errors.joinFirst')
     return
   }
@@ -330,11 +376,12 @@ async function leaveRoom() {
   actionLoading.value = 'leave'
 
   try {
-    const response = await GameApi.leaveRoom(roomId.value, participantId)
+    const response = await GameApi.leaveRoom(roomId.value)
     successMsg.value = t('gameRoom.messages.left', { refund: response.refund ?? 0 })
     joinResult.value = null
     roundStatus.value = null
     stopStatusPolling()
+    stopRoundEvents()
     refreshCabinetBalance()
   } catch (error: any) {
     errorMsg.value = normalizeError(error, t('gameRoom.errors.leave'))
@@ -487,6 +534,12 @@ async function leaveRoom() {
               <span>{{ autoRefresh ? t('common.yes') : t('common.no') }}</span>
             </label>
           </div>
+          <div class="meta-item">
+            <span>{{ t('gameRoom.round.liveStatus') }}</span>
+            <strong :class="{ live: sseConnected }">
+              {{ sseConnected ? t('gameRoom.round.liveConnected') : t('gameRoom.round.liveDisconnected') }}
+            </strong>
+          </div>
         </div>
 
         <div class="participants">
@@ -517,6 +570,16 @@ async function leaveRoom() {
             {{ winner.winning_money }}
           </span>
         </div>
+        <div class="live-events">
+          <h3>{{ t('gameRoom.round.liveEvents') }}</h3>
+          <p v-if="sseError" class="description">{{ sseError }}</p>
+          <p v-else-if="!liveEvents.length" class="description">{{ t('gameRoom.round.noLiveEvents') }}</p>
+          <div v-else class="event-list">
+            <span v-for="event in liveEvents" :key="event.id" class="event-chip">
+              {{ event.type }} {{ formatEventTime(event.timestamp) }}
+            </span>
+          </div>
+        </div>
       </article>
     </section>
 
@@ -535,10 +598,10 @@ async function leaveRoom() {
           <p class="description">
             {{ canBoost ? t('gameRoom.controls.boostHint') : t('gameRoom.controls.boostDisabled') }}
           </p>
-          <label>
+          <p class="boost-value">
             <span>{{ t('gameRoom.controls.boostValue') }}</span>
-            <input v-model="boostValue" type="number" min="1" step="1" placeholder="10" />
-          </label>
+            <strong>{{ formatBoost() }}</strong>
+          </p>
           <div class="actions stretch">
             <button
               class="btn btn--primary"
@@ -566,7 +629,7 @@ async function leaveRoom() {
             <button
               class="btn btn--danger"
               type="button"
-              :disabled="!activeParticipantId || actionLoading === 'leave'"
+              :disabled="!isJoined || actionLoading === 'leave'"
               @click="leaveRoom"
             >
               {{ actionLoading === 'leave' ? t('common.loading') : t('gameRoom.controls.leave') }}
@@ -625,7 +688,8 @@ async function leaveRoom() {
 
 .hero-pills,
 .actions,
-.winner-chip {
+.winner-chip,
+.event-chip {
   display: inline-flex;
   align-items: center;
   gap: 0.65rem;
@@ -685,12 +749,14 @@ dl {
 .description,
 .meta-item span,
 .participant-card span,
-label span {
+label span,
+.boost-value span {
   color: var(--color-muted);
 }
 
 .source-pill,
-.winner-chip {
+.winner-chip,
+.event-chip {
   justify-content: center;
   border-radius: 999px;
   padding: 0.55rem 0.85rem;
@@ -701,6 +767,10 @@ label span {
 
 .source-pill.joined {
   background: color-mix(in oklab, var(--color-success), transparent 82%);
+}
+
+strong.live {
+  color: var(--color-success);
 }
 
 .feedback-bar {
@@ -768,9 +838,19 @@ label,
 .seat-input,
 .participants,
 .winners,
-.participant-list {
+.participant-list,
+.live-events,
+.event-list {
   display: grid;
   gap: 0.55rem;
+}
+
+.boost-value {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  margin: 0;
 }
 
 input[type='number'] {

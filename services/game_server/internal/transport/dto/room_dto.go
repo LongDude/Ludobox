@@ -18,10 +18,6 @@ type JoinRoomResponse struct {
 	TimerStartsAt  *time.Time `json:"timer_starts_at,omitempty"`
 }
 
-type PurchaseBoostRequest struct {
-	BoostValue int64 `json:"boost_value" binding:"required,min=1"`
-}
-
 type PurchaseBoostResponse struct {
 	Success    bool   `json:"success"`
 	BoostPower int    `json:"boost_power"`

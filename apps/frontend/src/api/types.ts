@@ -118,10 +118,6 @@ export interface GameRoundStatusResponse {
   winners: GameParticipantInfo[]
 }
 
-export interface GamePurchaseBoostRequest {
-  boost_value: number
-}
-
 export interface GamePurchaseBoostResponse {
   success: boolean
   message?: string
@@ -139,6 +135,12 @@ export interface GameLeaveRoomResponse {
   success: boolean
   message?: string
   refund?: number
+}
+
+export interface GameRoundEvent {
+  type: string
+  timestamp: string
+  data: unknown
 }
 
 export interface UserResponse {

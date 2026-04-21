@@ -470,6 +470,94 @@ func TestLeaveRoomRejectsForeignParticipant(t *testing.T) {
 	}
 }
 
+func TestPurchaseBoostAllowsOnlyOneBoostPerUser(t *testing.T) {
+	ctx := context.Background()
+	scope := newMockTransactionScope()
+	repo := &mockRoomRepository{scope: scope}
+	service := NewRoomService(repo, nil, 1, nil, "")
+
+	firstParticipantID, err := service.JoinRoomWithSeat(ctx, 100, 1, 1)
+	if err != nil {
+		t.Fatalf("first JoinRoomWithSeat failed: %v", err)
+	}
+	secondParticipantID, err := service.JoinRoomWithSeat(ctx, 100, 1, 2)
+	if err != nil {
+		t.Fatalf("second JoinRoomWithSeat failed: %v", err)
+	}
+
+	if err := service.PurchaseBoost(ctx, firstParticipantID, 100, 25, 50); err != nil {
+		t.Fatalf("PurchaseBoost failed: %v", err)
+	}
+	if scope.participants[firstParticipantID].Boost != 25 {
+		t.Fatalf("unexpected boost: got %d want 25", scope.participants[firstParticipantID].Boost)
+	}
+	if scope.balances[100] != 750 {
+		t.Fatalf("unexpected balance after boost: got %d want 750", scope.balances[100])
+	}
+
+	err = service.PurchaseBoost(ctx, secondParticipantID, 100, 25, 50)
+	if !errors.Is(err, repository.ErrBoostAlreadyPurchased) {
+		t.Fatalf("expected ErrBoostAlreadyPurchased, got %v", err)
+	}
+	if scope.participants[secondParticipantID].Boost != 0 {
+		t.Fatalf("unexpected second participant boost: got %d want 0", scope.participants[secondParticipantID].Boost)
+	}
+	if scope.balances[100] != 750 {
+		t.Fatalf("unexpected balance after rejected boost: got %d want 750", scope.balances[100])
+	}
+}
+
+func TestLeaveRoomByUserReleasesAllUserSeats(t *testing.T) {
+	ctx := context.Background()
+	scope := newMockTransactionScope()
+	repo := &mockRoomRepository{scope: scope}
+	service := NewRoomService(repo, nil, 1, nil, "")
+
+	firstParticipantID, err := service.JoinRoomWithSeat(ctx, 100, 1, 1)
+	if err != nil {
+		t.Fatalf("first JoinRoomWithSeat failed: %v", err)
+	}
+	secondParticipantID, err := service.JoinRoomWithSeat(ctx, 100, 1, 2)
+	if err != nil {
+		t.Fatalf("second JoinRoomWithSeat failed: %v", err)
+	}
+	otherParticipantID, err := service.JoinRoomWithSeat(ctx, 200, 1, 3)
+	if err != nil {
+		t.Fatalf("other JoinRoomWithSeat failed: %v", err)
+	}
+	if err := service.PurchaseBoost(ctx, firstParticipantID, 100, 25, 50); err != nil {
+		t.Fatalf("PurchaseBoost failed: %v", err)
+	}
+
+	refund, err := service.LeaveRoomByUser(ctx, 100, 1)
+	if err != nil {
+		t.Fatalf("LeaveRoomByUser failed: %v", err)
+	}
+
+	if refund != 250 {
+		t.Fatalf("unexpected refund: got %d want 250", refund)
+	}
+	if scope.balances[100] != 1000 {
+		t.Fatalf("unexpected user balance: got %d want 1000", scope.balances[100])
+	}
+	if scope.participants[firstParticipantID].ExitRoomAt == nil {
+		t.Fatal("expected first participant to exit")
+	}
+	if scope.participants[secondParticipantID].ExitRoomAt == nil {
+		t.Fatal("expected second participant to exit")
+	}
+	if scope.participants[otherParticipantID].ExitRoomAt != nil {
+		t.Fatal("expected other user's participant to remain active")
+	}
+	activeCount, err := scope.GetActiveParticipantsCount(ctx, 1)
+	if err != nil {
+		t.Fatalf("GetActiveParticipantsCount failed: %v", err)
+	}
+	if activeCount != 1 {
+		t.Fatalf("unexpected active count: got %d want 1", activeCount)
+	}
+}
+
 func TestFinalizeRoundCommitsReservationsAndCreatesNextRound(t *testing.T) {
 	ctx := context.Background()
 	scope := newMockTransactionScope()

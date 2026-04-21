@@ -227,12 +227,66 @@ const docTemplate = `{
                 }
             }
         },
-        "/rooms/{roomID}/participants/{roundParticipantID}/boost": {
+        "/rooms/{roomID}/leave": {
             "post": {
-                "description": "User purchases a boost for their seat",
+                "description": "User leaves the room completely and releases all active seats before game starts",
                 "consumes": [
                     "application/json"
                 ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Rooms"
+                ],
+                "summary": "Leave room completely",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Bearer access token",
+                        "name": "Authorization",
+                        "in": "header",
+                        "required": true
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Room ID",
+                        "name": "roomID",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/dto.LeaveRoomResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    },
+                    "409": {
+                        "description": "Conflict",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/rooms/{roomID}/participants/{roundParticipantID}/boost": {
+            "post": {
+                "description": "User purchases the configured room boost for their seat",
                 "produces": [
                     "application/json"
                 ],
@@ -261,15 +315,6 @@ const docTemplate = `{
                         "name": "roundParticipantID",
                         "in": "path",
                         "required": true
-                    },
-                    {
-                        "description": "Purchase boost request",
-                        "name": "request",
-                        "in": "body",
-                        "required": true,
-                        "schema": {
-                            "$ref": "#/definitions/dto.PurchaseBoostRequest"
-                        }
                     }
                 ],
                 "responses": {
@@ -611,18 +656,6 @@ const docTemplate = `{
                 },
                 "winning_money": {
                     "type": "integer"
-                }
-            }
-        },
-        "dto.PurchaseBoostRequest": {
-            "type": "object",
-            "required": [
-                "boost_value"
-            ],
-            "properties": {
-                "boost_value": {
-                    "type": "integer",
-                    "minimum": 1
                 }
             }
         },
