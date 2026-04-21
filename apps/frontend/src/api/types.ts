@@ -44,6 +44,50 @@ export interface UserBalanceEvent {
   timestamp: string
 }
 
+export type UserGameHistoryResult =
+  | 'won'
+  | 'lost'
+  | 'left'
+  | 'cancelled'
+  | 'waiting'
+  | 'active'
+  | 'finished'
+  | string
+
+export interface UserGameHistoryRequest {
+  page?: number
+  page_size?: number
+  game_id?: number
+  room_id?: number
+  status?: UserGameHistoryResult | ''
+  date_from?: string
+  date_to?: string
+}
+
+export interface UserGameHistoryItem {
+  round_id: number
+  participant_id: number
+  room_id: number
+  game_id: number
+  game_name: string
+  seat_number: number
+  round_status: string
+  result: UserGameHistoryResult
+  entry_fee: number
+  boost_fee: number
+  winning_money: number
+  net_result: number
+  joined_at: string
+  finished_at?: string | null
+}
+
+export interface UserGameHistoryListResponse {
+  items: UserGameHistoryItem[]
+  total: number
+  page: number
+  page_size: number
+}
+
 export interface MatchmakingFilters {
   min_registration_price?: number
   max_registration_price?: number

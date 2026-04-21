@@ -14,6 +14,14 @@ func NewUserRepository(db *pgxpool.Pool) repository.UserRepository {
 	return &userRepository{db: db}
 }
 
+type gameHistoryRepository struct {
+	db *pgxpool.Pool
+}
+
+func NewGameHistoryRepository(db *pgxpool.Pool) repository.GameHistoryRepository {
+	return &gameHistoryRepository{db: db}
+}
+
 type configRepository struct {
 	db *pgxpool.Pool
 }

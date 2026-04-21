@@ -87,6 +87,13 @@ const routeMeta = computed(() => {
     }
   }
 
+  if (route.path === '/history') {
+    return {
+      eyebrow: t('layout.route.historyKicker'),
+      title: t('layout.route.historyTitle'),
+    }
+  }
+
   return {
     eyebrow: t('layout.route.defaultKicker'),
     title: t('layout.route.defaultTitle'),

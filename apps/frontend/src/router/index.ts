@@ -4,6 +4,7 @@ import { useAuthStore } from '@/stores/authStore'
 const Homeview = () => import('@/views/HomeView.vue')
 const AuthView = () => import('@/views/AuthView.vue')
 const ProfileView = () => import('@/views/ProfileView.vue')
+const GameHistoryView = () => import('@/views/GameHistoryView.vue')
 const SettingsView = () => import('@/views/SettingsView.vue')
 const SearchView = () => import('@/views/SearchView.vue')
 const PlayView = () => import('@/views/PlayView.vue')
@@ -18,6 +19,7 @@ const router = createRouter({
     { path: '/rooms', component: SearchView },
     { path: '/play/:roomId', component: PlayView, meta: { requiresAuth: true } },
     { path: '/profile', component: ProfileView, meta: { requiresAuth: true } },
+    { path: '/history', component: GameHistoryView, meta: { requiresAuth: true } },
     { path: '/settings', component: SettingsView, meta: { requiresAuth: true } },
     {
       path: '/admin',

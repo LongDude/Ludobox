@@ -10,7 +10,7 @@ interface NavItem {
   key: string
   label: string
   path: string
-  icon: 'home' | 'admin' | 'settings'
+  icon: 'home' | 'admin' | 'history' | 'settings'
 }
 
 const authStore = useAuthStore()
@@ -54,6 +54,13 @@ const navItems = computed<NavItem[]>(() => {
   }
 
   if (authStore.isAuthenticated) {
+    items.push({
+      key: 'history',
+      label: t('nav.gameHistory'),
+      path: '/history',
+      icon: 'history',
+    })
+
     items.push({
       key: 'settings',
       label: t('nav.settings'),
@@ -198,6 +205,32 @@ function isActive(path: string) {
                 rx="1.4"
                 fill="none"
                 stroke="currentColor"
+                stroke-width="1.8"
+              />
+            </svg>
+            <svg v-else-if="item.icon === 'history'" viewBox="0 0 24 24" aria-hidden="true">
+              <path
+                d="M12 7v5l3 2"
+                fill="none"
+                stroke="currentColor"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                stroke-width="1.8"
+              />
+              <circle
+                cx="12"
+                cy="12"
+                r="7.5"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="1.8"
+              />
+              <path
+                d="M5.2 8.5H3.5V4.8"
+                fill="none"
+                stroke="currentColor"
+                stroke-linecap="round"
+                stroke-linejoin="round"
                 stroke-width="1.8"
               />
             </svg>

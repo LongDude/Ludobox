@@ -53,12 +53,13 @@ func main() {
 
 	// SessionRepo := redis.NewSessionRepository(redisClient)
 	UserRepo := postgres.NewUserRepository(pgPool)
+	GameHistoryRepo := postgres.NewGameHistoryRepository(pgPool)
 	GameRepo := postgres.NewGameRepository(pgPool)
 	ConfigRepo := postgres.NewConfigRepository(pgPool)
 	RoomRepo := postgres.NewRoomRepository(pgPool)
 	GameServerRepo := postgres.NewGameServerRepository(pgPool)
 
-	usecase := app.NewApp(cfg, UserRepo, GameRepo, ConfigRepo, RoomRepo, GameServerRepo, logger)
+	usecase := app.NewApp(cfg, UserRepo, GameHistoryRepo, GameRepo, ConfigRepo, RoomRepo, GameServerRepo, logger)
 	adminEvents := service.NewAdminEventService(pgPool, logger)
 	usecase.AdminEvents = adminEvents
 	adminEvents.Start(context.Background())

@@ -19,6 +19,8 @@ import type {
   RoomResponse,
   RoomUpdateRequest,
   UserBalanceEvent,
+  UserGameHistoryListResponse,
+  UserGameHistoryRequest,
 } from './types'
 
 type AdminEventHandlers = SseHandlers<AdminEvent>
@@ -43,6 +45,20 @@ function buildAdminParams(request?: AdminListRequest) {
     filter_values: filters.length
       ? filters.map((filter) => String(filter.value).trim()).join(',')
       : undefined,
+  }
+}
+
+function buildUserGameHistoryParams(request?: UserGameHistoryRequest) {
+  if (!request) return undefined
+
+  return {
+    page: request.page,
+    page_size: request.page_size,
+    game_id: request.game_id,
+    room_id: request.room_id,
+    status: request.status || undefined,
+    date_from: request.date_from || undefined,
+    date_to: request.date_to || undefined,
   }
 }
 
@@ -109,6 +125,13 @@ export const UserApi = {
   updateCurrentUserBalance(payload: CurrentUserBalanceUpdateRequest) {
     return api
       .put<CurrentUserProfileResponse>('/users/user/balance', payload)
+      .then((response) => response.data)
+  },
+  listCurrentUserGameHistory(request?: UserGameHistoryRequest) {
+    return api
+      .get<UserGameHistoryListResponse>('/users/user/history/games', {
+        params: buildUserGameHistoryParams(request),
+      })
       .then((response) => response.data)
   },
   subscribeBalanceEvents(handlers: UserBalanceEventHandlers) {
