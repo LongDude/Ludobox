@@ -823,17 +823,26 @@ func (s *RoomService) cacheRoomInfo(ctx context.Context, roomInfo *domain.RoomIn
 
 func (s *RoomService) requestWinningPositions(ctx context.Context, config *domain.RoomConfig, participants []domain.RoundParticipant) ([]int, error) {
 	winnersCount := config.NumberWinners
-	if winnersCount > len(participants) {
-		winnersCount = len(participants)
+	countPlayers := config.Capacity
+	boostPower := config.BoostPower
+
+	if winnersCount > countPlayers {
+		winnersCount = countPlayers
 	}
 
-	probabilities := make([]float64, config.Capacity)
+	sumProbabilities := 0.0
+	probabilities := make([]float64, countPlayers)
 	for _, participant := range participants {
-		weight := 1.0
+		weight := float64(winnersCount) / float64(countPlayers)
 		if participant.Boost > 0 {
-			weight += float64(participant.Boost) / 100.0
+			weight += float64(boostPower) / 100.0
 		}
 		probabilities[participant.NumberInRoom-1] = weight
+		sumProbabilities += weight
+	}
+
+	for _, participant := range participants {
+		probabilities[participant.NumberInRoom-1] /= sumProbabilities
 	}
 
 	payload := rngDistributeRequest{
