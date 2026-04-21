@@ -21,5 +21,9 @@ build-game:
 build-matchmaking:
 	@docker compose build matchmaking-core
 
+build-rng:
+	@docker compose build rng-stub
+
+
 down:
 	@docker compose down
