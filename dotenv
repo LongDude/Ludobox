@@ -4,3 +4,4 @@ POSTGRES_USER=postgres
 POSTGRES_PASSWORD=password
 POSTGRES_DB=db
 SSLMode=
+INTERNAL_PROXY_TOKEN=rooms-internal-token
