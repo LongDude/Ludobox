@@ -54,7 +54,6 @@ const docTemplate = `{
                 "parameters": [
                     {
                         "type": "integer",
-                        "format": "int64",
                         "description": "Round ID",
                         "name": "roundID",
                         "in": "path",
@@ -94,7 +93,6 @@ const docTemplate = `{
                 "parameters": [
                     {
                         "type": "integer",
-                        "format": "int64",
                         "description": "Round ID",
                         "name": "roundID",
                         "in": "path",
@@ -118,7 +116,7 @@ const docTemplate = `{
                 }
             }
         },
-        "/rooms/join": {
+        "/rooms/{roomID}/join": {
             "post": {
                 "description": "User joins a room and gets assigned a seat",
                 "consumes": [
@@ -133,13 +131,18 @@ const docTemplate = `{
                 "summary": "Join room",
                 "parameters": [
                     {
-                        "description": "Join request",
-                        "name": "request",
-                        "in": "body",
-                        "required": true,
-                        "schema": {
-                            "$ref": "#/definitions/dto.JoinRoomRequest"
-                        }
+                        "type": "string",
+                        "description": "Bearer access token",
+                        "name": "Authorization",
+                        "in": "header",
+                        "required": true
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Room ID",
+                        "name": "roomID",
+                        "in": "path",
+                        "required": true
                     }
                 ],
                 "responses": {
@@ -164,7 +167,7 @@ const docTemplate = `{
                 }
             }
         },
-        "/rooms/join-seat": {
+        "/rooms/{roomID}/join-seat": {
             "post": {
                 "description": "User joins a room and selects a specific seat",
                 "consumes": [
@@ -178,6 +181,20 @@ const docTemplate = `{
                 ],
                 "summary": "Join room with specific seat",
                 "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Bearer access token",
+                        "name": "Authorization",
+                        "in": "header",
+                        "required": true
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Room ID",
+                        "name": "roomID",
+                        "in": "path",
+                        "required": true
+                    },
                     {
                         "description": "Join with seat request",
                         "name": "request",
@@ -210,7 +227,7 @@ const docTemplate = `{
                 }
             }
         },
-        "/rooms/participants/{roundParticipantID}/boost": {
+        "/rooms/{roomID}/participants/{roundParticipantID}/boost": {
             "post": {
                 "description": "User purchases a boost for their seat",
                 "consumes": [
@@ -225,8 +242,21 @@ const docTemplate = `{
                 "summary": "Purchase boost",
                 "parameters": [
                     {
+                        "type": "string",
+                        "description": "Bearer access token",
+                        "name": "Authorization",
+                        "in": "header",
+                        "required": true
+                    },
+                    {
                         "type": "integer",
-                        "format": "int64",
+                        "description": "Room ID",
+                        "name": "roomID",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "integer",
                         "description": "Round participant ID",
                         "name": "roundParticipantID",
                         "in": "path",
@@ -277,8 +307,21 @@ const docTemplate = `{
                 "summary": "Cancel boost",
                 "parameters": [
                     {
+                        "type": "string",
+                        "description": "Bearer access token",
+                        "name": "Authorization",
+                        "in": "header",
+                        "required": true
+                    },
+                    {
                         "type": "integer",
-                        "format": "int64",
+                        "description": "Room ID",
+                        "name": "roomID",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "integer",
                         "description": "Round participant ID",
                         "name": "roundParticipantID",
                         "in": "path",
@@ -301,7 +344,7 @@ const docTemplate = `{
                 }
             }
         },
-        "/rooms/participants/{roundParticipantID}/leave": {
+        "/rooms/{roomID}/participants/{roundParticipantID}/leave": {
             "post": {
                 "description": "User leaves the room before game starts",
                 "consumes": [
@@ -316,8 +359,21 @@ const docTemplate = `{
                 "summary": "Leave room",
                 "parameters": [
                     {
+                        "type": "string",
+                        "description": "Bearer access token",
+                        "name": "Authorization",
+                        "in": "header",
+                        "required": true
+                    },
+                    {
                         "type": "integer",
-                        "format": "int64",
+                        "description": "Room ID",
+                        "name": "roomID",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "integer",
                         "description": "Round participant ID",
                         "name": "roundParticipantID",
                         "in": "path",
@@ -346,7 +402,7 @@ const docTemplate = `{
                 }
             }
         },
-        "/rounds/{roundID}": {
+        "/rooms/{roomID}/rounds/{roundID}": {
             "get": {
                 "description": "Get current status of a round",
                 "consumes": [
@@ -361,8 +417,21 @@ const docTemplate = `{
                 "summary": "Get round status",
                 "parameters": [
                     {
+                        "type": "string",
+                        "description": "Bearer access token",
+                        "name": "Authorization",
+                        "in": "header",
+                        "required": true
+                    },
+                    {
                         "type": "integer",
-                        "format": "int64",
+                        "description": "Room ID",
+                        "name": "roomID",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "integer",
                         "description": "Round ID",
                         "name": "roundID",
                         "in": "path",
@@ -385,7 +454,7 @@ const docTemplate = `{
                 }
             }
         },
-        "/rounds/{roundID}/events": {
+        "/rooms/{roomID}/rounds/{roundID}/events": {
             "get": {
                 "description": "Subscribe to real-time updates for a round",
                 "tags": [
@@ -394,8 +463,21 @@ const docTemplate = `{
                 "summary": "Subscribe to round events (SSE)",
                 "parameters": [
                     {
+                        "type": "string",
+                        "description": "Bearer access token",
+                        "name": "Authorization",
+                        "in": "header",
+                        "required": true
+                    },
+                    {
                         "type": "integer",
-                        "format": "int64",
+                        "description": "Room ID",
+                        "name": "roomID",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "integer",
                         "description": "Round ID",
                         "name": "roundID",
                         "in": "path",
@@ -448,17 +530,6 @@ const docTemplate = `{
                 }
             }
         },
-        "dto.JoinRoomRequest": {
-            "type": "object",
-            "required": [
-                "room_id"
-            ],
-            "properties": {
-                "room_id": {
-                    "type": "integer"
-                }
-            }
-        },
         "dto.JoinRoomResponse": {
             "type": "object",
             "properties": {
@@ -494,16 +565,12 @@ const docTemplate = `{
         "dto.JoinRoomWithSeatRequest": {
             "type": "object",
             "required": [
-                "number_in_room",
-                "room_id"
+                "number_in_room"
             ],
             "properties": {
                 "number_in_room": {
                     "type": "integer",
                     "minimum": 1
-                },
-                "room_id": {
-                    "type": "integer"
                 }
             }
         },
@@ -540,7 +607,6 @@ const docTemplate = `{
                     "type": "integer"
                 },
                 "user_id": {
-                    "description": "nil для ботов",
                     "type": "integer"
                 },
                 "winning_money": {

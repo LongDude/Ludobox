@@ -18,13 +18,6 @@ definitions:
       message:
         type: string
     type: object
-  dto.JoinRoomRequest:
-    properties:
-      room_id:
-        type: integer
-    required:
-    - room_id
-    type: object
   dto.JoinRoomResponse:
     properties:
       current_players:
@@ -51,11 +44,8 @@ definitions:
       number_in_room:
         minimum: 1
         type: integer
-      room_id:
-        type: integer
     required:
     - number_in_room
-    - room_id
     type: object
   dto.LeaveRoomResponse:
     properties:
@@ -79,7 +69,6 @@ definitions:
       participant_id:
         type: integer
       user_id:
-        description: nil для ботов
         type: integer
       winning_money:
         type: integer
@@ -151,7 +140,6 @@ paths:
       description: Finish round, select winners, and finalize
       parameters:
       - description: Round ID
-        format: int64
         in: path
         name: roundID
         required: true
@@ -178,7 +166,6 @@ paths:
       description: Transition round to active state and finalize
       parameters:
       - description: Round ID
-        format: int64
         in: path
         name: roundID
         required: true
@@ -198,18 +185,22 @@ paths:
       summary: Start game (internal)
       tags:
       - Internal
-  /rooms/join:
+  /rooms/{roomID}/join:
     post:
       consumes:
       - application/json
       description: User joins a room and gets assigned a seat
       parameters:
-      - description: Join request
-        in: body
-        name: request
+      - description: Bearer access token
+        in: header
+        name: Authorization
         required: true
-        schema:
-          $ref: '#/definitions/dto.JoinRoomRequest'
+        type: string
+      - description: Room ID
+        in: path
+        name: roomID
+        required: true
+        type: integer
       produces:
       - application/json
       responses:
@@ -228,12 +219,22 @@ paths:
       summary: Join room
       tags:
       - Rooms
-  /rooms/join-seat:
+  /rooms/{roomID}/join-seat:
     post:
       consumes:
       - application/json
       description: User joins a room and selects a specific seat
       parameters:
+      - description: Bearer access token
+        in: header
+        name: Authorization
+        required: true
+        type: string
+      - description: Room ID
+        in: path
+        name: roomID
+        required: true
+        type: integer
       - description: Join with seat request
         in: body
         name: request
@@ -258,14 +259,23 @@ paths:
       summary: Join room with specific seat
       tags:
       - Rooms
-  /rooms/participants/{roundParticipantID}/boost:
+  /rooms/{roomID}/participants/{roundParticipantID}/boost:
     delete:
       consumes:
       - application/json
       description: User cancels their boost
       parameters:
+      - description: Bearer access token
+        in: header
+        name: Authorization
+        required: true
+        type: string
+      - description: Room ID
+        in: path
+        name: roomID
+        required: true
+        type: integer
       - description: Round participant ID
-        format: int64
         in: path
         name: roundParticipantID
         required: true
@@ -289,8 +299,17 @@ paths:
       - application/json
       description: User purchases a boost for their seat
       parameters:
+      - description: Bearer access token
+        in: header
+        name: Authorization
+        required: true
+        type: string
+      - description: Room ID
+        in: path
+        name: roomID
+        required: true
+        type: integer
       - description: Round participant ID
-        format: int64
         in: path
         name: roundParticipantID
         required: true
@@ -319,14 +338,23 @@ paths:
       summary: Purchase boost
       tags:
       - Rooms
-  /rooms/participants/{roundParticipantID}/leave:
+  /rooms/{roomID}/participants/{roundParticipantID}/leave:
     post:
       consumes:
       - application/json
       description: User leaves the room before game starts
       parameters:
+      - description: Bearer access token
+        in: header
+        name: Authorization
+        required: true
+        type: string
+      - description: Room ID
+        in: path
+        name: roomID
+        required: true
+        type: integer
       - description: Round participant ID
-        format: int64
         in: path
         name: roundParticipantID
         required: true
@@ -349,14 +377,23 @@ paths:
       summary: Leave room
       tags:
       - Rooms
-  /rounds/{roundID}:
+  /rooms/{roomID}/rounds/{roundID}:
     get:
       consumes:
       - application/json
       description: Get current status of a round
       parameters:
+      - description: Bearer access token
+        in: header
+        name: Authorization
+        required: true
+        type: string
+      - description: Room ID
+        in: path
+        name: roomID
+        required: true
+        type: integer
       - description: Round ID
-        format: int64
         in: path
         name: roundID
         required: true
@@ -375,12 +412,21 @@ paths:
       summary: Get round status
       tags:
       - Rounds
-  /rounds/{roundID}/events:
+  /rooms/{roomID}/rounds/{roundID}/events:
     get:
       description: Subscribe to real-time updates for a round
       parameters:
+      - description: Bearer access token
+        in: header
+        name: Authorization
+        required: true
+        type: string
+      - description: Room ID
+        in: path
+        name: roomID
+        required: true
+        type: integer
       - description: Round ID
-        format: int64
         in: path
         name: roundID
         required: true

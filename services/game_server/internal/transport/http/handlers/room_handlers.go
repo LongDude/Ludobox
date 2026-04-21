@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"game_server/internal/app"
+	"game_server/internal/domain"
 	"game_server/internal/repository"
 	"game_server/internal/transport/dto"
 
@@ -33,7 +34,51 @@ func authenticatedUserID(ctx *gin.Context) (int64, error) {
 // ParamInt64 парсит параметр пути как int64
 func paramInt64(ctx *gin.Context, key string) (int64, error) {
 	value := ctx.Param(key)
-	return strconv.ParseInt(value, 10, 64)
+	parsed, err := strconv.ParseInt(value, 10, 64)
+	if err != nil || parsed <= 0 {
+		if err == nil {
+			err = fmt.Errorf("%s must be positive", key)
+		}
+		return 0, err
+	}
+	return parsed, nil
+}
+
+func routeRoomID(ctx *gin.Context) (int64, error) {
+	roomID, err := paramInt64(ctx, "roomID")
+	if err != nil {
+		return 0, fmt.Errorf("invalid room_id path parameter")
+	}
+
+	candidates := []struct {
+		name  string
+		value string
+	}{
+		{name: "X-Game-Room-ID header", value: ctx.GetHeader("X-Game-Room-ID")},
+		{name: "X-Room-ID header", value: ctx.GetHeader("X-Room-ID")},
+		{name: "room_id query parameter", value: ctx.Query("room_id")},
+	}
+
+	for _, candidate := range candidates {
+		value := strings.TrimSpace(candidate.value)
+		if value == "" {
+			continue
+		}
+
+		candidateRoomID, err := strconv.ParseInt(value, 10, 64)
+		if err != nil || candidateRoomID <= 0 {
+			return 0, fmt.Errorf("invalid %s", candidate.name)
+		}
+		if candidateRoomID != roomID {
+			return 0, fmt.Errorf("%s does not match path room_id", candidate.name)
+		}
+	}
+
+	return roomID, nil
+}
+
+func roomInfoMatchesRouteRoom(roomInfo *domain.RoomInfo, roomID int64) bool {
+	return roomInfo != nil && roomInfo.Room != nil && roomInfo.Room.RoomID == roomID
 }
 
 // JoinRoom godoc
@@ -42,11 +87,12 @@ func paramInt64(ctx *gin.Context, key string) (int64, error) {
 // @Tags Rooms
 // @Accept json
 // @Produce json
-// @Param request body dto.JoinRoomRequest true "Join request"
+// @Param Authorization header string true "Bearer access token"
+// @Param roomID path int64 true "Room ID"
 // @Success 200 {object} dto.JoinRoomResponse
 // @Failure 400 {object} dto.ErrorResponse
 // @Failure 409 {object} dto.ErrorResponse
-// @Router /rooms/join [post]
+// @Router /rooms/{roomID}/join [post]
 func JoinRoom(ctx *gin.Context, a *app.App) {
 	userID, err := authenticatedUserID(ctx)
 	if err != nil {
@@ -54,14 +100,14 @@ func JoinRoom(ctx *gin.Context, a *app.App) {
 		return
 	}
 
-	var req dto.JoinRoomRequest
-	if err := ctx.ShouldBindJSON(&req); err != nil {
+	roomID, err := routeRoomID(ctx)
+	if err != nil {
 		ctx.JSON(http.StatusBadRequest, dto.ErrorResponse{Error: err.Error()})
 		return
 	}
 
 	// Вызываем RoomService.JoinRoom
-	participantID, err := a.RoomService.JoinRoom(ctx.Request.Context(), userID, req.RoomID)
+	participantID, err := a.RoomService.JoinRoom(ctx.Request.Context(), userID, roomID)
 	if err != nil {
 		renderRoomError(ctx, err)
 		return
@@ -74,7 +120,7 @@ func JoinRoom(ctx *gin.Context, a *app.App) {
 		return
 	}
 
-	roomInfo, err := a.RoomService.GetRoomInfo(ctx.Request.Context(), req.RoomID)
+	roomInfo, err := a.RoomService.GetRoomInfo(ctx.Request.Context(), roomID)
 	if err != nil {
 		a.Logger.Errorf("Error getting room info: %v", err)
 		ctx.JSON(http.StatusInternalServerError, dto.ErrorResponse{Error: err.Error()})
@@ -120,11 +166,13 @@ func JoinRoom(ctx *gin.Context, a *app.App) {
 // @Tags Rooms
 // @Accept json
 // @Produce json
+// @Param Authorization header string true "Bearer access token"
+// @Param roomID path int64 true "Room ID"
 // @Param request body dto.JoinRoomWithSeatRequest true "Join with seat request"
 // @Success 200 {object} dto.JoinRoomResponse
 // @Failure 400 {object} dto.ErrorResponse
 // @Failure 409 {object} dto.ErrorResponse
-// @Router /rooms/join-seat [post]
+// @Router /rooms/{roomID}/join-seat [post]
 func JoinRoomWithSeat(ctx *gin.Context, a *app.App) {
 	userID, err := authenticatedUserID(ctx)
 	if err != nil {
@@ -138,7 +186,13 @@ func JoinRoomWithSeat(ctx *gin.Context, a *app.App) {
 		return
 	}
 
-	participantID, err := a.RoomService.JoinRoomWithSeat(ctx.Request.Context(), userID, req.RoomID, req.NumberInRoom)
+	roomID, err := routeRoomID(ctx)
+	if err != nil {
+		ctx.JSON(http.StatusBadRequest, dto.ErrorResponse{Error: err.Error()})
+		return
+	}
+
+	participantID, err := a.RoomService.JoinRoomWithSeat(ctx.Request.Context(), userID, roomID, req.NumberInRoom)
 	if err != nil {
 		renderRoomError(ctx, err)
 		return
@@ -151,7 +205,7 @@ func JoinRoomWithSeat(ctx *gin.Context, a *app.App) {
 		return
 	}
 
-	roomInfo, err := a.RoomService.GetRoomInfo(ctx.Request.Context(), req.RoomID)
+	roomInfo, err := a.RoomService.GetRoomInfo(ctx.Request.Context(), roomID)
 	if err != nil {
 		a.Logger.Errorf("Error getting room info: %v", err)
 		ctx.JSON(http.StatusInternalServerError, dto.ErrorResponse{Error: err.Error()})
@@ -191,12 +245,14 @@ func JoinRoomWithSeat(ctx *gin.Context, a *app.App) {
 // @Tags Rooms
 // @Accept json
 // @Produce json
+// @Param Authorization header string true "Bearer access token"
+// @Param roomID path int64 true "Room ID"
 // @Param roundParticipantID path int64 true "Round participant ID"
 // @Param request body dto.PurchaseBoostRequest true "Purchase boost request"
 // @Success 200 {object} dto.PurchaseBoostResponse
 // @Failure 400 {object} dto.ErrorResponse
 // @Failure 409 {object} dto.ErrorResponse
-// @Router /rooms/participants/{roundParticipantID}/boost [post]
+// @Router /rooms/{roomID}/participants/{roundParticipantID}/boost [post]
 func PurchaseBoost(ctx *gin.Context, a *app.App) {
 	userID, err := authenticatedUserID(ctx)
 	if err != nil {
@@ -207,6 +263,12 @@ func PurchaseBoost(ctx *gin.Context, a *app.App) {
 	participantID, err := paramInt64(ctx, "participantID")
 	if err != nil {
 		ctx.JSON(http.StatusBadRequest, dto.ErrorResponse{Error: "Invalid participant ID"})
+		return
+	}
+
+	roomID, err := routeRoomID(ctx)
+	if err != nil {
+		ctx.JSON(http.StatusBadRequest, dto.ErrorResponse{Error: err.Error()})
 		return
 	}
 
@@ -227,6 +289,10 @@ func PurchaseBoost(ctx *gin.Context, a *app.App) {
 	roomInfo, err := a.RoomService.GetRoomInfoByRound(ctx.Request.Context(), participant.RoundsID)
 	if err != nil {
 		ctx.JSON(http.StatusInternalServerError, dto.ErrorResponse{Error: err.Error()})
+		return
+	}
+	if !roomInfoMatchesRouteRoom(roomInfo, roomID) {
+		ctx.JSON(http.StatusNotFound, dto.ErrorResponse{Error: "Participant not found", Code: "PARTICIPANT_NOT_FOUND"})
 		return
 	}
 
@@ -269,10 +335,12 @@ func PurchaseBoost(ctx *gin.Context, a *app.App) {
 // @Tags Rooms
 // @Accept json
 // @Produce json
+// @Param Authorization header string true "Bearer access token"
+// @Param roomID path int64 true "Room ID"
 // @Param roundParticipantID path int64 true "Round participant ID"
 // @Success 200 {object} dto.CancelBoostResponse
 // @Failure 400 {object} dto.ErrorResponse
-// @Router /rooms/participants/{roundParticipantID}/boost [delete]
+// @Router /rooms/{roomID}/participants/{roundParticipantID}/boost [delete]
 func CancelBoost(ctx *gin.Context, a *app.App) {
 	userID, err := authenticatedUserID(ctx)
 	if err != nil {
@@ -286,10 +354,25 @@ func CancelBoost(ctx *gin.Context, a *app.App) {
 		return
 	}
 
+	roomID, err := routeRoomID(ctx)
+	if err != nil {
+		ctx.JSON(http.StatusBadRequest, dto.ErrorResponse{Error: err.Error()})
+		return
+	}
+
 	// Получаем информацию об участнике
 	participant, err := a.RoomService.GetParticipantInfo(ctx.Request.Context(), participantID)
 	if err != nil {
 		ctx.JSON(http.StatusNotFound, dto.ErrorResponse{Error: "Participant not found"})
+		return
+	}
+	roomInfo, err := a.RoomService.GetRoomInfoByRound(ctx.Request.Context(), participant.RoundsID)
+	if err != nil {
+		ctx.JSON(http.StatusInternalServerError, dto.ErrorResponse{Error: err.Error()})
+		return
+	}
+	if !roomInfoMatchesRouteRoom(roomInfo, roomID) {
+		ctx.JSON(http.StatusNotFound, dto.ErrorResponse{Error: "Participant not found", Code: "PARTICIPANT_NOT_FOUND"})
 		return
 	}
 
@@ -314,11 +397,13 @@ func CancelBoost(ctx *gin.Context, a *app.App) {
 // @Tags Rooms
 // @Accept json
 // @Produce json
+// @Param Authorization header string true "Bearer access token"
+// @Param roomID path int64 true "Room ID"
 // @Param roundParticipantID path int64 true "Round participant ID"
 // @Success 200 {object} dto.LeaveRoomResponse
 // @Failure 400 {object} dto.ErrorResponse
 // @Failure 409 {object} dto.ErrorResponse
-// @Router /rooms/participants/{roundParticipantID}/leave [post]
+// @Router /rooms/{roomID}/participants/{roundParticipantID}/leave [post]
 func LeaveRoom(ctx *gin.Context, a *app.App) {
 	userID, err := authenticatedUserID(ctx)
 	if err != nil {
@@ -332,10 +417,25 @@ func LeaveRoom(ctx *gin.Context, a *app.App) {
 		return
 	}
 
+	roomID, err := routeRoomID(ctx)
+	if err != nil {
+		ctx.JSON(http.StatusBadRequest, dto.ErrorResponse{Error: err.Error()})
+		return
+	}
+
 	// Получаем информацию об участнике
 	participant, err := a.RoomService.GetParticipantInfo(ctx.Request.Context(), participantID)
 	if err != nil {
 		ctx.JSON(http.StatusNotFound, dto.ErrorResponse{Error: "Participant not found"})
+		return
+	}
+	roomInfo, err := a.RoomService.GetRoomInfoByRound(ctx.Request.Context(), participant.RoundsID)
+	if err != nil {
+		ctx.JSON(http.StatusInternalServerError, dto.ErrorResponse{Error: err.Error()})
+		return
+	}
+	if !roomInfoMatchesRouteRoom(roomInfo, roomID) {
+		ctx.JSON(http.StatusNotFound, dto.ErrorResponse{Error: "Participant not found", Code: "PARTICIPANT_NOT_FOUND"})
 		return
 	}
 
@@ -348,7 +448,7 @@ func LeaveRoom(ctx *gin.Context, a *app.App) {
 
 	// Публикуем событие
 	currentPlayers := 0
-	roomInfo, err := a.RoomService.GetRoomInfoByRound(ctx.Request.Context(), participant.RoundsID)
+	roomInfo, err = a.RoomService.GetRoomInfoByRound(ctx.Request.Context(), participant.RoundsID)
 	if err == nil && roomInfo != nil {
 		currentPlayers = roomInfo.ActiveParticipantsCount
 	}
@@ -365,11 +465,19 @@ func LeaveRoom(ctx *gin.Context, a *app.App) {
 // @Tags Rounds
 // @Accept json
 // @Produce json
+// @Param Authorization header string true "Bearer access token"
+// @Param roomID path int64 true "Room ID"
 // @Param roundID path int64 true "Round ID"
 // @Success 200 {object} dto.RoundStatusResponse
 // @Failure 404 {object} dto.ErrorResponse
-// @Router /rounds/{roundID} [get]
+// @Router /rooms/{roomID}/rounds/{roundID} [get]
 func GetRoundStatus(ctx *gin.Context, a *app.App) {
+	roomID, err := routeRoomID(ctx)
+	if err != nil {
+		ctx.JSON(http.StatusBadRequest, dto.ErrorResponse{Error: err.Error()})
+		return
+	}
+
 	roundID, err := paramInt64(ctx, "roundID")
 	if err != nil {
 		ctx.JSON(http.StatusBadRequest, dto.ErrorResponse{Error: "Invalid round ID"})
@@ -383,6 +491,10 @@ func GetRoundStatus(ctx *gin.Context, a *app.App) {
 			return
 		}
 		ctx.JSON(http.StatusInternalServerError, dto.ErrorResponse{Error: err.Error()})
+		return
+	}
+	if roundInfo.RoomID != roomID {
+		ctx.JSON(http.StatusNotFound, dto.ErrorResponse{Error: "Round not found", Code: "ROUND_NOT_FOUND"})
 		return
 	}
 
@@ -431,14 +543,36 @@ func GetRoundStatus(ctx *gin.Context, a *app.App) {
 // @Summary Subscribe to round events (SSE)
 // @Description Subscribe to real-time updates for a round
 // @Tags Rounds
+// @Param Authorization header string true "Bearer access token"
+// @Param roomID path int64 true "Room ID"
 // @Param roundID path int64 true "Round ID"
 // @Success 200 {object} string "SSE stream"
 // @Failure 400 {object} dto.ErrorResponse
-// @Router /rounds/{roundID}/events [get]
+// @Router /rooms/{roomID}/rounds/{roundID}/events [get]
 func SubscribeToRoundEvents(ctx *gin.Context, a *app.App) {
+	roomID, err := routeRoomID(ctx)
+	if err != nil {
+		ctx.JSON(http.StatusBadRequest, dto.ErrorResponse{Error: err.Error()})
+		return
+	}
+
 	roundID, err := paramInt64(ctx, "roundID")
 	if err != nil {
 		ctx.JSON(http.StatusBadRequest, dto.ErrorResponse{Error: "Invalid round ID"})
+		return
+	}
+
+	roundInfo, err := a.RoomService.GetRoundInfo(ctx.Request.Context(), roundID)
+	if err != nil {
+		if errors.Is(err, repository.ErrRoundArchived) {
+			ctx.JSON(http.StatusNotFound, dto.ErrorResponse{Error: "Round not found", Code: "ROUND_NOT_FOUND"})
+			return
+		}
+		ctx.JSON(http.StatusInternalServerError, dto.ErrorResponse{Error: err.Error()})
+		return
+	}
+	if roundInfo.RoomID != roomID {
+		ctx.JSON(http.StatusNotFound, dto.ErrorResponse{Error: "Round not found", Code: "ROUND_NOT_FOUND"})
 		return
 	}
 

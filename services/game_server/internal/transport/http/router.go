@@ -13,22 +13,24 @@ func MainRouter(r *gin.RouterGroup, a *app.App) {
 	// Rooms API
 	rooms := r.Group("/rooms")
 	{
-		rooms.POST("/join", func(ctx *gin.Context) { handlers.JoinRoom(ctx, a) })
-		rooms.POST("/join-seat", func(ctx *gin.Context) { handlers.JoinRoomWithSeat(ctx, a) })
-
-		participants := rooms.Group("/participants/:participantID")
+		roomScoped := rooms.Group("/:roomID")
 		{
-			participants.POST("/boost", func(ctx *gin.Context) { handlers.PurchaseBoost(ctx, a) })
-			participants.DELETE("/boost", func(ctx *gin.Context) { handlers.CancelBoost(ctx, a) })
-			participants.POST("/leave", func(ctx *gin.Context) { handlers.LeaveRoom(ctx, a) })
-		}
-	}
+			roomScoped.POST("/join", func(ctx *gin.Context) { handlers.JoinRoom(ctx, a) })
+			roomScoped.POST("/join-seat", func(ctx *gin.Context) { handlers.JoinRoomWithSeat(ctx, a) })
 
-	// Rounds API
-	rounds := r.Group("/rounds")
-	{
-		rounds.GET("/:roundID", func(ctx *gin.Context) { handlers.GetRoundStatus(ctx, a) })
-		rounds.GET("/:roundID/events", func(ctx *gin.Context) { handlers.SubscribeToRoundEvents(ctx, a) })
+			participants := roomScoped.Group("/participants/:participantID")
+			{
+				participants.POST("/boost", func(ctx *gin.Context) { handlers.PurchaseBoost(ctx, a) })
+				participants.DELETE("/boost", func(ctx *gin.Context) { handlers.CancelBoost(ctx, a) })
+				participants.POST("/leave", func(ctx *gin.Context) { handlers.LeaveRoom(ctx, a) })
+			}
+
+			rounds := roomScoped.Group("/rounds")
+			{
+				rounds.GET("/:roundID", func(ctx *gin.Context) { handlers.GetRoundStatus(ctx, a) })
+				rounds.GET("/:roundID/events", func(ctx *gin.Context) { handlers.SubscribeToRoundEvents(ctx, a) })
+			}
+		}
 	}
 
 	// Internal API

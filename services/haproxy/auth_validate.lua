@@ -146,18 +146,29 @@ core.register_action("resolve_game_room_owner", { "http-req" }, function(txn)
 end)
 
 core.register_action("extract_game_room_id", { "http-req" }, function(txn)
-    local room_id = txn.sf:req_hdr("X-Room-ID")
+    local function numeric_room_id(value)
+        if not value or value == "" then
+            return nil
+        end
+
+        value = string.match(value, "^%s*(.-)%s*$") or ""
+        if string.match(value, "^%d+$") then
+            return value
+        end
+
+        return nil
+    end
+
+    local room_id = numeric_room_id(txn.sf:req_hdr("X-Room-ID"))
 
     if not room_id or room_id == "" then
-        room_id = txn.sf:urlp("room_id")
+        room_id = numeric_room_id(txn.sf:urlp("room_id"))
     end
 
     if (not room_id or room_id == "") then
         local path = txn.sf:path() or ""
-        room_id = string.match(path, "^/api/game/rooms/([^/?]+)")
-            or string.match(path, "^/api/game/room/([^/?]+)")
-            or string.match(path, "^/api/game/rounds/([^/?]+)")
-            or string.match(path, "^/api/game/round/([^/?]+)")
+        room_id = string.match(path, "^/api/game/rooms/(%d+)/")
+            or string.match(path, "^/api/game/rooms/(%d+)$")
     end
 
     if room_id and room_id ~= "" then
