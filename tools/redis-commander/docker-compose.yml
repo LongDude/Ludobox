@@ -23,6 +23,30 @@ services:
       networks:
         - rooms_network
 
+  rc-matchmaking:
+    image: rediscommander/redis-commander:latest
+    container_name: redis-commander-matchmaking
+    environment:
+      - REDIS_HOST=matchmaking-redis
+      - REDIS_PORT=6379
+      - REDIS_PASSWORD=password
+    ports:
+      - 9003:8081
+    networks:
+      - rooms_network
+
+  rc-user:
+    image: rediscommander/redis-commander:latest
+    container_name: redis-commander-user
+    environment:
+      - REDIS_HOST=user-redis
+      - REDIS_PORT=6379
+      - REDIS_PASSWORD=password
+    ports:
+      - 9004:8081
+    networks:
+      - rooms_network
+
 networks:
   rooms_network:
     name: "ludobox_rooms_network"
