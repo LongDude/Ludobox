@@ -78,17 +78,15 @@ export const useAuthStore = defineStore('auth', () => {
   async function logout() {
     try {
       AccessToken.value = null
-      const res = await SSOApi.logout()
+      User.value = null
+      await SSOApi.logout()
     } finally {
     }
   }
   async function refreshToken() {
-    try {
-      const res = await SSOApi.refresh()
-      AccessToken.value = res.access_token
-    } finally {
-      console.log('refresh')
-    }
+    const res = await SSOApi.refresh()
+    AccessToken.value = res.access_token
+    return res.access_token
   }
 
   async function requestPasswordReset(email: string) {

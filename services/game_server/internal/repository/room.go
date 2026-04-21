@@ -30,6 +30,11 @@ type TransactionScope interface {
 
 	// Раунды
 	ArchiveRound(ctx context.Context, roundID int64) error
+	CreateRound(ctx context.Context, roomID int64) (int64, error)
+	UpdateRoundStatus(ctx context.Context, roundID int64, status string) error
+	GetActiveParticipantsCount(ctx context.Context, roundID int64) (int, error)
+	FindFreeNumberInRoom(ctx context.Context, roundID int64, capacity int) (int, error)
+	GetRoundStatus(ctx context.Context, roundID int64) (string, error)
 }
 
 // RoomRepository управляет транзакциями и предоставляет read-only доступ к данным.
@@ -41,4 +46,10 @@ type RoomRepository interface {
 	// Read-only методы (не требуют транзакции, если не указано иное)
 	GetParticipantByID(ctx context.Context, participantID int64) (*domain.RoundParticipant, error)
 	GetParticipantsByRoundID(ctx context.Context, roundID int64) ([]domain.RoundParticipant, error)
+
+	// Room методы
+	GetRoomsByServerID(ctx context.Context, serverID int64) ([]domain.Room, error)
+	GetRoom(ctx context.Context, roomID int64) (*domain.RoomInfo, error)
+	GetRoomConfig(ctx context.Context, configID int64) (*domain.RoomConfig, error)
+	GetCurrentRoundByRoomID(ctx context.Context, roomID int64) (*int64, error)
 }

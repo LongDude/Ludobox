@@ -8,27 +8,83 @@ import (
 
 	"github.com/sirupsen/logrus"
 
+	appcfg "game_server/internal/config"
 	"game_server/internal/repository"
 )
 
 type RoomService struct {
-	repo   repository.RoomRepository
-	logger *logrus.Logger
+	repo     repository.RoomRepository
+	logger   *logrus.Logger
+	serverID int64
 }
 
-func NewRoomService(repo repository.RoomRepository, log *logrus.Logger) *RoomService {
-	return &RoomService{repo: repo, logger: log}
+func NewRoomService(repo repository.RoomRepository, log *logrus.Logger, serverID int64) *RoomService {
+	return &RoomService{repo: repo, logger: log, serverID: serverID}
 }
 
-// JoinRoom атомарно: блокирует баланс, создаёт участника (1 место), резервирует вход, списывает деньги.
-// capacity и currentActivePlayers передаются из game_server для валидации без гонки.
-func (s *RoomService) JoinRoom(ctx context.Context, userID, roundID, entryPrice int64, capacity, currentActivePlayers int, expiresAt time.Time) (int64, error) {
-	if currentActivePlayers >= capacity {
+// InitializeRoomsCache loads all rooms for this server and caches them with their configs
+// This should be called at startup to warm up the cache
+func (s *RoomService) InitializeRoomsCache(ctx context.Context) error {
+	rooms, err := s.repo.GetRoomsByServerID(ctx, s.serverID)
+	if err != nil {
+		return fmt.Errorf("get rooms by server id: %w", err)
+	}
+
+	s.logger.WithFields(map[string]interface{}{
+		"server_id": s.serverID,
+		"count":     len(rooms),
+	}).Info("Initialized rooms cache")
+
+	// TODO: Cache rooms and configs in Redis
+	// This will be implemented when Redis cache layer is added
+
+	return nil
+}
+
+// JoinRoom атомарно: блокирует баланс, создаёт участника, резервирует вход, списывает деньги.
+// Автоматически создает раунд если его нет, занимает первое свободное место.
+func (s *RoomService) JoinRoom(ctx context.Context, userID, roomID int64) (int64, error) {
+	roomInfo, err := s.repo.GetRoom(ctx, roomID)
+	if err != nil {
+		return 0, fmt.Errorf("get room: %w", err)
+	}
+
+	if roomInfo == nil {
+		return 0, errors.New("room not found")
+	}
+
+	roomConfig := roomInfo.Config
+	activeCount := roomInfo.ActiveParticipantsCount
+	capacity := roomConfig.Capacity
+
+	if activeCount >= capacity {
 		return 0, repository.ErrRoomIsFull
 	}
 
+	entryPrice := roomConfig.RegistrationPrice
+	// expiresAt = createdAt + time (из конфига комнаты) + 600
+	expiresAt := time.Now().Add(time.Duration(roomConfig.Time)*time.Second + appcfg.ReservationGracePeriod)
+
 	var participantID int64
-	err := s.repo.InTransaction(ctx, func(ts repository.TransactionScope) error {
+	err = s.repo.InTransaction(ctx, func(ts repository.TransactionScope) error {
+		// Получаем или создаём текущий раунд
+		var roundID int64
+		if roomInfo.CurrentRoundID != nil {
+			roundID = *roomInfo.CurrentRoundID
+		} else {
+			// Создаём новый раунд если его нет
+			newRoundID, err := ts.CreateRound(ctx, roomID)
+			if err != nil {
+				return fmt.Errorf("create round: %w", err)
+			}
+			roundID = newRoundID
+			// Устанавливаем статус в 'waiting'
+			if err := ts.UpdateRoundStatus(ctx, roundID, "waiting"); err != nil {
+				return fmt.Errorf("set round status: %w", err)
+			}
+		}
+
+		// Проверяем баланс
 		bal, err := ts.GetBalanceLocked(ctx, userID)
 		if err != nil {
 			return fmt.Errorf("lock balance: %w", err)
@@ -37,15 +93,24 @@ func (s *RoomService) JoinRoom(ctx context.Context, userID, roundID, entryPrice 
 			return repository.ErrInsufficientBalance
 		}
 
-		pID, err := ts.CreateParticipant(ctx, userID, roundID, 1)
+		// Находим свободное место в комнате
+		numberInRoom, err := ts.FindFreeNumberInRoom(ctx, roundID, capacity)
+		if err != nil {
+			return fmt.Errorf("find free spot: %w", err)
+		}
+
+		// Создаём участника
+		pID, err := ts.CreateParticipant(ctx, userID, roundID, numberInRoom)
 		if err != nil {
 			return fmt.Errorf("create participant: %w", err)
 		}
 
+		// Резервируем вход
 		if _, err = ts.ReserveEntry(ctx, pID, entryPrice, expiresAt); err != nil {
 			return fmt.Errorf("reserve entry: %w", err)
 		}
 
+		// Списываем деньги
 		if err = ts.UpdateBalance(ctx, userID, -entryPrice); err != nil {
 			return fmt.Errorf("deduct balance: %w", err)
 		}
@@ -57,10 +122,12 @@ func (s *RoomService) JoinRoom(ctx context.Context, userID, roundID, entryPrice 
 }
 
 // PurchaseBoost атомарно: отменяет старый буст, создаёт новый резерв, обновляет boost в БД, списывает стоимость.
-func (s *RoomService) PurchaseBoost(ctx context.Context, participantID, userID int64, boostValue, boostCost int64, expiresAt time.Time) error {
+func (s *RoomService) PurchaseBoost(ctx context.Context, participantID, userID int64, boostValue, boostCost int64) error {
 	if boostValue > 0 && boostCost <= 0 {
 		return errors.New("missing boost cost")
 	}
+
+	expiresAt := time.Now().Add(appcfg.ReservationGracePeriod)
 
 	return s.repo.InTransaction(ctx, func(ts repository.TransactionScope) error {
 		bal, err := ts.GetBalanceLocked(ctx, userID)
@@ -109,8 +176,18 @@ func (s *RoomService) CancelBoost(ctx context.Context, participantID, userID int
 }
 
 // LeaveRoom атомарно: отменяет ВСЕ резервы (вход + буст), возвращает деньги, помечает участника как вышедшего.
+// Если это был последний участник - удаляет раунд.
 func (s *RoomService) LeaveRoom(ctx context.Context, participantID, userID int64) error {
 	return s.repo.InTransaction(ctx, func(ts repository.TransactionScope) error {
+		// Получаем информацию о участнике
+		participant, err := s.repo.GetParticipantByID(ctx, participantID)
+		if err != nil {
+			return fmt.Errorf("get participant: %w", err)
+		}
+
+		roundID := participant.RoundsID
+
+		// Отменяем все резервы и возвращаем деньги
 		refund, err := ts.ReleaseAllReservations(ctx, participantID)
 		if err != nil {
 			return fmt.Errorf("release all: %w", err)
@@ -120,14 +197,46 @@ func (s *RoomService) LeaveRoom(ctx context.Context, participantID, userID int64
 				return fmt.Errorf("refund: %w", err)
 			}
 		}
-		return ts.MarkParticipantExited(ctx, participantID)
+
+		// Помечаем участника как вышедшего
+		if err = ts.MarkParticipantExited(ctx, participantID); err != nil {
+			return fmt.Errorf("mark exited: %w", err)
+		}
+
+		// Проверяем количество активных участников
+		activeCount, err := ts.GetActiveParticipantsCount(ctx, roundID)
+		if err != nil {
+			return fmt.Errorf("get active participants count: %w", err)
+		}
+
+		// Если нет активных участников - удаляем раунд (мягкое удаление)
+		if activeCount == 0 {
+			if err = ts.UpdateRoundStatus(ctx, roundID, "cancelled"); err != nil {
+				return fmt.Errorf("cancel round: %w", err)
+			}
+			if err = ts.ArchiveRound(ctx, roundID); err != nil {
+				return fmt.Errorf("archive round: %w", err)
+			}
+		}
+
+		return nil
 	})
 }
 
 // FinalizeRound атомарно: подтверждает резервы всех участников, начисляет выигрыши, архивирует раунд.
 // winners: map[participantID]winAmount (0 для не-победителей)
+// Проверяет, что раунд ещё активный (не заканчивался)
 func (s *RoomService) FinalizeRound(ctx context.Context, roundID int64, winners map[int64]int64) error {
 	return s.repo.InTransaction(ctx, func(ts repository.TransactionScope) error {
+		// Проверяем статус раунда - должен быть 'active'
+		status, err := ts.GetRoundStatus(ctx, roundID)
+		if err != nil {
+			return fmt.Errorf("get round status: %w", err)
+		}
+		if status != "active" {
+			return fmt.Errorf("round is not active (status: %s)", status)
+		}
+
 		for pID, winAmt := range winners {
 			if _, err := ts.CommitReservations(ctx, pID); err != nil && !errors.Is(err, repository.ErrActiveReservationNotFound) {
 				return fmt.Errorf("commit reservations for %d: %w", pID, err)
@@ -145,6 +254,11 @@ func (s *RoomService) FinalizeRound(ctx context.Context, roundID int64, winners 
 					return fmt.Errorf("update winning money for %d: %w", pID, err)
 				}
 			}
+		}
+
+		// Устанавливаем статус в 'finished' и архивируем
+		if err := ts.UpdateRoundStatus(ctx, roundID, "finished"); err != nil {
+			return fmt.Errorf("set round status finished: %w", err)
 		}
 		return ts.ArchiveRound(ctx, roundID)
 	})
