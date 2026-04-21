@@ -111,6 +111,7 @@ export interface GameRoomStateResponse {
   boost_power: number
   boost_price: number
   timer_starts_at?: string | null
+  current_user_participants?: GameParticipantInfo[]
 }
 
 export interface GameParticipantInfo {

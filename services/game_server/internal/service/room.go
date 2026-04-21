@@ -160,6 +160,35 @@ func (s *RoomService) joinRoom(ctx context.Context, userID, roomID int64, reques
 			shouldStartTimer = true
 		}
 
+		existingParticipants, err := ts.GetParticipantsByRoundID(ctx, roundID)
+		if err != nil {
+			return fmt.Errorf("get participants by round: %w", err)
+		}
+
+		existingUserParticipants := make([]domain.RoundParticipant, 0)
+		for _, participant := range existingParticipants {
+			if participant.UserID == userID && participant.ExitRoomAt == nil {
+				existingUserParticipants = append(existingUserParticipants, participant)
+			}
+		}
+
+		if requestedSeat == nil && len(existingUserParticipants) > 0 {
+			participantID = existingUserParticipants[0].RoundParticipantID
+			configTimeSeconds = roomConfig.Time
+			minUsers = roomConfig.MinUsers
+			return nil
+		}
+		if requestedSeat != nil {
+			for _, participant := range existingUserParticipants {
+				if participant.NumberInRoom == *requestedSeat {
+					participantID = participant.RoundParticipantID
+					configTimeSeconds = roomConfig.Time
+					minUsers = roomConfig.MinUsers
+					return nil
+				}
+			}
+		}
+
 		activeCount, err := ts.GetActiveParticipantsCount(ctx, roundID)
 		if err != nil {
 			return fmt.Errorf("get active participants count: %w", err)
@@ -436,7 +465,7 @@ func (s *RoomService) LeaveRoomByUser(ctx context.Context, userID, roomID int64)
 			return repository.ErrGameAlreadyStarted
 		}
 		if roundInfo.Status == "finished" || roundInfo.Status == "cancelled" {
-			return repository.ErrRoundNotJoinable
+			return nil
 		}
 
 		participants, err := ts.GetParticipantsByRoundID(ctx, roundID)
@@ -659,6 +688,11 @@ func (s *RoomService) GetParticipantInfo(ctx context.Context, participantID int6
 // GetParticipantsByRound returns active participants of the round.
 func (s *RoomService) GetParticipantsByRound(ctx context.Context, roundID int64) ([]domain.RoundParticipant, error) {
 	return s.repo.GetParticipantsByRoundID(ctx, roundID)
+}
+
+// GetUserParticipantsByRoom returns active participants owned by the user in the room.
+func (s *RoomService) GetUserParticipantsByRoom(ctx context.Context, roomID, userID int64) ([]domain.RoundParticipant, error) {
+	return s.repo.GetActiveParticipantsByRoomAndUser(ctx, roomID, userID)
 }
 
 // GetRoundInfo returns the round metadata.

@@ -32,6 +32,20 @@ func authenticatedUserID(ctx *gin.Context) (int64, error) {
 	return userID, nil
 }
 
+func authenticatedUserIDOptional(ctx *gin.Context) (*int64, error) {
+	userIDHeader := strings.TrimSpace(ctx.GetHeader("X-Authenticated-User"))
+	if userIDHeader == "" {
+		return nil, nil
+	}
+
+	userID, err := strconv.ParseInt(userIDHeader, 10, 64)
+	if err != nil || userID <= 0 {
+		return nil, fmt.Errorf("invalid X-Authenticated-User header")
+	}
+
+	return &userID, nil
+}
+
 // ParamInt64 парсит параметр пути как int64
 func paramInt64(ctx *gin.Context, key string) (int64, error) {
 	value := ctx.Param(key)
@@ -82,7 +96,11 @@ func roomInfoMatchesRouteRoom(roomInfo *domain.RoomInfo, roomID int64) bool {
 	return roomInfo != nil && roomInfo.Room != nil && roomInfo.Room.RoomID == roomID
 }
 
-func roomStateResponse(roomInfo *domain.RoomInfo, timerService *service.TimerService) dto.RoomStateResponse {
+func roomStateResponse(
+	roomInfo *domain.RoomInfo,
+	timerService *service.TimerService,
+	userParticipants []domain.RoundParticipant,
+) dto.RoomStateResponse {
 	response := dto.RoomStateResponse{
 		RoomID:         roomInfo.Room.RoomID,
 		RoomCapacity:   roomInfo.Config.Capacity,
@@ -107,6 +125,18 @@ func roomStateResponse(roomInfo *domain.RoomInfo, timerService *service.TimerSer
 			}
 		}
 	}
+	for _, participant := range userParticipants {
+		userID := participant.UserID
+		response.CurrentUserParticipants = append(response.CurrentUserParticipants, dto.ParticipantInfo{
+			ParticipantID: participant.RoundParticipantID,
+			UserID:        &userID,
+			NumberInRoom:  participant.NumberInRoom,
+			Boost:         participant.Boost,
+			WinningMoney:  participant.WinningMoney,
+			IsBot:         false,
+			ExitedAt:      participant.ExitRoomAt,
+		})
+	}
 	return response
 }
 
@@ -127,7 +157,22 @@ func GetRoomState(ctx *gin.Context, a *app.App) {
 		return
 	}
 
-	ctx.JSON(http.StatusOK, roomStateResponse(roomInfo, a.TimerService))
+	userID, err := authenticatedUserIDOptional(ctx)
+	if err != nil {
+		ctx.JSON(http.StatusBadRequest, dto.ErrorResponse{Error: err.Error()})
+		return
+	}
+
+	userParticipants := make([]domain.RoundParticipant, 0)
+	if userID != nil {
+		userParticipants, err = a.RoomService.GetUserParticipantsByRoom(ctx.Request.Context(), roomID, *userID)
+		if err != nil {
+			ctx.JSON(http.StatusInternalServerError, dto.ErrorResponse{Error: err.Error()})
+			return
+		}
+	}
+
+	ctx.JSON(http.StatusOK, roomStateResponse(roomInfo, a.TimerService, userParticipants))
 }
 
 // JoinRoom godoc
@@ -156,6 +201,14 @@ func JoinRoom(ctx *gin.Context, a *app.App) {
 	}
 
 	// Вызываем RoomService.JoinRoom
+	existingParticipants, existingErr := a.RoomService.GetUserParticipantsByRoom(ctx.Request.Context(), roomID, userID)
+	existingParticipantIDs := make(map[int64]struct{}, len(existingParticipants))
+	if existingErr == nil {
+		for _, participant := range existingParticipants {
+			existingParticipantIDs[participant.RoundParticipantID] = struct{}{}
+		}
+	}
+
 	participantID, err := a.RoomService.JoinRoom(ctx.Request.Context(), userID, roomID)
 	if err != nil {
 		renderRoomError(ctx, err)
@@ -178,13 +231,15 @@ func JoinRoom(ctx *gin.Context, a *app.App) {
 
 	// Публикуем событие присоединения
 	if roomInfo.CurrentRoundID != nil {
-		a.EventsService.PublishPlayerJoined(
-			ctx.Request.Context(),
-			*roomInfo.CurrentRoundID,
-			participantID,
-			participant.NumberInRoom,
-			roomInfo.ActiveParticipantsCount,
-		)
+		if _, existed := existingParticipantIDs[participantID]; !existed {
+			a.EventsService.PublishPlayerJoined(
+				ctx.Request.Context(),
+				*roomInfo.CurrentRoundID,
+				participantID,
+				participant.NumberInRoom,
+				roomInfo.ActiveParticipantsCount,
+			)
+		}
 	}
 
 	roundStatus := ""
@@ -244,6 +299,14 @@ func JoinRoomWithSeat(ctx *gin.Context, a *app.App) {
 		return
 	}
 
+	existingParticipants, existingErr := a.RoomService.GetUserParticipantsByRoom(ctx.Request.Context(), roomID, userID)
+	existingParticipantIDs := make(map[int64]struct{}, len(existingParticipants))
+	if existingErr == nil {
+		for _, participant := range existingParticipants {
+			existingParticipantIDs[participant.RoundParticipantID] = struct{}{}
+		}
+	}
+
 	participantID, err := a.RoomService.JoinRoomWithSeat(ctx.Request.Context(), userID, roomID, req.NumberInRoom)
 	if err != nil {
 		renderRoomError(ctx, err)
@@ -265,13 +328,15 @@ func JoinRoomWithSeat(ctx *gin.Context, a *app.App) {
 	}
 
 	if roomInfo.CurrentRoundID != nil {
-		a.EventsService.PublishPlayerJoined(
-			ctx.Request.Context(),
-			*roomInfo.CurrentRoundID,
-			participantID,
-			participant.NumberInRoom,
-			roomInfo.ActiveParticipantsCount,
-		)
+		if _, existed := existingParticipantIDs[participantID]; !existed {
+			a.EventsService.PublishPlayerJoined(
+				ctx.Request.Context(),
+				*roomInfo.CurrentRoundID,
+				participantID,
+				participant.NumberInRoom,
+				roomInfo.ActiveParticipantsCount,
+			)
+		}
 	}
 
 	roundStatus := ""

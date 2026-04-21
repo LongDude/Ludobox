@@ -174,13 +174,10 @@ func (ts *TimerService) StartTimer(ctx context.Context, roundID int64, roomID in
 							continue
 						}
 
-						ts.clearDeadline(roundID, "finished")
-						if ts.onGameFinalize != nil {
-							if err := ts.onGameFinalize(timerCtx, roundID); err != nil {
-								ts.logger.Errorf("Error finalizing round %d: %v", roundID, err)
-							}
+						if ts.finalizeRound(timerCtx, roundID) {
+							ts.clearDeadline(roundID, "finished")
+							return
 						}
-						return
 					}
 				}
 			}
@@ -270,6 +267,27 @@ func (ts *TimerService) clearTimer(roundID int64) {
 	ts.mu.Lock()
 	defer ts.mu.Unlock()
 	delete(ts.timers, roundID)
+}
+
+func (ts *TimerService) finalizeRound(ctx context.Context, roundID int64) bool {
+	if ts.onGameFinalize == nil {
+		return true
+	}
+
+	err := ts.onGameFinalize(ctx, roundID)
+	if err == nil {
+		return true
+	}
+
+	ts.logger.Errorf("Error finalizing round %d: %v", roundID, err)
+
+	roundInfo, roundErr := ts.roomRepo.GetRoundInfo(ctx, roundID)
+	if roundErr != nil {
+		ts.logger.Errorf("Error reloading round %d after finalize failure: %v", roundID, roundErr)
+		return false
+	}
+
+	return roundInfo.Status != "active"
 }
 
 func secondsUntil(deadline time.Time) int {

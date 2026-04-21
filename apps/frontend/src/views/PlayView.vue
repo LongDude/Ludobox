@@ -142,10 +142,30 @@ const participants = computed(() =>
 )
 
 const winners = computed(() => roundStatus.value?.winners ?? [])
+const roomUserParticipants = computed(() =>
+  (roomState.value?.current_user_participants ?? []).filter((participant) => !participant.exited_at),
+)
 const joinedParticipants = computed(() => {
   const userId = currentUserId.value
-  if (!userId) return []
-  return participants.value.filter((participant) => participant.user_id === userId && !participant.exited_at)
+  if (userId) {
+    const matched = participants.value.filter(
+      (participant) => participant.user_id === userId && !participant.exited_at,
+    )
+    if (matched.length > 0) return matched
+  }
+
+  if (participants.value.length > 0 && roomUserParticipants.value.length > 0) {
+    const ownedParticipantIds = new Set(
+      roomUserParticipants.value.map((participant) => participant.participant_id),
+    )
+    const matched = participants.value.filter(
+      (participant) =>
+        !participant.exited_at && ownedParticipantIds.has(participant.participant_id),
+    )
+    if (matched.length > 0) return matched
+  }
+
+  return roomUserParticipants.value
 })
 const activeParticipant = computed(() => {
   if (joinedParticipants.value.length > 0) {
@@ -159,6 +179,7 @@ const activeParticipant = computed(() => {
 const activeParticipantId = computed(() => activeParticipant.value?.participant_id ?? null)
 const mySeat = computed(() => activeParticipant.value?.number_in_room ?? null)
 const isJoined = computed(() => {
+  if (roomUserParticipants.value.length > 0) return true
   if (roundStatus.value) return joinedParticipants.value.length > 0
   return Boolean(initialParticipantId.value && initialParticipantRoundId.value === activeRoundId.value)
 })

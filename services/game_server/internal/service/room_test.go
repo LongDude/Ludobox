@@ -449,8 +449,35 @@ func TestJoinRoomRespectsHalfCapacityLimit(t *testing.T) {
 		}
 	}
 
-	if _, err := service.JoinRoom(ctx, 100, 1); !errors.Is(err, repository.ErrMaxSeatsExceeded) {
+	if _, err := service.JoinRoomWithSeat(ctx, 100, 1, 3); !errors.Is(err, repository.ErrMaxSeatsExceeded) {
 		t.Fatalf("expected ErrMaxSeatsExceeded, got %v", err)
+	}
+}
+
+func TestJoinRoomReusesExistingParticipantForSameUser(t *testing.T) {
+	ctx := context.Background()
+	scope := newMockTransactionScope()
+	repo := &mockRoomRepository{scope: scope}
+	service := NewRoomService(repo, nil, 1, nil, "")
+
+	participantID, err := service.JoinRoomWithSeat(ctx, 100, 1, 2)
+	if err != nil {
+		t.Fatalf("JoinRoomWithSeat failed: %v", err)
+	}
+
+	reusedParticipantID, err := service.JoinRoom(ctx, 100, 1)
+	if err != nil {
+		t.Fatalf("JoinRoom failed: %v", err)
+	}
+
+	if reusedParticipantID != participantID {
+		t.Fatalf("expected existing participant %d, got %d", participantID, reusedParticipantID)
+	}
+	if len(scope.participants) != 1 {
+		t.Fatalf("unexpected participants count: got %d want 1", len(scope.participants))
+	}
+	if scope.balances[100] != 900 {
+		t.Fatalf("unexpected balance after reused join: got %d want 900", scope.balances[100])
 	}
 }
 
@@ -580,6 +607,28 @@ func TestLeaveRoomByUserReleasesAllUserSeats(t *testing.T) {
 	}
 	if activeCount != 1 {
 		t.Fatalf("unexpected active count: got %d want 1", activeCount)
+	}
+}
+
+func TestLeaveRoomByUserIgnoresFinishedRound(t *testing.T) {
+	ctx := context.Background()
+	scope := newMockTransactionScope()
+	repo := &mockRoomRepository{scope: scope}
+	service := NewRoomService(repo, nil, 1, nil, "")
+
+	if _, err := service.JoinRoomWithSeat(ctx, 100, 1, 1); err != nil {
+		t.Fatalf("JoinRoomWithSeat failed: %v", err)
+	}
+	if err := scope.UpdateRoundStatus(ctx, 1, "finished"); err != nil {
+		t.Fatalf("UpdateRoundStatus failed: %v", err)
+	}
+
+	refund, err := service.LeaveRoomByUser(ctx, 100, 1)
+	if err != nil {
+		t.Fatalf("LeaveRoomByUser failed: %v", err)
+	}
+	if refund != 0 {
+		t.Fatalf("unexpected refund: got %d want 0", refund)
 	}
 }
 
