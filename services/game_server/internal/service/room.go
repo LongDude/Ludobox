@@ -900,7 +900,7 @@ func (s *RoomService) requestWinningPositions(ctx context.Context, config *domai
 	sumProbabilities := 0.0
 	weight := 1.0 / float64(winnersCount)
 	probabilities := make([]float64, countPlayers)
-	for i := range probabilities {
+	for i := range countPlayers {
 		probabilities[i] = weight
 	}
 	for _, participant := range participants {
@@ -912,8 +912,8 @@ func (s *RoomService) requestWinningPositions(ctx context.Context, config *domai
 		sumProbabilities += weight
 	}
 
-	for _, participant := range participants {
-		probabilities[participant.NumberInRoom-1] /= sumProbabilities
+	for i := range countPlayers {
+		probabilities[i] /= sumProbabilities
 	}
 
 	payload := rngDistributeRequest{
