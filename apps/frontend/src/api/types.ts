@@ -22,6 +22,67 @@ export interface PasswordResetResponse {
   message?: string
 }
 
+export interface CurrentUserProfileResponse {
+  user_id: number
+  nickname: string
+  balance: number
+}
+
+export interface CurrentUserProfileUpdateRequest {
+  nickname: string
+}
+
+export interface CurrentUserBalanceUpdateRequest {
+  delta: number
+}
+
+export interface MatchmakingFilters {
+  min_registration_price?: number
+  max_registration_price?: number
+  min_capacity?: number
+  max_capacity?: number
+  is_boost?: boolean
+  min_boost_power?: number
+  page?: number
+  page_size?: number
+}
+
+export interface Pagination {
+  total: number
+  page: number
+  page_size: number
+}
+
+export interface RoomRecommendationResponse {
+  room_id: number
+  config_id: number
+  server_id: number
+  game_id: number
+  registration_price: number
+  capacity: number
+  min_users: number
+  is_boost: boolean
+  boost_power: number
+  current_players: number
+  instance_key: string
+  redis_host: string
+  score: number
+}
+
+export interface RecommendRoomsResponse {
+  items: RoomRecommendationResponse[]
+  cached: boolean
+  pagination: Pagination
+}
+
+export interface QuickMatchResponse {
+  room: RoomRecommendationResponse
+  round_id: number
+  round_participant_id: number
+  seat_number: number
+  reused_existing_room: boolean
+}
+
 export interface UserResponse {
   id?: number
   email: string
@@ -165,6 +226,7 @@ export interface RoomResponse {
   config?: ConfigResponse | null
   server_id: number
   server_name?: string | null
+  current_players: number
   status: RoomStatus
   archived_at?: string | null
 }

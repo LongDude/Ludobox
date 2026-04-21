@@ -19,6 +19,7 @@ var roomSortableColumns = map[string]string{
 	"config_id":                 "r.config_id",
 	"server_id":                 "r.server_id",
 	"server_name":               "gs.instance_key",
+	"current_players":           "r.current_players",
 	"status":                    "r.status",
 	"archived_at":               "r.archived_at",
 	"config_capacity":           "c.capacity",
@@ -38,6 +39,7 @@ var roomFilterColumns = map[string]roomFilterField{
 	"config_id":                 {column: "r.config_id", kind: "int"},
 	"server_id":                 {column: "r.server_id", kind: "int"},
 	"server_name":               {column: "gs.instance_key", kind: "string"},
+	"current_players":           {column: "r.current_players", kind: "int"},
 	"status":                    {column: "r.status", kind: "string"},
 	"config_capacity":           {column: "c.capacity", kind: "int"},
 	"config_registration_price": {column: "c.registration_price", kind: "int"},
@@ -138,6 +140,7 @@ func (r *roomRepository) GetNotArchivedRooms(ctx context.Context, params domain.
 			r.room_id,
 			r.config_id,
 			r.server_id,
+			r.current_players,
 			r.status,
 			r.archived_at,
 			c.config_id,
@@ -363,6 +366,7 @@ func scanRoom(row rowScanner) (*domain.Room, error) {
 		id                  int64
 		configID            int64
 		serverID            int64
+		currentPlayers      int32
 		status              string
 		archivedAt          sql.NullTime
 		joinedConfigID      int64
@@ -388,6 +392,7 @@ func scanRoom(row rowScanner) (*domain.Room, error) {
 		&id,
 		&configID,
 		&serverID,
+		&currentPlayers,
 		&status,
 		&archivedAt,
 		&joinedConfigID,
@@ -412,10 +417,11 @@ func scanRoom(row rowScanner) (*domain.Room, error) {
 	}
 
 	room := &domain.Room{
-		ID:           int(id),
-		ConfigID:     int(configID),
-		GameServerID: int(serverID),
-		Status:       domain.RoomStatus(status),
+		ID:             int(id),
+		ConfigID:       int(configID),
+		GameServerID:   int(serverID),
+		CurrentPlayers: int(currentPlayers),
+		Status:         domain.RoomStatus(status),
 		Config: &domain.Config{
 			ID:                  int(joinedConfigID),
 			GameID:              int(gameID),
@@ -460,6 +466,7 @@ func getRoomByID(ctx context.Context, db queryRower, id int) (*domain.Room, erro
 			r.room_id,
 			r.config_id,
 			r.server_id,
+			r.current_players,
 			r.status,
 			r.archived_at,
 			c.config_id,

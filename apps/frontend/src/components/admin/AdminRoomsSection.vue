@@ -4,6 +4,8 @@ import { UserApi } from '@/api/useUserApi'
 import type { ConfigResponse, RoomResponse, RoomStatus } from '@/api/types'
 import { useI18n } from '@/i18n'
 
+type PlayerSortDirection = '' | 'asc' | 'desc'
+
 const loading = ref(false)
 const creating = ref(false)
 const errorMsg = ref('')
@@ -19,6 +21,7 @@ const filters = reactive({
   status: '' as '' | RoomStatus,
   serverName: '',
   gameName: '',
+  playersOrder: '' as PlayerSortDirection,
 })
 
 const createConfigId = ref('')
@@ -64,8 +67,8 @@ async function loadRooms() {
     const response = await UserApi.listRooms({
       page: page.value,
       page_size: pageSize.value,
-      sort_field: 'room_id',
-      sort_direction: 'desc',
+      sort_field: filters.playersOrder ? 'current_players' : 'room_id',
+      sort_direction: filters.playersOrder || 'desc',
       filters: [
         filters.status ? { field: 'status', operator: 'eq', value: filters.status } : undefined,
         filters.serverName
@@ -172,6 +175,7 @@ function resetFilters() {
   filters.status = ''
   filters.serverName = ''
   filters.gameName = ''
+  filters.playersOrder = ''
   page.value = 1
   void loadRooms()
 }
@@ -226,6 +230,10 @@ function roomConfigLabel(room: RoomResponse) {
 function serverLabel(room: RoomResponse) {
   return room.server_name?.trim() || t('admin.roomsSection.serverFallback', { id: room.server_id })
 }
+
+function playersLabel(count: number) {
+  return t('admin.roomsSection.playersCount', { count })
+}
 </script>
 
 <template>
@@ -277,6 +285,11 @@ function serverLabel(room: RoomResponse) {
           type="text"
           :placeholder="t('admin.roomsSection.filters.gameName')"
         />
+        <select v-model="filters.playersOrder" class="input">
+          <option value="">{{ t('admin.roomsSection.filters.playersOrderDefault') }}</option>
+          <option value="desc">{{ t('admin.roomsSection.filters.playersOrderDesc') }}</option>
+          <option value="asc">{{ t('admin.roomsSection.filters.playersOrderAsc') }}</option>
+        </select>
       </div>
       <div class="toolbar-actions">
         <button class="button primary" @click="applyFilters">{{ t('common.apply') }}</button>
@@ -321,6 +334,10 @@ function serverLabel(room: RoomResponse) {
           <div>
             <dt>{{ t('admin.roomsSection.meta.status') }}</dt>
             <dd>{{ statusLabel(room.status) }}</dd>
+          </div>
+          <div>
+            <dt>{{ t('admin.roomsSection.meta.players') }}</dt>
+            <dd>{{ playersLabel(room.current_players) }}</dd>
           </div>
         </dl>
 
@@ -474,7 +491,7 @@ function serverLabel(room: RoomResponse) {
 .room-meta {
   display: grid;
   gap: 0.75rem;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(10rem, 1fr));
   margin: 0;
 }
 

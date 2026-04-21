@@ -3,6 +3,7 @@ import { computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/authStore'
 import { useSettingStore } from '@/stores/settingStore'
+import { useUserCabinetStore } from '@/stores/userCabinetStore'
 import { useI18n } from '@/i18n'
 import ToastCenter from '@/components/ToastCenter.vue'
 
@@ -12,6 +13,7 @@ defineProps<{
 }>()
 
 const authStore = useAuthStore()
+const cabinetStore = useUserCabinetStore()
 const settings = useSettingStore()
 const route = useRoute()
 const router = useRouter()
@@ -31,7 +33,39 @@ const userName = computed(() => {
   return [user.first_name, user.last_name].filter(Boolean).join(' ') || user.email || t('profile.title')
 })
 
+const balanceValue = computed(() => {
+  if (!authStore.isAuthenticated) return ''
+  if (cabinetStore.loading && !cabinetStore.profile) return '...'
+  if (cabinetStore.profile) {
+    return new Intl.NumberFormat(locale.value === 'ru' ? 'ru-RU' : 'en-US').format(
+      cabinetStore.profile.balance,
+    )
+  }
+  return '-'
+})
+
 const routeMeta = computed(() => {
+  if (route.path === '/') {
+    return {
+      eyebrow: t('layout.route.homeKicker'),
+      title: t('layout.route.homeTitle'),
+    }
+  }
+
+  if (route.path === '/rooms') {
+    return {
+      eyebrow: t('layout.route.roomsKicker'),
+      title: t('layout.route.roomsTitle'),
+    }
+  }
+
+  if (route.path.startsWith('/play/')) {
+    return {
+      eyebrow: t('layout.route.playKicker'),
+      title: t('layout.route.playTitle'),
+    }
+  }
+
   if (route.path === '/admin') {
     return {
       eyebrow: t('layout.route.adminKicker'),
@@ -50,13 +84,6 @@ const routeMeta = computed(() => {
     return {
       eyebrow: t('layout.route.profileKicker'),
       title: t('layout.route.profileTitle'),
-    }
-  }
-
-  if (route.path.startsWith('/search')) {
-    return {
-      eyebrow: t('layout.route.searchKicker'),
-      title: t('layout.route.searchTitle'),
     }
   }
 
@@ -92,9 +119,9 @@ async function logout() {
     <div class="actions">
       <span class="locale-pill">{{ locale.toUpperCase() }}</span>
 
-      <div class="balance-pill" :aria-label="t('layout.balanceDemo')">
+      <div v-if="authStore.isAuthenticated" class="balance-pill" :aria-label="t('layout.balanceLabel')">
         <img src="./../assets/balance.svg" alt="" class="balance-icon" />
-        <strong>1000</strong>
+        <strong>{{ balanceValue }}</strong>
       </div>
 
       <button

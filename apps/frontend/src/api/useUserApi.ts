@@ -4,6 +4,9 @@ import type {
   ConfigListResponse,
   ConfigResponse,
   ConfigUpsertRequest,
+  CurrentUserBalanceUpdateRequest,
+  CurrentUserProfileResponse,
+  CurrentUserProfileUpdateRequest,
   GameListResponse,
   GameResponse,
   GameUpsertRequest,
@@ -37,6 +40,19 @@ function buildAdminParams(request?: AdminListRequest) {
 }
 
 export const UserApi = {
+  getCurrentUser() {
+    return api.get<CurrentUserProfileResponse>('/users/user').then((response) => response.data)
+  },
+  updateCurrentUser(payload: CurrentUserProfileUpdateRequest) {
+    return api
+      .put<CurrentUserProfileResponse>('/users/user', payload)
+      .then((response) => response.data)
+  },
+  updateCurrentUserBalance(payload: CurrentUserBalanceUpdateRequest) {
+    return api
+      .put<CurrentUserProfileResponse>('/users/user/balance', payload)
+      .then((response) => response.data)
+  },
   listGames(request?: AdminListRequest) {
     return api
       .get<GameListResponse>('/users/admin/games', { params: buildAdminParams(request) })
