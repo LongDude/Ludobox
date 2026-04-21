@@ -651,12 +651,21 @@ func (s *RoomService) finalizeRoundAndCreateNext(ctx context.Context, roundID in
 			}
 		}
 
+		roomInfo, err := s.GetRoomInfoByRound(ctx, roundID)
+		if err != nil {
+			return err
+		}
+		if roomInfo == nil || roomInfo.Config == nil {
+			return repository.ErrRoomNotFound
+		}
+
 		for _, participant := range participants {
 			if _, err := ts.CommitReservations(ctx, participant.RoundParticipantID); err != nil && !errors.Is(err, repository.ErrActiveReservationNotFound) {
 				return fmt.Errorf("commit reservations for participant %d: %w", participant.RoundParticipantID, err)
 			}
 
-			winAmount := winners[participant.RoundParticipantID]
+			winAmount := (roomInfo.Config.RegistrationPrice * int64(roomInfo.Config.Capacity)) / int64(len(winners))
+			// winAmount := winners[participant.RoundParticipantID]
 			if winAmount > 0 {
 				if err := ts.UpdateBalance(ctx, participant.UserID, winAmount); err != nil {
 					return fmt.Errorf("credit winner %d: %w", participant.RoundParticipantID, err)
@@ -893,7 +902,7 @@ func (s *RoomService) requestWinningPositions(ctx context.Context, config *domai
 	for _, participant := range participants {
 		weight := 1.0 / float64(winnersCount)
 		if participant.Boost > 0 {
-			weight += float64(boostPower) / 100.0
+			weight = weight * (100 + float64(boostPower)) / 100.0
 		}
 		probabilities[participant.NumberInRoom-1] = weight
 		sumProbabilities += weight
