@@ -787,10 +787,18 @@ func SubscribeToRoundEvents(ctx *gin.Context, a *app.App) {
 	w.Header().Set("X-Accel-Buffering", "no")
 
 	ctx.Status(http.StatusOK)
-	w.(http.Flusher).Flush()
+	flusher, ok := w.(http.Flusher)
+	if !ok {
+		ctx.JSON(http.StatusInternalServerError, dto.ErrorResponse{Error: "Streaming is not supported"})
+		return
+	}
+	if _, err := fmt.Fprint(w, ": connected\n\n"); err != nil {
+		return
+	}
+	flusher.Flush()
 
 	// Слушаем события
-	ticker := time.NewTicker(30 * time.Second)
+	ticker := time.NewTicker(10 * time.Second)
 	defer ticker.Stop()
 
 	for {
@@ -808,17 +816,13 @@ func SubscribeToRoundEvents(ctx *gin.Context, a *app.App) {
 				a.Logger.Debugf("Error writing SSE message: %v", err)
 				return
 			}
-			if flusher, ok := w.(http.Flusher); ok {
-				flusher.Flush()
-			}
+			flusher.Flush()
 		case <-ticker.C:
 			// Отправляем heartbeat
 			if _, err := fmt.Fprint(w, ": heartbeat\n\n"); err != nil {
 				return
 			}
-			if flusher, ok := w.(http.Flusher); ok {
-				flusher.Flush()
-			}
+			flusher.Flush()
 		case <-ctx.Request.Context().Done():
 			return
 		}

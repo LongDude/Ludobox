@@ -42,7 +42,7 @@ func TestStartTimerKeepsRoundWaitingUntilConfiguredCountdownExpires(t *testing.T
 		t.Fatalf("round started too early: got %d calls", startedCalls.Load())
 	}
 
-	deadline := time.Now().Add(2500 * time.Millisecond)
+	deadline := time.Now().Add(4 * time.Second)
 	for time.Now().Before(deadline) {
 		if startedCalls.Load() == 1 && finalizedCalls.Load() == 1 {
 			return

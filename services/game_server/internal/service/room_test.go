@@ -702,13 +702,14 @@ func TestFinalizeRoundCommitsReservationsAndCreatesNextRound(t *testing.T) {
 
 func TestBuildPayoutsUsesActualParticipantsAndCommission(t *testing.T) {
 	config := &domain.RoomConfig{
+		Capacity:            2,
 		RegistrationPrice:   100,
 		Commission:          10,
 		WinningDistribution: []int{60, 40},
 		RoundTime:           60,
 	}
 
-	payouts := buildPayouts(config, 2, 2)
+	payouts := buildPayouts(config, 2)
 	if len(payouts) != 2 {
 		t.Fatalf("unexpected payouts length: got %d want 2", len(payouts))
 	}

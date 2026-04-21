@@ -1,4 +1,10 @@
 import { api } from '@/api/base/useLudaApi'
+import {
+  buildApiUrl,
+  readJsonSseStream,
+  SseRequestError,
+  type SseHandlers,
+} from '@/api/base/sse'
 import { useAuthStore } from '@/stores/authStore'
 import type {
   GameCancelBoostResponse,
@@ -11,84 +17,55 @@ import type {
   GameRoundStatusResponse,
 } from './types'
 
-type RoundEventHandlers = {
-  onOpen?: () => void
-  onEvent?: (event: GameRoundEvent) => void
-  onError?: (error: unknown) => void
-  onClose?: () => void
+type RoundEventHandlers = SseHandlers<GameRoundEvent>
+
+function delay(ms: number, signal: AbortSignal) {
+  if (signal.aborted) return Promise.resolve()
+
+  return new Promise<void>((resolve) => {
+    const timeout = setTimeout(resolve, ms)
+    signal.addEventListener(
+      'abort',
+      () => {
+        clearTimeout(timeout)
+        resolve()
+      },
+      { once: true },
+    )
+  })
 }
 
-function buildApiUrl(path: string) {
-  const baseURL = api.defaults.baseURL || ''
-  const cleanPath = path.replace(/^\//, '')
-
-  if (/^https?:\/\//i.test(baseURL)) {
-    const normalizedBase = baseURL.endsWith('/') ? baseURL : `${baseURL}/`
-    return new URL(cleanPath, normalizedBase).toString()
-  }
-
-  if (typeof window !== 'undefined') {
-    const relativeBase = baseURL ? `${baseURL.replace(/\/$/, '')}/` : '/'
-    return new URL(`${relativeBase}${cleanPath}`, window.location.origin).toString()
-  }
-
-  return `${baseURL.replace(/\/$/, '')}/${cleanPath}`
-}
-
-async function readRoundEventStream(
+async function runAuthorizedRoundEventStream(
   url: string,
-  token: string | null,
+  auth: ReturnType<typeof useAuthStore>,
   signal: AbortSignal,
   handlers: RoundEventHandlers,
 ) {
-  const headers: Record<string, string> = {
-    Accept: 'text/event-stream',
-  }
-  if (token) {
-    headers.Authorization = `Bearer ${token}`
-  }
-
-  const response = await fetch(url, {
-    headers,
-    signal,
-    credentials: 'include',
-  })
-
-  if (!response.ok) {
-    const error = new Error(`SSE request failed with ${response.status}`)
-    ;(error as Error & { status?: number }).status = response.status
-    throw error
-  }
-  if (!response.body) {
-    throw new Error('SSE stream is not available')
-  }
-
-  handlers.onOpen?.()
-
-  const reader = response.body.pipeThrough(new TextDecoderStream()).getReader()
-  let buffer = ''
+  let retryDelay = 1000
 
   while (!signal.aborted) {
-    const { value, done } = await reader.read()
-    if (done) break
-    buffer += (value || '').replace(/\r\n/g, '\n')
+    try {
+      await readJsonSseStream<GameRoundEvent>(url, auth.AccessToken, signal, handlers)
+      if (!signal.aborted) {
+        throw new Error('SSE stream closed')
+      }
+    } catch (error: any) {
+      if (signal.aborted || error?.name === 'AbortError') return
 
-    let boundary = buffer.indexOf('\n\n')
-    while (boundary >= 0) {
-      const rawEvent = buffer.slice(0, boundary)
-      buffer = buffer.slice(boundary + 2)
-
-      const data = rawEvent
-        .split('\n')
-        .filter((line) => line.startsWith('data:'))
-        .map((line) => line.slice(5).trimStart())
-        .join('\n')
-
-      if (data) {
-        handlers.onEvent?.(JSON.parse(data) as GameRoundEvent)
+      if (error instanceof SseRequestError && error.status === 401) {
+        try {
+          await auth.refreshToken()
+          retryDelay = 1000
+          continue
+        } catch (refreshError) {
+          handlers.onError?.(refreshError)
+        }
+      } else {
+        handlers.onError?.(error)
       }
 
-      boundary = buffer.indexOf('\n\n')
+      await delay(retryDelay, signal)
+      retryDelay = Math.min(retryDelay * 2, 10000)
     }
   }
 }
@@ -139,31 +116,9 @@ export const GameApi = {
   subscribeRoundEvents(roomId: number, roundId: number, handlers: RoundEventHandlers) {
     const controller = new AbortController()
     const auth = useAuthStore()
-    const url = buildApiUrl(`/game/rooms/${roomId}/rounds/${roundId}/events`)
+    const url = buildApiUrl(api.defaults.baseURL, `/game/rooms/${roomId}/rounds/${roundId}/events`)
 
-    void readRoundEventStream(url, auth.AccessToken, controller.signal, handlers)
-      .catch(async (error: any) => {
-        if (controller.signal.aborted || error?.name === 'AbortError') return
-        let streamError = error
-
-        if (error?.status === 401) {
-          try {
-            const token = await auth.refreshToken()
-            if (!controller.signal.aborted && token) {
-              try {
-                await readRoundEventStream(url, token, controller.signal, handlers)
-                return
-              } catch (retryError) {
-                streamError = retryError
-              }
-            }
-          } catch {}
-        }
-
-        if (!controller.signal.aborted) {
-          handlers.onError?.(streamError)
-        }
-      })
+    void runAuthorizedRoundEventStream(url, auth, controller.signal, handlers)
       .finally(() => {
         if (!controller.signal.aborted) {
           handlers.onClose?.()
