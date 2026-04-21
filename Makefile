@@ -1,6 +1,11 @@
 help:
-	@echo "build - start containers with precompilation"
 	@echo "up - start containers"
+	@echo "build - start containers with precompilation"
+	@echo "build-sso - "
+	@echo "build-user - "
+	@echo "build-game - "
+	@echo "build-matchmaking - "
+	@echo "build-rng - "
 	@echo "down - stop containers"
 
 up:
