@@ -114,6 +114,14 @@ func (es *EventsService) PublishBoostCancelled(ctx context.Context, roundID int6
 	})
 }
 
+func (es *EventsService) PublishRoundTimer(ctx context.Context, roundID int64, status string, secondsLeft int) {
+	es.PublishEvent(ctx, roundID, "round_timer", dto.EventRoundTimer{
+		RoundID:     roundID,
+		Status:      status,
+		SecondsLeft: secondsLeft,
+	})
+}
+
 // PublishRoundStarted отправляет событие начала игры
 func (es *EventsService) PublishRoundStarted(ctx context.Context, roundID int64, finalPlayers int, gameDurationSec int) {
 	es.PublishEvent(ctx, roundID, "round_started", dto.EventRoundStarted{

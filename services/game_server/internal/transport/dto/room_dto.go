@@ -87,6 +87,12 @@ type EventBoostCancelled struct {
 	ParticipantID int64 `json:"participant_id"`
 }
 
+type EventRoundTimer struct {
+	RoundID     int64  `json:"round_id"`
+	Status      string `json:"status"`
+	SecondsLeft int    `json:"seconds_left"`
+}
+
 type EventRoundStarted struct {
 	RoundID         int64 `json:"round_id"`
 	FinalPlayers    int   `json:"final_players"`

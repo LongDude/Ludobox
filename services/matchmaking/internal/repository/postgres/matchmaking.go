@@ -2,13 +2,16 @@ package postgres
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
+	"net/http"
+	"strconv"
 	"time"
 	"user_service/internal/domain"
 
 	"github.com/jackc/pgx/v5"
-	"github.com/jackc/pgx/v5/pgconn"
 )
 
 type queryRower interface {
@@ -211,73 +214,12 @@ func (ar *internalRepository) GetUserActiveRoom(ctx context.Context, userID int6
 }
 
 func (ar *internalRepository) JoinRoom(ctx context.Context, userID int64, roomID int64, staleAfter time.Duration) (*domain.RoomMembership, error) {
-	tx, err := ar.db.Begin(ctx)
-	if err != nil {
-		return nil, fmt.Errorf("begin join room tx: %w", err)
-	}
-	defer func() {
-		_ = tx.Rollback(ctx)
-	}()
-
-	currentMembership, err := loadUserActiveRoom(ctx, tx, userID)
-	if err == nil {
-		if currentMembership.RoomID == roomID {
-			if commitErr := tx.Commit(ctx); commitErr != nil {
-				return nil, fmt.Errorf("commit join room tx: %w", commitErr)
-			}
-			return currentMembership, nil
-		}
-		return nil, domain.ErrorUserAlreadyInRoom
-	}
-	if !errors.Is(err, domain.ErrorActiveRoomNotFound) {
-		return nil, fmt.Errorf("check user active room: %w", err)
-	}
-
-	recommendation, err := lockJoinableRoom(ctx, tx, roomID, staleAfter)
+	recommendation, err := getJoinableRoom(ctx, ar.db, roomID, staleAfter)
 	if err != nil {
 		return nil, err
 	}
 
-	roundID, currentPlayers, err := ensureActiveRound(ctx, tx, roomID)
-	if err != nil {
-		return nil, err
-	}
-	if currentPlayers >= recommendation.Capacity {
-		return nil, domain.ErrorRoomFull
-	}
-
-	seatNumber := currentPlayers + 1
-
-	const insertParticipantQuery = `
-		INSERT INTO round_participants (user_id, rounds_id, number_in_room)
-		VALUES ($1, $2, $3)
-		RETURNING round_participants_id;
-	`
-
-	var roundParticipantID int64
-	if err := tx.QueryRow(ctx, insertParticipantQuery, userID, roundID, seatNumber).Scan(&roundParticipantID); err != nil {
-		var pgErr *pgconn.PgError
-		if errors.As(err, &pgErr) {
-			if pgErr.Code == "23503" {
-				return nil, domain.ErrorUserNotFound
-			}
-		}
-		return nil, fmt.Errorf("insert round participant: %w", err)
-	}
-
-	recommendation.CurrentPlayers = seatNumber
-	membership := &domain.RoomMembership{
-		RoomRecommendation: *recommendation,
-		RoundID:            roundID,
-		RoundParticipantID: roundParticipantID,
-		SeatNumber:         seatNumber,
-	}
-
-	if err := tx.Commit(ctx); err != nil {
-		return nil, fmt.Errorf("commit join room tx: %w", err)
-	}
-
-	return membership, nil
+	return ar.joinRoomViaGameServer(ctx, userID, recommendation)
 }
 
 func loadUserActiveRoom(ctx context.Context, db queryRower, userID int64) (*domain.RoomMembership, error) {
@@ -347,7 +289,7 @@ func loadUserActiveRoom(ctx context.Context, db queryRower, userID int64) (*doma
 	return &membership, nil
 }
 
-func lockJoinableRoom(ctx context.Context, tx pgx.Tx, roomID int64, staleAfter time.Duration) (*domain.RoomRecommendation, error) {
+func getJoinableRoom(ctx context.Context, db queryRower, roomID int64, staleAfter time.Duration) (*domain.RoomRecommendation, error) {
 	staleAfterSeconds := normalizeStaleAfterSeconds(staleAfter)
 
 	const query = `
@@ -373,11 +315,10 @@ func lockJoinableRoom(ctx context.Context, tx pgx.Tx, roomID int64, staleAfter t
 		  AND gs.status = 'up'
 		  AND gs.archived_at IS NULL
 		  AND gs.last_heartbeat_at >= NOW() - make_interval(secs => $2)
-		FOR UPDATE OF r;
 	`
 
 	var recommendation domain.RoomRecommendation
-	if err := tx.QueryRow(ctx, query, roomID, staleAfterSeconds).Scan(
+	if err := db.QueryRow(ctx, query, roomID, staleAfterSeconds).Scan(
 		&recommendation.RoomID,
 		&recommendation.ConfigID,
 		&recommendation.ServerID,
@@ -399,52 +340,104 @@ func lockJoinableRoom(ctx context.Context, tx pgx.Tx, roomID int64, staleAfter t
 	return &recommendation, nil
 }
 
-func ensureActiveRound(ctx context.Context, tx pgx.Tx, roomID int64) (int64, int32, error) {
-	const selectRoundQuery = `
-		SELECT rounds_id
-		FROM rounds
-		WHERE room_id = $1
-		  AND archived_at IS NULL
-		ORDER BY created_at DESC
-		LIMIT 1
-		FOR UPDATE;
-	`
-
-	var roundID int64
-	if err := tx.QueryRow(ctx, selectRoundQuery, roomID).Scan(&roundID); err != nil {
-		if !errors.Is(err, pgx.ErrNoRows) {
-			return 0, 0, fmt.Errorf("select active round: %w", err)
-		}
-
-		const createRoundQuery = `
-			INSERT INTO rounds (room_id)
-			VALUES ($1)
-			RETURNING rounds_id;
-		`
-		if createErr := tx.QueryRow(ctx, createRoundQuery, roomID).Scan(&roundID); createErr != nil {
-			return 0, 0, fmt.Errorf("create active round: %w", createErr)
-		}
-	}
-
-	const countPlayersQuery = `
-		SELECT COUNT(*)::INT
-		FROM round_participants
-		WHERE rounds_id = $1
-		  AND exit_room_at IS NULL;
-	`
-
-	var currentPlayers int32
-	if err := tx.QueryRow(ctx, countPlayersQuery, roundID).Scan(&currentPlayers); err != nil {
-		return 0, 0, fmt.Errorf("count active players: %w", err)
-	}
-
-	return roundID, currentPlayers, nil
-}
-
 func normalizeStaleAfterSeconds(staleAfter time.Duration) int64 {
 	staleAfterSeconds := int64(staleAfter / time.Second)
 	if staleAfterSeconds <= 0 {
 		return 1
 	}
 	return staleAfterSeconds
+}
+
+type gameServerJoinRoomResponse struct {
+	ParticipantID  int64 `json:"participant_id"`
+	RoundID        int64 `json:"round_id"`
+	NumberInRoom   int   `json:"number_in_room"`
+	CurrentPlayers int   `json:"current_players"`
+}
+
+type gameServerErrorResponse struct {
+	Error   string `json:"error"`
+	Code    string `json:"code"`
+	Message string `json:"message"`
+}
+
+func (ar *internalRepository) joinRoomViaGameServer(ctx context.Context, userID int64, recommendation *domain.RoomRecommendation) (*domain.RoomMembership, error) {
+	if recommendation == nil {
+		return nil, domain.ErrorRoomUnavailable
+	}
+	if recommendation.InstanceKey == "" {
+		return nil, domain.ErrorGameServerUnavailable
+	}
+
+	url := fmt.Sprintf("http://%s:8080/api/rooms/%d/join", recommendation.InstanceKey, recommendation.RoomID)
+	request, err := http.NewRequestWithContext(ctx, http.MethodPost, url, nil)
+	if err != nil {
+		return nil, fmt.Errorf("build join room request: %w", err)
+	}
+	request.Header.Set("X-Authenticated-User", strconv.FormatInt(userID, 10))
+
+	response, err := ar.httpClient.Do(request)
+	if err != nil {
+		return nil, fmt.Errorf("%w: join room request failed", domain.ErrorGameServerUnavailable)
+	}
+	defer response.Body.Close()
+
+	body, err := io.ReadAll(response.Body)
+	if err != nil {
+		return nil, fmt.Errorf("read join room response: %w", err)
+	}
+
+	if response.StatusCode < http.StatusOK || response.StatusCode >= http.StatusMultipleChoices {
+		return nil, mapJoinRoomError(response.StatusCode, body)
+	}
+
+	var joinResponse gameServerJoinRoomResponse
+	if err := json.Unmarshal(body, &joinResponse); err != nil {
+		return nil, fmt.Errorf("decode join room response: %w", err)
+	}
+
+	recommendationCopy := *recommendation
+	recommendationCopy.CurrentPlayers = int32(joinResponse.CurrentPlayers)
+
+	return &domain.RoomMembership{
+		RoomRecommendation: recommendationCopy,
+		RoundID:            joinResponse.RoundID,
+		RoundParticipantID: joinResponse.ParticipantID,
+		SeatNumber:         int32(joinResponse.NumberInRoom),
+	}, nil
+}
+
+func mapJoinRoomError(statusCode int, body []byte) error {
+	var errorResponse gameServerErrorResponse
+	_ = json.Unmarshal(body, &errorResponse)
+
+	switch errorResponse.Code {
+	case "ROOM_FULL":
+		return domain.ErrorRoomFull
+	case "ROOM_NOT_FOUND", "ROUND_NOT_JOINABLE", "GAME_STARTED":
+		return domain.ErrorRoomUnavailable
+	case "WRONG_GAME_SERVER":
+		return domain.ErrorGameServerUnavailable
+	}
+
+	switch statusCode {
+	case http.StatusNotFound, http.StatusConflict:
+		return domain.ErrorRoomUnavailable
+	case http.StatusPaymentRequired:
+		return fmt.Errorf("join room rejected: %s", firstNonEmpty(errorResponse.Error, errorResponse.Message, "insufficient balance"))
+	default:
+		if statusCode >= http.StatusInternalServerError {
+			return domain.ErrorGameServerUnavailable
+		}
+		return fmt.Errorf("join room failed with status %d", statusCode)
+	}
+}
+
+func firstNonEmpty(values ...string) string {
+	for _, value := range values {
+		if value != "" {
+			return value
+		}
+	}
+	return ""
 }

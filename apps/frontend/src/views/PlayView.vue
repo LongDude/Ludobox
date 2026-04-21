@@ -302,6 +302,18 @@ function restartRoundEvents() {
 }
 
 function handleRoundEvent(event: GameRoundEvent) {
+  if (event.type === 'round_timer') {
+    const data = eventData(event)
+    if (roundStatus.value) {
+      roundStatus.value = {
+        ...roundStatus.value,
+        status: String(data.status || roundStatus.value.status || 'waiting'),
+        time_left_seconds: Number(data.seconds_left ?? roundStatus.value.time_left_seconds ?? 0) || 0,
+      }
+    }
+    return
+  }
+
   liveEvents.value = [
     { ...event, id: ++liveEventId },
     ...liveEvents.value,
@@ -374,6 +386,13 @@ function eventDescription(event: GameRoundEvent) {
   if (event.type === 'round_finalized') {
     const winners = Array.isArray(data.winners) ? data.winners.length : 0
     return t('gameRoom.events.roundFinalizedDetails', { winners })
+  }
+
+  if (event.type === 'round_timer') {
+    return t('gameRoom.events.roundStartedDetails', {
+      players: '-',
+      seconds: Number(data.seconds_left ?? 0) || 0,
+    })
   }
 
   return t('gameRoom.events.genericDetails')

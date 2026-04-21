@@ -155,6 +155,9 @@ func JoinRoom(ctx *gin.Context, a *app.App) {
 
 	if roomInfo.CurrentRoundID != nil {
 		response.RoundID = *roomInfo.CurrentRoundID
+		if ok, timerInfo := a.TimerService.GetTimerInfo(*roomInfo.CurrentRoundID); ok {
+			response.TimerStartsAt = timerInfo.StartedAt
+		}
 	}
 
 	ctx.JSON(http.StatusOK, response)
@@ -227,7 +230,7 @@ func JoinRoomWithSeat(ctx *gin.Context, a *app.App) {
 		roundStatus = *roomInfo.CurrentRoundStatus
 	}
 
-	ctx.JSON(http.StatusOK, dto.JoinRoomResponse{
+	response := dto.JoinRoomResponse{
 		ParticipantID:  participantID,
 		RoundID:        derefInt64(roomInfo.CurrentRoundID),
 		NumberInRoom:   participant.NumberInRoom,
@@ -236,7 +239,14 @@ func JoinRoomWithSeat(ctx *gin.Context, a *app.App) {
 		MinPlayers:     roomInfo.Config.MinUsers,
 		RoundStatus:    roundStatus,
 		EntryPrice:     roomInfo.Config.RegistrationPrice,
-	})
+	}
+	if roomInfo.CurrentRoundID != nil {
+		if ok, timerInfo := a.TimerService.GetTimerInfo(*roomInfo.CurrentRoundID); ok {
+			response.TimerStartsAt = timerInfo.StartedAt
+		}
+	}
+
+	ctx.JSON(http.StatusOK, response)
 }
 
 // PurchaseBoost godoc

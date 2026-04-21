@@ -507,7 +507,7 @@ func TestPurchaseBoostAllowsOnlyOneBoostPerUser(t *testing.T) {
 	}
 }
 
-func TestPurchaseBoostAllowedDuringActiveTimer(t *testing.T) {
+func TestPurchaseBoostRejectedDuringActiveRound(t *testing.T) {
 	ctx := context.Background()
 	scope := newMockTransactionScope()
 	repo := &mockRoomRepository{scope: scope}
@@ -521,14 +521,14 @@ func TestPurchaseBoostAllowedDuringActiveTimer(t *testing.T) {
 		t.Fatalf("UpdateRoundStatus failed: %v", err)
 	}
 
-	if err := service.PurchaseBoost(ctx, participantID, 100, 25, 50); err != nil {
-		t.Fatalf("PurchaseBoost during active timer failed: %v", err)
+	if err := service.PurchaseBoost(ctx, participantID, 100, 25, 50); !errors.Is(err, repository.ErrGameAlreadyStarted) {
+		t.Fatalf("expected ErrGameAlreadyStarted, got %v", err)
 	}
-	if scope.participants[participantID].Boost != 25 {
-		t.Fatalf("unexpected boost: got %d want 25", scope.participants[participantID].Boost)
+	if scope.participants[participantID].Boost != 0 {
+		t.Fatalf("unexpected boost: got %d want 0", scope.participants[participantID].Boost)
 	}
-	if scope.balances[100] != 850 {
-		t.Fatalf("unexpected balance: got %d want 850", scope.balances[100])
+	if scope.balances[100] != 900 {
+		t.Fatalf("unexpected balance: got %d want 900", scope.balances[100])
 	}
 }
 
@@ -616,5 +616,24 @@ func TestFinalizeRoundCommitsReservationsAndCreatesNextRound(t *testing.T) {
 	}
 	if scope.roomInfo.CurrentRoundID == nil || *scope.roomInfo.CurrentRoundID == 1 {
 		t.Fatal("expected next round to be created")
+	}
+}
+
+func TestBuildPayoutsUsesActualParticipantsAndCommission(t *testing.T) {
+	config := &domain.RoomConfig{
+		RegistrationPrice:   100,
+		Commission:          10,
+		WinningDistribution: []int{60, 40},
+	}
+
+	payouts := buildPayouts(config, 2, 2)
+	if len(payouts) != 2 {
+		t.Fatalf("unexpected payouts length: got %d want 2", len(payouts))
+	}
+	if payouts[0] != 108 {
+		t.Fatalf("unexpected first payout: got %d want 108", payouts[0])
+	}
+	if payouts[1] != 72 {
+		t.Fatalf("unexpected second payout: got %d want 72", payouts[1])
 	}
 }

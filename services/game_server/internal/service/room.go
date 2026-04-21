@@ -332,7 +332,7 @@ func (s *RoomService) CancelBoost(ctx context.Context, participantID, userID int
 }
 
 func canChangeBoost(roundStatus string) bool {
-	return roundStatus == "waiting" || roundStatus == "active"
+	return roundStatus == "waiting"
 }
 
 // LeaveRoom atomically releases all reservations, refunds the participant, and frees the seat.
@@ -712,7 +712,7 @@ func (s *RoomService) FinalizeGameRound(ctx context.Context, roundID int64) ([]d
 		return nil, err
 	}
 
-	payouts := buildPayouts(roomInfo.Config, len(winningPositions))
+	payouts := buildPayouts(roomInfo.Config, len(participants), len(winningPositions))
 	payoutsByParticipant := make(map[int64]int64, len(winningPositions))
 	winners := make([]domain.RoundParticipant, 0, len(winningPositions))
 	participantsBySeat := make(map[int]domain.RoundParticipant, len(participants))
@@ -873,12 +873,14 @@ func (s *RoomService) requestWinningPositions(ctx context.Context, config *domai
 	return rngResponse.WinningPositions, nil
 }
 
-func buildPayouts(config *domain.RoomConfig, winnersCount int) []int64 {
+func buildPayouts(config *domain.RoomConfig, participantsCount int, winnersCount int) []int64 {
 	if winnersCount == 0 {
 		return nil
 	}
 
-	prizePool := config.RegistrationPrice * int64(config.Capacity)
+	grossBank := config.RegistrationPrice * int64(participantsCount)
+	commission := grossBank * int64(config.Commission) / 100
+	prizePool := grossBank - commission
 	payouts := make([]int64, winnersCount)
 	distribution := config.WinningDistribution
 	if len(distribution) > winnersCount {
@@ -892,7 +894,11 @@ func buildPayouts(config *domain.RoomConfig, winnersCount int) []int64 {
 			continue
 		}
 
-		payouts[idx] = prizePool * int64(distribution[idx]) / 100
+		share := 0
+		if idx < len(distribution) {
+			share = distribution[idx]
+		}
+		payouts[idx] = prizePool * int64(share) / 100
 		assigned += payouts[idx]
 	}
 
