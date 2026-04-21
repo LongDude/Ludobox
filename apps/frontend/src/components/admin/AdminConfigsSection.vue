@@ -1,7 +1,13 @@
 <script setup lang="ts">
 import { computed, onMounted, reactive, ref, watch } from 'vue'
 import { UserApi } from '@/api/useUserApi'
-import type { ConfigResponse, ConfigUpsertRequest, GameResponse } from '@/api/types'
+import type {
+  AdminEventResource,
+  ConfigResponse,
+  ConfigUpsertRequest,
+  GameResponse,
+} from '@/api/types'
+import { useDeferredAdminReload } from '@/composables/useDeferredAdminReload'
 import { useI18n } from '@/i18n'
 import {
   distributionToInput,
@@ -13,6 +19,11 @@ import {
 } from '@/utils/admin'
 
 type EditorMode = 'create' | 'edit'
+type AdminEventVersions = Partial<Record<AdminEventResource, number>>
+
+const props = defineProps<{
+  adminEventVersions?: AdminEventVersions
+}>()
 
 const loading = ref(false)
 const saving = ref(false)
@@ -101,6 +112,27 @@ watch(
 onMounted(async () => {
   await Promise.all([loadConfigs(), loadAllGames()])
 })
+
+const scheduleConfigsReload = useDeferredAdminReload(loadConfigs, saving)
+const scheduleGamesReload = useDeferredAdminReload(loadAllGames, saving)
+
+watch(
+  () => props.adminEventVersions?.configs,
+  (version, previousVersion) => {
+    if (version !== undefined && previousVersion !== undefined && version !== previousVersion) {
+      scheduleConfigsReload()
+    }
+  },
+)
+
+watch(
+  () => props.adminEventVersions?.games,
+  (version, previousVersion) => {
+    if (version !== undefined && previousVersion !== undefined && version !== previousVersion) {
+      scheduleGamesReload()
+    }
+  },
+)
 
 function toRequest(config: ConfigResponse): ConfigUpsertRequest {
   return {

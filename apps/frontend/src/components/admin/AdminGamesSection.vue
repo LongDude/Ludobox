@@ -1,10 +1,16 @@
 <script setup lang="ts">
-import { computed, onMounted, reactive, ref } from 'vue'
+import { computed, onMounted, reactive, ref, watch } from 'vue'
 import { UserApi } from '@/api/useUserApi'
-import type { GameResponse, GameUpsertRequest } from '@/api/types'
+import type { AdminEventResource, GameResponse, GameUpsertRequest } from '@/api/types'
+import { useDeferredAdminReload } from '@/composables/useDeferredAdminReload'
 import { useI18n } from '@/i18n'
 
 type EditorMode = 'create' | 'edit'
+type AdminEventVersions = Partial<Record<AdminEventResource, number>>
+
+const props = defineProps<{
+  adminEventVersions?: AdminEventVersions
+}>()
 
 const loading = ref(false)
 const saving = ref(false)
@@ -40,6 +46,17 @@ const pageSummary = computed(() =>
 onMounted(async () => {
   await loadGames()
 })
+
+const scheduleGamesReload = useDeferredAdminReload(loadGames, saving)
+
+watch(
+  () => props.adminEventVersions?.games,
+  (version, previousVersion) => {
+    if (version !== undefined && previousVersion !== undefined && version !== previousVersion) {
+      scheduleGamesReload()
+    }
+  },
+)
 
 function resetForm() {
   form.name_game = ''

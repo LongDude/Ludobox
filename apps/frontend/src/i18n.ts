@@ -711,7 +711,6 @@ const messages: Record<Locale, Record<string, string>> = {
     'gameRoom.controls.leave': 'Leave room',
   },
   ru: {
-    'gameRoom.round.fallbackPolling': 'Запасной polling',
     'gameRoom.round.ssePrimary': 'SSE подключён. Статус раунда обновляется по live-событиям.',
     'gameRoom.round.pollingFallback': 'SSE не подключён. Запасной polling поддерживает актуальный статус.',
     'gameRoom.round.timeline': 'Этапы раунда',

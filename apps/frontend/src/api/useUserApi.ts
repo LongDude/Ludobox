@@ -1,5 +1,8 @@
 import { api } from '@/api/base/useLudaApi'
+import { buildApiUrl, readJsonSseStream, SseRequestError, type SseHandlers } from '@/api/base/sse'
+import { useAuthStore } from '@/stores/authStore'
 import type {
+  AdminEvent,
   AdminListRequest,
   ConfigListResponse,
   ConfigResponse,
@@ -16,6 +19,8 @@ import type {
   RoomResponse,
   RoomUpdateRequest,
 } from './types'
+
+type AdminEventHandlers = SseHandlers<AdminEvent>
 
 function buildAdminParams(request?: AdminListRequest) {
   if (!request) return undefined
@@ -36,6 +41,57 @@ function buildAdminParams(request?: AdminListRequest) {
     filter_values: filters.length
       ? filters.map((filter) => String(filter.value).trim()).join(',')
       : undefined,
+  }
+}
+
+function delay(ms: number, signal: AbortSignal) {
+  if (signal.aborted) return Promise.resolve()
+
+  return new Promise<void>((resolve) => {
+    const timeout = setTimeout(resolve, ms)
+    signal.addEventListener(
+      'abort',
+      () => {
+        clearTimeout(timeout)
+        resolve()
+      },
+      { once: true },
+    )
+  })
+}
+
+async function runAdminEventStream(
+  url: string,
+  auth: ReturnType<typeof useAuthStore>,
+  signal: AbortSignal,
+  handlers: AdminEventHandlers,
+) {
+  let retryDelay = 1000
+
+  while (!signal.aborted) {
+    try {
+      await readJsonSseStream<AdminEvent>(url, auth.AccessToken, signal, handlers)
+      if (!signal.aborted) {
+        throw new Error('Admin SSE stream closed')
+      }
+    } catch (error: any) {
+      if (signal.aborted || error?.name === 'AbortError') return
+
+      if (error instanceof SseRequestError && error.status === 401) {
+        try {
+          await auth.refreshToken()
+          retryDelay = 1000
+          continue
+        } catch (refreshError) {
+          handlers.onError?.(refreshError)
+        }
+      } else {
+        handlers.onError?.(error)
+      }
+
+      await delay(retryDelay, signal)
+      retryDelay = Math.min(retryDelay * 2, 10000)
+    }
   }
 }
 
@@ -114,5 +170,16 @@ export const UserApi = {
     return api
       .get<GameServerListResponse>('/users/admin/servers', { params: buildAdminParams(request) })
       .then((response) => response.data)
+  },
+  subscribeAdminEvents(handlers: AdminEventHandlers) {
+    const controller = new AbortController()
+    const auth = useAuthStore()
+    const url = buildApiUrl(api.defaults.baseURL, '/users/admin/events')
+
+    void runAdminEventStream(url, auth, controller.signal, handlers).finally(() => {
+      handlers.onClose?.()
+    })
+
+    return () => controller.abort()
   },
 }

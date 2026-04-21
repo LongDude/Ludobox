@@ -1,10 +1,16 @@
 <script setup lang="ts">
-import { computed, onMounted, reactive, ref } from 'vue'
+import { computed, onMounted, reactive, ref, watch } from 'vue'
 import { UserApi } from '@/api/useUserApi'
-import type { ConfigResponse, RoomResponse, RoomStatus } from '@/api/types'
+import type { AdminEventResource, ConfigResponse, RoomResponse, RoomStatus } from '@/api/types'
+import { useDeferredAdminReload } from '@/composables/useDeferredAdminReload'
 import { useI18n } from '@/i18n'
 
 type PlayerSortDirection = '' | 'asc' | 'desc'
+type AdminEventVersions = Partial<Record<AdminEventResource, number>>
+
+const props = defineProps<{
+  adminEventVersions?: AdminEventVersions
+}>()
 
 const loading = ref(false)
 const creating = ref(false)
@@ -28,6 +34,7 @@ const createConfigId = ref('')
 const editingRoomId = ref<number | null>(null)
 const serverDrafts = reactive<Record<number, string>>({})
 const savingRoomId = ref<number | null>(null)
+const busy = computed(() => creating.value || savingRoomId.value !== null)
 
 const configById = computed(() => {
   return new Map(configs.value.map((config) => [config.config_id, config]))
@@ -44,6 +51,37 @@ const pageSummary = computed(() =>
 onMounted(async () => {
   await Promise.all([loadRooms(), loadConfigOptions()])
 })
+
+const scheduleRoomsReload = useDeferredAdminReload(loadRooms, busy)
+const scheduleConfigOptionsReload = useDeferredAdminReload(loadConfigOptions, busy)
+
+watch(
+  () => props.adminEventVersions?.rooms,
+  (version, previousVersion) => {
+    if (version !== undefined && previousVersion !== undefined && version !== previousVersion) {
+      scheduleRoomsReload()
+    }
+  },
+)
+
+watch(
+  () => [props.adminEventVersions?.configs, props.adminEventVersions?.games] as const,
+  ([configVersion, gameVersion], [previousConfigVersion, previousGameVersion]) => {
+    const configsChanged =
+      configVersion !== undefined &&
+      previousConfigVersion !== undefined &&
+      configVersion !== previousConfigVersion
+    const gamesChanged =
+      gameVersion !== undefined &&
+      previousGameVersion !== undefined &&
+      gameVersion !== previousGameVersion
+
+    if (configsChanged || gamesChanged) {
+      scheduleConfigOptionsReload()
+      scheduleRoomsReload()
+    }
+  },
+)
 
 async function loadConfigOptions() {
   try {

@@ -346,3 +346,13 @@ export interface GameServerListResponse {
   page: number
   page_size: number
 }
+
+export type AdminEventResource = 'games' | 'configs' | 'rooms' | 'servers'
+
+export interface AdminEvent {
+  type: string
+  resource?: AdminEventResource | ''
+  action: string
+  id?: number
+  timestamp: string
+}

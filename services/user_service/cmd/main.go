@@ -2,6 +2,8 @@ package main
 
 import (
 	"context"
+	"errors"
+	nethttp "net/http"
 	"os"
 	"os/signal"
 	"syscall"
@@ -9,7 +11,8 @@ import (
 	"user_service/internal/app"
 	"user_service/internal/config"
 	"user_service/internal/repository/postgres"
-	"user_service/internal/transport/http"
+	"user_service/internal/service"
+	transporthttp "user_service/internal/transport/http"
 	"user_service/internal/validation"
 	"user_service/pkg/logger"
 	"user_service/pkg/storage"
@@ -23,8 +26,8 @@ import (
 func main() {
 	// Init validator
 	validation.Init()
-	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
-	defer cancel()
+	startupCtx, startupCancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer startupCancel()
 	// ! Init logger
 	logger := logger.LoggerSetup(true)
 	// ! Parse config from env
@@ -35,11 +38,12 @@ func main() {
 	}
 	// ! Init repoisitory
 	// ! Init postgres
-	pgPool, err := storage.PostgresConnect(ctx, cfg.PostgresConfig)
+	pgPool, err := storage.PostgresConnect(startupCtx, cfg.PostgresConfig)
 	if err != nil {
 		logger.Fatalf("Failed to create pool conection to postgres with error: %v", err)
 		return
 	}
+	defer pgPool.Close()
 	// ! Init redis
 	// redisClient, err := storage.RedisConnect(ctx, cfg.RedisConfig)
 	// if err != nil {
@@ -55,13 +59,18 @@ func main() {
 	GameServerRepo := postgres.NewGameServerRepository(pgPool)
 
 	usecase := app.NewApp(cfg, UserRepo, GameRepo, ConfigRepo, RoomRepo, GameServerRepo, logger)
+	adminEvents := service.NewAdminEventService(pgPool, logger)
+	usecase.AdminEvents = adminEvents
+	adminEvents.Start(context.Background())
+	defer adminEvents.Stop()
+
 	// ! Init REST
-	server := http.NewHTTPServer(cfg, usecase)
+	server := transporthttp.NewHTTPServer(cfg, usecase)
 	logger.Info("Start HTTP server")
 	go func() {
-		err = server.Listen()
-		if err != nil {
-			logger.Fatalf("Failed to start HTTP server: %v", err)
+		listenErr := server.Listen()
+		if listenErr != nil && !errors.Is(listenErr, nethttp.ErrServerClosed) {
+			logger.Fatalf("Failed to start HTTP server: %v", listenErr)
 		}
 	}()
 	//Wait for interrupt signal to shutdown server
@@ -71,12 +80,17 @@ func main() {
 	logger.Info("Shutdown HTTP Server ...")
 
 	// ! Graceful shutdown
-	err = server.Stop(ctx)
+	adminEvents.Stop()
+
+	shutdownCtx, shutdownCancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer shutdownCancel()
+
+	err = server.Stop(shutdownCtx)
 	if err != nil {
 		logger.Fatal("Server Shutdown:", err)
 	}
 	select {
-	case <-ctx.Done():
+	case <-shutdownCtx.Done():
 		logger.Info("Timeout stop server")
 	default:
 		logger.Info("Server exiting")

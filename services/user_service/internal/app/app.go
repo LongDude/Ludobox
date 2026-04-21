@@ -15,6 +15,7 @@ type App struct {
 	ConfigService     service.ConfigService
 	RoomService       service.RoomService
 	GameServerService service.GameServerService
+	AdminEvents       service.AdminEvents
 	Logger            *logrus.Logger
 }
 

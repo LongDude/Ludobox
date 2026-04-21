@@ -1,8 +1,11 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue'
+import { computed, onMounted, ref, watch } from 'vue'
 import { UserApi } from '@/api/useUserApi'
-import type { GameServerResponse, RoomResponse } from '@/api/types'
+import type { AdminEventResource, GameServerResponse, RoomResponse } from '@/api/types'
+import { useDeferredAdminReload } from '@/composables/useDeferredAdminReload'
 import { useI18n } from '@/i18n'
+
+type AdminEventVersions = Partial<Record<AdminEventResource, number>>
 
 interface ServerBucket {
   server: GameServerResponse
@@ -11,6 +14,10 @@ interface ServerBucket {
   inGameCount: number
   completedCount: number
 }
+
+const props = defineProps<{
+  adminEventVersions?: AdminEventVersions
+}>()
 
 const loading = ref(false)
 const errorMsg = ref('')
@@ -58,6 +65,23 @@ const idleServers = computed(() => buckets.value.filter((bucket) => bucket.rooms
 onMounted(async () => {
   await loadOverview()
 })
+
+const scheduleOverviewReload = useDeferredAdminReload(loadOverview)
+
+watch(
+  () =>
+    [
+      props.adminEventVersions?.rooms,
+      props.adminEventVersions?.servers,
+      props.adminEventVersions?.configs,
+      props.adminEventVersions?.games,
+    ] as const,
+  (versions, previousVersions) => {
+    if (versions.some((version, index) => version !== previousVersions[index])) {
+      scheduleOverviewReload()
+    }
+  },
+)
 
 async function loadOverview() {
   loading.value = true

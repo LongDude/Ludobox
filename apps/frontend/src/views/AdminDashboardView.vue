@@ -1,6 +1,8 @@
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, onMounted, onUnmounted, reactive } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
+import { UserApi } from '@/api/useUserApi'
+import type { AdminEventResource } from '@/api/types'
 import LeftTab from '@/components/LeftTab.vue'
 import UpTab from '@/components/UpTab.vue'
 import { useLayoutInset } from '@/composables/useLayoutInset'
@@ -12,6 +14,7 @@ import AdminRoomsSection from '@/components/admin/AdminRoomsSection.vue'
 import AdminServerOverviewSection from '@/components/admin/AdminServerOverviewSection.vue'
 
 type AdminTab = 'overview' | 'games' | 'users' | 'configs' | 'rooms'
+type AdminEventVersions = Record<AdminEventResource, number>
 
 interface TabMeta {
   key: AdminTab
@@ -88,12 +91,47 @@ const activeMeta = computed(
   () => tabs.value.find((tab) => tab.key === activeTab.value) ?? tabs.value[0],
 )
 const activeComponent = computed(() => componentMap[activeTab.value])
+const adminEventVersions = reactive<AdminEventVersions>({
+  games: 0,
+  configs: 0,
+  rooms: 0,
+  servers: 0,
+})
+const activeComponentProps = computed(() =>
+  activeTab.value === 'users' ? {} : { adminEventVersions },
+)
+
+const adminEventResources: AdminEventResource[] = ['games', 'configs', 'rooms', 'servers']
+let stopAdminEvents: (() => void) | null = null
+
+onMounted(() => {
+  stopAdminEvents = UserApi.subscribeAdminEvents({
+    onEvent(event) {
+      if (event.type !== 'admin_resource_changed') return
+      if (!isAdminEventResource(event.resource)) return
+
+      adminEventVersions[event.resource] += 1
+    },
+    onError(error) {
+      console.warn('Admin SSE connection failed', error)
+    },
+  })
+})
+
+onUnmounted(() => {
+  stopAdminEvents?.()
+  stopAdminEvents = null
+})
 
 function setTab(tab: AdminTab) {
   router.replace({
     path: '/admin',
     query: tab === 'overview' ? {} : { tab },
   })
+}
+
+function isAdminEventResource(value: unknown): value is AdminEventResource {
+  return typeof value === 'string' && adminEventResources.includes(value as AdminEventResource)
 }
 </script>
 
@@ -147,7 +185,7 @@ function setTab(tab: AdminTab) {
       </div>
 
       <KeepAlive>
-        <component :is="activeComponent" />
+        <component :is="activeComponent" v-bind="activeComponentProps" />
       </KeepAlive>
     </section>
   </div>
