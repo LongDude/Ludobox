@@ -83,6 +83,64 @@ export interface QuickMatchResponse {
   reused_existing_room: boolean
 }
 
+export interface GameJoinRoomWithSeatRequest {
+  number_in_room: number
+}
+
+export interface GameJoinRoomResponse {
+  participant_id: number
+  round_id: number
+  number_in_room: number
+  room_capacity: number
+  current_players: number
+  min_players: number
+  entry_price: number
+  round_status: string
+  timer_starts_at?: string | null
+}
+
+export interface GameParticipantInfo {
+  participant_id: number
+  user_id?: number | null
+  number_in_room: number
+  boost: number
+  winning_money: number
+  is_bot: boolean
+  exited_at?: string | null
+}
+
+export interface GameRoundStatusResponse {
+  round_id: number
+  status: string
+  created_at: string
+  time_left_seconds: number
+  participants: GameParticipantInfo[]
+  winners: GameParticipantInfo[]
+}
+
+export interface GamePurchaseBoostRequest {
+  boost_value: number
+}
+
+export interface GamePurchaseBoostResponse {
+  success: boolean
+  message?: string
+  boost_power: number
+  boost_cost: number
+}
+
+export interface GameCancelBoostResponse {
+  success: boolean
+  message?: string
+  refund?: number
+}
+
+export interface GameLeaveRoomResponse {
+  success: boolean
+  message?: string
+  refund?: number
+}
+
 export interface UserResponse {
   id?: number
   email: string
