@@ -70,8 +70,8 @@ definitions:
 host: localhost:8080
 info:
   contact: {}
-  description: LudaBox Matchmaking
-  title: LudaBox API
+  description: LudoBox Matchmaking
+  title: LudoBox API
   version: "1.0"
 paths:
   /healthz:

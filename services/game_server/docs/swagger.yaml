@@ -106,8 +106,8 @@ definitions:
 host: localhost:8080
 info:
   contact: {}
-  description: LudaBox GameServer
-  title: LudaBox API
+  description: LudoBox GameServer
+  title: LudoBox API
   version: "1.0"
 paths:
   /healthz:

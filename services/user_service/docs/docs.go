@@ -411,6 +411,56 @@ const docTemplate = `{
                 }
             }
         },
+        "/admin/events": {
+            "get": {
+                "description": "Streams admin resource change events for games, configs, rooms and servers.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "text/event-stream"
+                ],
+                "tags": [
+                    "Admin Events"
+                ],
+                "summary": "Subscribe admin events",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Authorization Token",
+                        "name": "Authorization",
+                        "in": "header",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/service.AdminEvent"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/presenters.ErrorResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/presenters.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/presenters.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
         "/admin/game": {
             "post": {
                 "description": "Creates a new game.",
@@ -1601,6 +1651,156 @@ const docTemplate = `{
                     }
                 }
             }
+        },
+        "/user/balance/events": {
+            "get": {
+                "description": "Streams balance changes for the authenticated user.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "text/event-stream"
+                ],
+                "tags": [
+                    "User"
+                ],
+                "summary": "Subscribe current user balance events",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Authenticated user id",
+                        "name": "X-Authenticated-User",
+                        "in": "header",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Authorization Token",
+                        "name": "Authorization",
+                        "in": "header",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/service.UserBalanceEvent"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/presenters.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/presenters.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/user/history/games": {
+            "get": {
+                "description": "Returns current user's game participation history with results and financial outcome.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "User"
+                ],
+                "summary": "List current user game history",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Authenticated user id",
+                        "name": "X-Authenticated-User",
+                        "in": "header",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Authorization Token",
+                        "name": "Authorization",
+                        "in": "header",
+                        "required": true
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Page number",
+                        "name": "page",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Page size",
+                        "name": "page_size",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Game id",
+                        "name": "game_id",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Room id",
+                        "name": "room_id",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Result/status: won, lost, left, cancelled, waiting, active",
+                        "name": "status",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Start date/time, RFC3339 or YYYY-MM-DD",
+                        "name": "date_from",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "End date/time, RFC3339 or YYYY-MM-DD",
+                        "name": "date_to",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/presenters.GameHistoryResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/presenters.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/presenters.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/presenters.ErrorResponse"
+                        }
+                    }
+                }
+            }
         }
     },
     "definitions": {
@@ -1637,10 +1837,16 @@ const docTemplate = `{
                 "min_users": {
                     "type": "integer"
                 },
+                "next_round_delay": {
+                    "type": "integer"
+                },
                 "number_winners": {
                     "type": "integer"
                 },
                 "registration_price": {
+                    "type": "integer"
+                },
+                "round_time": {
                     "type": "integer"
                 },
                 "time": {
@@ -1678,10 +1884,16 @@ const docTemplate = `{
                 "min_users": {
                     "type": "integer"
                 },
+                "next_round_delay": {
+                    "type": "integer"
+                },
                 "number_winners": {
                     "type": "integer"
                 },
                 "registration_price": {
+                    "type": "integer"
+                },
+                "round_time": {
                     "type": "integer"
                 },
                 "time": {
@@ -1720,6 +1932,73 @@ const docTemplate = `{
             "properties": {
                 "error": {
                     "type": "string"
+                }
+            }
+        },
+        "presenters.GameHistoryItemResponse": {
+            "type": "object",
+            "properties": {
+                "boost_fee": {
+                    "type": "integer"
+                },
+                "entry_fee": {
+                    "type": "integer"
+                },
+                "finished_at": {
+                    "type": "string"
+                },
+                "game_id": {
+                    "type": "integer"
+                },
+                "game_name": {
+                    "type": "string"
+                },
+                "joined_at": {
+                    "type": "string"
+                },
+                "net_result": {
+                    "type": "integer"
+                },
+                "participant_id": {
+                    "type": "integer"
+                },
+                "result": {
+                    "type": "string"
+                },
+                "room_id": {
+                    "type": "integer"
+                },
+                "round_id": {
+                    "type": "integer"
+                },
+                "round_status": {
+                    "type": "string"
+                },
+                "seat_number": {
+                    "type": "integer"
+                },
+                "winning_money": {
+                    "type": "integer"
+                }
+            }
+        },
+        "presenters.GameHistoryResponse": {
+            "type": "object",
+            "properties": {
+                "items": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/presenters.GameHistoryItemResponse"
+                    }
+                },
+                "page": {
+                    "type": "integer"
+                },
+                "page_size": {
+                    "type": "integer"
+                },
+                "total": {
+                    "type": "integer"
                 }
             }
         },
@@ -1926,6 +2205,46 @@ const docTemplate = `{
                     "example": "ludobox_vip_2"
                 }
             }
+        },
+        "service.AdminEvent": {
+            "type": "object",
+            "properties": {
+                "action": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "integer"
+                },
+                "resource": {
+                    "type": "string"
+                },
+                "timestamp": {
+                    "type": "string"
+                },
+                "type": {
+                    "type": "string"
+                }
+            }
+        },
+        "service.UserBalanceEvent": {
+            "type": "object",
+            "properties": {
+                "action": {
+                    "type": "string"
+                },
+                "balance": {
+                    "type": "integer"
+                },
+                "timestamp": {
+                    "type": "string"
+                },
+                "type": {
+                    "type": "string"
+                },
+                "user_id": {
+                    "type": "integer"
+                }
+            }
         }
     }
 }`
@@ -1936,8 +2255,8 @@ var SwaggerInfo = &swag.Spec{
 	Host:             "localhost:8080",
 	BasePath:         "/api",
 	Schemes:          []string{},
-	Title:            "LudaBox API",
-	Description:      "LudaBox UserService",
+	Title:            "LudoBox API",
+	Description:      "LudoBox UserService",
 	InfoInstanceName: "swagger",
 	SwaggerTemplate:  docTemplate,
 	LeftDelim:        "{{",

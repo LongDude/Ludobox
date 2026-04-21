@@ -1,6 +1,6 @@
 services:
   core:
-    container_name: LudaBox_Matchmaking
+    container_name: Ludobox_Matchmaking
     build:
       context: .
       dockerfile: ./dockerfile
@@ -43,7 +43,7 @@ services:
       - core_network
 
   nginx:
-    container_name: LudaBox_Matchmaking_nginx
+    container_name: Ludobox_Matchmaking_nginx
     build:
       context: ./nginx
     environment:
@@ -63,14 +63,14 @@ services:
 
   certbot:
     image: certbot/certbot:latest
-    container_name: LudaBox_Matchmaking_certbot
+    container_name: Ludobox_Matchmaking_certbot
     volumes:
       - ./certbot/conf:/etc/letsencrypt
       - ./certbot/www:/var/www/certbot
         
   
   postgres:
-    container_name: LudaBox_Matchmaking_db
+    container_name: Ludobox_Matchmaking_db
     image: postgres:17
     environment:
       - POSTGRES_USER=${POSTGRES_USER}
@@ -89,7 +89,7 @@ services:
   
   redis:
     image: redis:8-alpine
-    container_name: LudaBox_Matchmaking_redis
+    container_name: Ludobox_Matchmaking_redis
     # ports:
     #   - "${REDIS_PORT}:${REDIS_PORT}"
     volumes:

@@ -69,7 +69,7 @@
           font-size="80"
           font-weight="900"
           letter-spacing="-2"
-          fill="url(#textGrad)">LudaBox</text>
+          fill="url(#textGrad)">LudoBox</text>
 
     <text x="244" y="168"
           font-family="Inter, Segoe UI, Arial, sans-serif"
