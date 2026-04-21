@@ -55,6 +55,39 @@ local function send_get_request(host, port, path, extra_headers)
     return status_code, body, nil
 end
 
+local function trim(value)
+    return string.match(value or "", "^%s*(.-)%s*$") or ""
+end
+
+local function origin_is_allowed(origin)
+    origin = trim(origin)
+    if origin == "" then
+        return false
+    end
+
+    local allowed_origins = trim(os.getenv("HAPROXY_ALLOWED_CORS_ORIGINS") or "")
+    if allowed_origins == "" then
+        allowed_origins = os.getenv("ALLOWED_CORS_ORIGINS") or ""
+    end
+
+    for item in string.gmatch(allowed_origins, "([^,]+)") do
+        local allowed = trim(item)
+        if allowed == "*" or allowed == origin then
+            return true
+        end
+    end
+
+    return false
+end
+
+core.register_action("mark_cors_origin", { "http-req" }, function(txn)
+    local origin = trim(txn.sf:req_hdr("Origin") or "")
+    local allowed = origin_is_allowed(origin)
+
+    txn:set_var("txn.cors_origin", origin)
+    txn:set_var("txn.cors_origin_allowed", allowed)
+end)
+
 core.register_action("validate_sso_access_token", { "http-req" }, function(txn)
     local auth_header = txn:get_var("txn.auth_header")
     if not auth_header or auth_header == "" then

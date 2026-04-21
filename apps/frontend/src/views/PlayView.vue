@@ -5,7 +5,12 @@ import LeftTab from '@/components/LeftTab.vue'
 import UpTab from '@/components/UpTab.vue'
 import FooterTab from '@/components/FooterTab.vue'
 import { GameApi } from '@/api/useMatchApi'
-import type { GameJoinRoomResponse, GameParticipantInfo, GameRoundEvent, GameRoundStatusResponse } from '@/api/types'
+import type {
+  GameJoinRoomResponse,
+  GameParticipantInfo,
+  GameRoundEvent,
+  GameRoundStatusResponse,
+} from '@/api/types'
 import { useAuthStore } from '@/stores/authStore'
 import { useMatchSessionStore } from '@/stores/matchSessionStore'
 import { useUserCabinetStore } from '@/stores/userCabinetStore'
@@ -20,6 +25,8 @@ const cabinet = useUserCabinetStore()
 const { t } = useI18n()
 const { LeftTabHidden: leftHidden, layoutInset } = useLayoutInset()
 
+type LiveRoundEvent = GameRoundEvent & { id: number }
+
 const roomId = computed(() => Number(route.params.roomId))
 
 const joinResult = ref<GameJoinRoomResponse | null>(null)
@@ -33,7 +40,7 @@ const selectedSeat = ref('')
 const autoRefresh = ref(true)
 const sseConnected = ref(false)
 const sseError = ref('')
-const liveEvents = ref<{ id: number; type: string; timestamp: string }[]>([])
+const liveEvents = ref<LiveRoundEvent[]>([])
 let statusTimer: number | null = null
 let roundEventsStop: (() => void) | null = null
 let liveEventId = 0
@@ -83,6 +90,33 @@ const currentPlayers = computed(() => {
 })
 
 const statusLabel = computed(() => roundStatus.value?.status || joinResult.value?.round_status || '-')
+const roundPhase = computed(() => normalizeRoundPhase(statusLabel.value))
+const roundPhases = computed(() =>
+  [
+    {
+      key: 'waiting',
+      title: t('gameRoom.round.phaseWaiting'),
+      description: t('gameRoom.round.phaseWaitingHint'),
+    },
+    {
+      key: 'playing',
+      title: t('gameRoom.round.phasePlaying'),
+      description: t('gameRoom.round.phasePlayingHint'),
+    },
+    {
+      key: 'finalized',
+      title: t('gameRoom.round.phaseFinalized'),
+      description: t('gameRoom.round.phaseFinalizedHint'),
+    },
+  ].map((phase, index, phases) => {
+    const activeIndex = phases.findIndex((item) => item.key === roundPhase.value)
+    return {
+      ...phase,
+      active: phase.key === roundPhase.value,
+      complete: activeIndex > index,
+    }
+  }),
+)
 
 const seatOptions = computed(() => {
   if (!roomCapacity.value) return []
@@ -148,7 +182,7 @@ watch(
   { immediate: true },
 )
 
-watch([activeRoundId, autoRefresh], () => {
+watch([activeRoundId, autoRefresh, sseConnected], () => {
   restartStatusPolling()
 })
 
@@ -192,6 +226,17 @@ function normalizeError(error: any, fallback: string) {
   return error?.message || error?.details?.message || error?.details?.error || fallback
 }
 
+function normalizeRoundPhase(status: string) {
+  const normalized = String(status || '').toLowerCase()
+  if (['completed', 'complete', 'finished', 'finalized', 'archived'].includes(normalized)) {
+    return 'finalized'
+  }
+  if (['in_game', 'in-game', 'started', 'running', 'active', 'playing'].includes(normalized)) {
+    return 'playing'
+  }
+  return 'waiting'
+}
+
 function clearFeedback() {
   errorMsg.value = ''
   successMsg.value = ''
@@ -217,7 +262,7 @@ function stopStatusPolling() {
 function restartStatusPolling() {
   stopStatusPolling()
 
-  if (!activeRoundId.value || !autoRefresh.value) return
+  if (!activeRoundId.value || !autoRefresh.value || sseConnected.value) return
 
   statusTimer = window.setInterval(() => {
     void loadRoundStatus(true)
@@ -243,6 +288,7 @@ function restartRoundEvents() {
     onOpen: () => {
       sseConnected.value = true
       sseError.value = ''
+      void loadRoundStatus(true)
     },
     onEvent: handleRoundEvent,
     onError: (error) => {
@@ -257,7 +303,7 @@ function restartRoundEvents() {
 
 function handleRoundEvent(event: GameRoundEvent) {
   liveEvents.value = [
-    { id: ++liveEventId, type: event.type, timestamp: event.timestamp },
+    { ...event, id: ++liveEventId },
     ...liveEvents.value,
   ].slice(0, 5)
 
@@ -271,6 +317,66 @@ function formatEventTime(timestamp: string) {
   const date = new Date(timestamp)
   if (Number.isNaN(date.getTime())) return ''
   return date.toLocaleTimeString()
+}
+
+function eventTitle(event: GameRoundEvent) {
+  const key = `gameRoom.events.${event.type}`
+  const label = t(key)
+  if (label !== key) return label
+
+  return event.type.replace(/_/g, ' ')
+}
+
+function eventData(event: GameRoundEvent) {
+  if (!event.data || typeof event.data !== 'object') return {}
+  return event.data as Record<string, unknown>
+}
+
+function eventDescription(event: GameRoundEvent) {
+  const data = eventData(event)
+
+  if (event.type === 'player_joined') {
+    return t('gameRoom.events.playerJoinedDetails', {
+      participant: Number(data.participant_id ?? 0) || '-',
+      seat: Number(data.number_in_room ?? 0) || '-',
+      players: Number(data.current_players ?? 0) || '-',
+    })
+  }
+
+  if (event.type === 'player_left') {
+    return t('gameRoom.events.playerLeftDetails', {
+      participant: Number(data.participant_id ?? 0) || '-',
+      seat: Number(data.number_in_room ?? 0) || '-',
+      players: Number(data.current_players ?? 0) || '-',
+    })
+  }
+
+  if (event.type === 'boost_purchased') {
+    return t('gameRoom.events.boostPurchasedDetails', {
+      participant: Number(data.participant_id ?? 0) || '-',
+      power: Number(data.boost_power ?? 0) || '-',
+    })
+  }
+
+  if (event.type === 'boost_cancelled') {
+    return t('gameRoom.events.boostCancelledDetails', {
+      participant: Number(data.participant_id ?? 0) || '-',
+    })
+  }
+
+  if (event.type === 'round_started') {
+    return t('gameRoom.events.roundStartedDetails', {
+      players: Number(data.final_players ?? 0) || '-',
+      seconds: Number(data.game_duration_sec ?? 0) || '-',
+    })
+  }
+
+  if (event.type === 'round_finalized') {
+    const winners = Array.isArray(data.winners) ? data.winners.length : 0
+    return t('gameRoom.events.roundFinalizedDetails', { winners })
+  }
+
+  return t('gameRoom.events.genericDetails')
 }
 
 async function loadRoundStatus(silent = false) {
@@ -557,7 +663,7 @@ async function leaveRoom() {
             <strong>{{ roundStatus?.time_left_seconds ?? '-' }}</strong>
           </div>
           <div class="meta-item">
-            <span>{{ t('gameRoom.round.autoRefresh') }}</span>
+            <span>{{ t('gameRoom.round.fallbackPolling') }}</span>
             <label class="switch-line">
               <input v-model="autoRefresh" type="checkbox" />
               <span>{{ autoRefresh ? t('common.yes') : t('common.no') }}</span>
@@ -571,6 +677,22 @@ async function leaveRoom() {
           </div>
         </div>
 
+        <p class="description live-hint">
+          {{ sseConnected ? t('gameRoom.round.ssePrimary') : t('gameRoom.round.pollingFallback') }}
+        </p>
+
+        <div class="round-timeline" :aria-label="t('gameRoom.round.timeline')">
+          <div
+            v-for="phase in roundPhases"
+            :key="phase.key"
+            class="phase-step"
+            :class="{ active: phase.active, complete: phase.complete }"
+          >
+            <strong>{{ phase.title }}</strong>
+            <span>{{ phase.description }}</span>
+          </div>
+        </div>
+
         <div class="participants">
           <h3>{{ t('gameRoom.round.participants') }}</h3>
           <p v-if="!participants.length" class="description">{{ t('gameRoom.round.empty') }}</p>
@@ -581,8 +703,14 @@ async function leaveRoom() {
               class="participant-card"
               :class="{ own: participant.participant_id === activeParticipantId }"
             >
+              <span v-if="participant.participant_id === activeParticipantId" class="own-badge">
+                {{ t('gameRoom.participant.you') }}
+              </span>
               <strong>{{ t('gameRoom.participant.seat', { seat: participant.number_in_room }) }}</strong>
               <span>{{ t('gameRoom.participant.id', { id: participant.participant_id }) }}</span>
+              <span v-if="participant.user_id">
+                {{ t('gameRoom.participant.user', { id: participant.user_id }) }}
+              </span>
               <span>{{ participantState(participant) }}</span>
               <span>{{ t('gameRoom.participant.boost', { value: participant.boost }) }}</span>
               <span v-if="participant.winning_money">
@@ -595,7 +723,7 @@ async function leaveRoom() {
         <div v-if="winners.length" class="winners">
           <h3>{{ t('gameRoom.round.winners') }}</h3>
           <span v-for="winner in winners" :key="winner.participant_id" class="winner-chip">
-            {{ t('gameRoom.participant.seat', { seat: winner.number_in_room }) }} ·
+            {{ t('gameRoom.participant.seat', { seat: winner.number_in_room }) }} -
             {{ winner.winning_money }}
           </span>
         </div>
@@ -604,9 +732,13 @@ async function leaveRoom() {
           <p v-if="sseError" class="description">{{ sseError }}</p>
           <p v-else-if="!liveEvents.length" class="description">{{ t('gameRoom.round.noLiveEvents') }}</p>
           <div v-else class="event-list">
-            <span v-for="event in liveEvents" :key="event.id" class="event-chip">
-              {{ event.type }} {{ formatEventTime(event.timestamp) }}
-            </span>
+            <article v-for="event in liveEvents" :key="event.id" class="event-card">
+              <div>
+                <strong>{{ eventTitle(event) }}</strong>
+                <span>{{ eventDescription(event) }}</span>
+              </div>
+              <time>{{ formatEventTime(event.timestamp) }}</time>
+            </article>
           </div>
         </div>
       </article>
@@ -717,8 +849,7 @@ async function leaveRoom() {
 
 .hero-pills,
 .actions,
-.winner-chip,
-.event-chip {
+.winner-chip {
   display: inline-flex;
   align-items: center;
   gap: 0.65rem;
@@ -785,7 +916,7 @@ label span,
 
 .source-pill,
 .winner-chip,
-.event-chip {
+.own-badge {
   justify-content: center;
   border-radius: 999px;
   padding: 0.55rem 0.85rem;
@@ -816,6 +947,43 @@ strong.live {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 0.85rem;
+}
+
+.live-hint {
+  padding: 0.75rem 0.9rem;
+  border-radius: 1rem;
+  background: color-mix(in oklab, #0ea5e9, transparent 90%);
+}
+
+.round-timeline {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.65rem;
+}
+
+.phase-step {
+  display: grid;
+  gap: 0.35rem;
+  min-height: 5.25rem;
+  padding: 0.85rem;
+  border-radius: 1rem;
+  border: 1px solid color-mix(in oklab, var(--color-border), transparent 8%);
+  background: color-mix(in oklab, var(--color-surface), white 8%);
+}
+
+.phase-step.active {
+  border-color: color-mix(in oklab, #0284c7, transparent 20%);
+  background:
+    radial-gradient(circle at top right, color-mix(in oklab, #0ea5e9, transparent 78%), transparent 52%),
+    color-mix(in oklab, var(--color-surface), white 12%);
+}
+
+.phase-step.complete {
+  border-color: color-mix(in oklab, var(--color-success), transparent 25%);
+}
+
+.phase-step span {
+  color: var(--color-muted);
 }
 
 .meta-item,
@@ -900,6 +1068,38 @@ input[type='number'] {
   background: color-mix(in oklab, var(--color-primary-secondary), transparent 88%);
 }
 
+.own-badge {
+  display: inline-flex;
+  width: fit-content;
+  padding: 0.35rem 0.65rem;
+  color: #075985;
+  background: color-mix(in oklab, #38bdf8, transparent 82%);
+}
+
+.event-card {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.85rem;
+  padding: 0.8rem 0.9rem;
+  border-radius: 1rem;
+  border: 1px solid color-mix(in oklab, var(--color-border), transparent 10%);
+  background: color-mix(in oklab, var(--color-surface), white 8%);
+}
+
+.event-card div {
+  display: grid;
+  gap: 0.25rem;
+}
+
+.event-card span,
+.event-card time {
+  color: var(--color-muted);
+}
+
+.event-card time {
+  white-space: nowrap;
+}
+
 .switch-line {
   display: inline-flex;
   align-items: center;
@@ -974,7 +1174,8 @@ input[type='number'] {
 @media (max-width: 720px) {
   .hero-card,
   .card-head.row,
-  .meta-grid {
+  .meta-grid,
+  .round-timeline {
     grid-template-columns: 1fr;
   }
 
