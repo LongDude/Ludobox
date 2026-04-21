@@ -63,6 +63,10 @@ func main() {
 	usecase.AdminEvents = adminEvents
 	adminEvents.Start(context.Background())
 	defer adminEvents.Stop()
+	userBalanceEvents := service.NewUserBalanceEventService(pgPool, logger)
+	usecase.UserBalanceEvents = userBalanceEvents
+	userBalanceEvents.Start(context.Background())
+	defer userBalanceEvents.Stop()
 
 	// ! Init REST
 	server := transporthttp.NewHTTPServer(cfg, usecase)
@@ -81,6 +85,7 @@ func main() {
 
 	// ! Graceful shutdown
 	adminEvents.Stop()
+	userBalanceEvents.Stop()
 
 	shutdownCtx, shutdownCancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer shutdownCancel()

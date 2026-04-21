@@ -18,9 +18,11 @@ import type {
   RoomListResponse,
   RoomResponse,
   RoomUpdateRequest,
+  UserBalanceEvent,
 } from './types'
 
 type AdminEventHandlers = SseHandlers<AdminEvent>
+type UserBalanceEventHandlers = SseHandlers<UserBalanceEvent>
 
 function buildAdminParams(request?: AdminListRequest) {
   if (!request) return undefined
@@ -60,19 +62,19 @@ function delay(ms: number, signal: AbortSignal) {
   })
 }
 
-async function runAdminEventStream(
+async function runAuthorizedEventStream<T>(
   url: string,
   auth: ReturnType<typeof useAuthStore>,
   signal: AbortSignal,
-  handlers: AdminEventHandlers,
+  handlers: SseHandlers<T>,
 ) {
   let retryDelay = 1000
 
   while (!signal.aborted) {
     try {
-      await readJsonSseStream<AdminEvent>(url, auth.AccessToken, signal, handlers)
+      await readJsonSseStream<T>(url, auth.AccessToken, signal, handlers)
       if (!signal.aborted) {
-        throw new Error('Admin SSE stream closed')
+        throw new Error('SSE stream closed')
       }
     } catch (error: any) {
       if (signal.aborted || error?.name === 'AbortError') return
@@ -108,6 +110,17 @@ export const UserApi = {
     return api
       .put<CurrentUserProfileResponse>('/users/user/balance', payload)
       .then((response) => response.data)
+  },
+  subscribeBalanceEvents(handlers: UserBalanceEventHandlers) {
+    const controller = new AbortController()
+    const auth = useAuthStore()
+    const url = buildApiUrl(api.defaults.baseURL, '/users/user/balance/events')
+
+    void runAuthorizedEventStream<UserBalanceEvent>(url, auth, controller.signal, handlers).finally(() => {
+      handlers.onClose?.()
+    })
+
+    return () => controller.abort()
   },
   listGames(request?: AdminListRequest) {
     return api
@@ -176,7 +189,7 @@ export const UserApi = {
     const auth = useAuthStore()
     const url = buildApiUrl(api.defaults.baseURL, '/users/admin/events')
 
-    void runAdminEventStream(url, auth, controller.signal, handlers).finally(() => {
+    void runAuthorizedEventStream<AdminEvent>(url, auth, controller.signal, handlers).finally(() => {
       handlers.onClose?.()
     })
 

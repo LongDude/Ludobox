@@ -14,10 +14,12 @@ export const useUserCabinetStore = defineStore('userCabinet', () => {
 
   let pendingLoad: Promise<CurrentUserProfileResponse | null> | null = null
   let lastLoadId = 0
+  let stopBalanceEvents: (() => void) | null = null
 
   function reset() {
     lastLoadId += 1
     pendingLoad = null
+    stopBalanceSubscription()
     profile.value = null
     loading.value = false
     loaded.value = false
@@ -82,6 +84,37 @@ export const useUserCabinetStore = defineStore('userCabinet', () => {
     return loadProfile(true)
   }
 
+  function startBalanceSubscription() {
+    if (stopBalanceEvents || !auth.isAuthenticated) return
+
+    stopBalanceEvents = UserApi.subscribeBalanceEvents({
+      onEvent(event) {
+        if (event.type !== 'user_balance_changed' && event.type !== 'user_balance_snapshot') return
+
+        if (profile.value) {
+          profile.value = {
+            ...profile.value,
+            user_id: event.user_id,
+            balance: event.balance,
+          }
+          loaded.value = true
+          error.value = ''
+          return
+        }
+
+        void refresh().catch(() => {})
+      },
+      onError(err) {
+        error.value = err instanceof Error ? err.message : 'Failed to subscribe balance events.'
+      },
+    })
+  }
+
+  function stopBalanceSubscription() {
+    stopBalanceEvents?.()
+    stopBalanceEvents = null
+  }
+
   async function updateNickname(nickname: string) {
     if (!auth.isAuthenticated) {
       throw new Error('Unauthorized')
@@ -114,6 +147,7 @@ export const useUserCabinetStore = defineStore('userCabinet', () => {
         return
       }
 
+      startBalanceSubscription()
       if (!loaded.value && !pendingLoad) {
         void ensureLoaded().catch(() => {})
       }
@@ -130,6 +164,8 @@ export const useUserCabinetStore = defineStore('userCabinet', () => {
     refresh,
     updateNickname,
     applyBalanceDelta,
+    startBalanceSubscription,
+    stopBalanceSubscription,
     reset,
   }
 })

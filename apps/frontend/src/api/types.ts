@@ -36,6 +36,14 @@ export interface CurrentUserBalanceUpdateRequest {
   delta: number
 }
 
+export interface UserBalanceEvent {
+  type: string
+  action: string
+  user_id: number
+  balance: number
+  timestamp: string
+}
+
 export interface MatchmakingFilters {
   min_registration_price?: number
   max_registration_price?: number
