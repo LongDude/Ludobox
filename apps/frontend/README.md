@@ -95,7 +95,6 @@ VITE_SSO_CLIENT_ID_URL=https://domain/api
 
 - `VITE_FRONTEND_BASE_URL` — базовый URL фронтенда (для redirect URL OAuth).
 - `VITE_SSO_CLIENT_ID_URL` — базовый URL SSO‑сервиса.
-- `VITE_ALIB_API_URL` — базовый URL ALib API.
 - `VITE_API_BASE_URL` — зарезервирован для общего базового URL.
 
 ## Сборка и деплой
