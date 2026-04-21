@@ -37,6 +37,574 @@ const docTemplate = `{
                     }
                 }
             }
+        },
+        "/internal/rounds/{roundID}/finalize": {
+            "post": {
+                "description": "Finish round, select winners, and finalize",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Internal"
+                ],
+                "summary": "Finalize game (internal)",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "format": "int64",
+                        "description": "Round ID",
+                        "name": "roundID",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/internal/rounds/{roundID}/start": {
+            "post": {
+                "description": "Transition round to active state and finalize",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Internal"
+                ],
+                "summary": "Start game (internal)",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "format": "int64",
+                        "description": "Round ID",
+                        "name": "roundID",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/rooms/join": {
+            "post": {
+                "description": "User joins a room and gets assigned a seat",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Rooms"
+                ],
+                "summary": "Join room",
+                "parameters": [
+                    {
+                        "description": "Join request",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/dto.JoinRoomRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/dto.JoinRoomResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    },
+                    "409": {
+                        "description": "Conflict",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/rooms/join-seat": {
+            "post": {
+                "description": "User joins a room and selects a specific seat",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Rooms"
+                ],
+                "summary": "Join room with specific seat",
+                "parameters": [
+                    {
+                        "description": "Join with seat request",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/dto.JoinRoomWithSeatRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/dto.JoinRoomResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    },
+                    "409": {
+                        "description": "Conflict",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/rooms/participants/{roundParticipantID}/boost": {
+            "post": {
+                "description": "User purchases a boost for their seat",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Rooms"
+                ],
+                "summary": "Purchase boost",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "format": "int64",
+                        "description": "Round participant ID",
+                        "name": "roundParticipantID",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "Purchase boost request",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/dto.PurchaseBoostRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/dto.PurchaseBoostResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    },
+                    "409": {
+                        "description": "Conflict",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    }
+                }
+            },
+            "delete": {
+                "description": "User cancels their boost",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Rooms"
+                ],
+                "summary": "Cancel boost",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "format": "int64",
+                        "description": "Round participant ID",
+                        "name": "roundParticipantID",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/dto.CancelBoostResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/rooms/participants/{roundParticipantID}/leave": {
+            "post": {
+                "description": "User leaves the room before game starts",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Rooms"
+                ],
+                "summary": "Leave room",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "format": "int64",
+                        "description": "Round participant ID",
+                        "name": "roundParticipantID",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/dto.LeaveRoomResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    },
+                    "409": {
+                        "description": "Conflict",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/rounds/{roundID}": {
+            "get": {
+                "description": "Get current status of a round",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Rounds"
+                ],
+                "summary": "Get round status",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "format": "int64",
+                        "description": "Round ID",
+                        "name": "roundID",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/dto.RoundStatusResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/rounds/{roundID}/events": {
+            "get": {
+                "description": "Subscribe to real-time updates for a round",
+                "tags": [
+                    "Rounds"
+                ],
+                "summary": "Subscribe to round events (SSE)",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "format": "int64",
+                        "description": "Round ID",
+                        "name": "roundID",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "SSE stream",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        }
+    },
+    "definitions": {
+        "dto.CancelBoostResponse": {
+            "type": "object",
+            "properties": {
+                "message": {
+                    "type": "string"
+                },
+                "refund": {
+                    "type": "integer"
+                },
+                "success": {
+                    "type": "boolean"
+                }
+            }
+        },
+        "dto.ErrorResponse": {
+            "type": "object",
+            "properties": {
+                "code": {
+                    "type": "string"
+                },
+                "error": {
+                    "type": "string"
+                },
+                "message": {
+                    "type": "string"
+                }
+            }
+        },
+        "dto.JoinRoomRequest": {
+            "type": "object",
+            "required": [
+                "room_id"
+            ],
+            "properties": {
+                "room_id": {
+                    "type": "integer"
+                }
+            }
+        },
+        "dto.JoinRoomResponse": {
+            "type": "object",
+            "properties": {
+                "current_players": {
+                    "type": "integer"
+                },
+                "entry_price": {
+                    "type": "integer"
+                },
+                "min_players": {
+                    "type": "integer"
+                },
+                "number_in_room": {
+                    "type": "integer"
+                },
+                "participant_id": {
+                    "type": "integer"
+                },
+                "room_capacity": {
+                    "type": "integer"
+                },
+                "round_id": {
+                    "type": "integer"
+                },
+                "round_status": {
+                    "type": "string"
+                },
+                "timer_starts_at": {
+                    "type": "string"
+                }
+            }
+        },
+        "dto.JoinRoomWithSeatRequest": {
+            "type": "object",
+            "required": [
+                "number_in_room",
+                "room_id"
+            ],
+            "properties": {
+                "number_in_room": {
+                    "type": "integer",
+                    "minimum": 1
+                },
+                "room_id": {
+                    "type": "integer"
+                }
+            }
+        },
+        "dto.LeaveRoomResponse": {
+            "type": "object",
+            "properties": {
+                "message": {
+                    "type": "string"
+                },
+                "refund": {
+                    "type": "integer"
+                },
+                "success": {
+                    "type": "boolean"
+                }
+            }
+        },
+        "dto.ParticipantInfo": {
+            "type": "object",
+            "properties": {
+                "boost": {
+                    "type": "integer"
+                },
+                "exited_at": {
+                    "type": "string"
+                },
+                "is_bot": {
+                    "type": "boolean"
+                },
+                "number_in_room": {
+                    "type": "integer"
+                },
+                "participant_id": {
+                    "type": "integer"
+                },
+                "user_id": {
+                    "description": "nil для ботов",
+                    "type": "integer"
+                },
+                "winning_money": {
+                    "type": "integer"
+                }
+            }
+        },
+        "dto.PurchaseBoostRequest": {
+            "type": "object",
+            "required": [
+                "boost_value"
+            ],
+            "properties": {
+                "boost_value": {
+                    "type": "integer",
+                    "minimum": 1
+                }
+            }
+        },
+        "dto.PurchaseBoostResponse": {
+            "type": "object",
+            "properties": {
+                "boost_cost": {
+                    "type": "integer"
+                },
+                "boost_power": {
+                    "type": "integer"
+                },
+                "message": {
+                    "type": "string"
+                },
+                "success": {
+                    "type": "boolean"
+                }
+            }
+        },
+        "dto.RoundStatusResponse": {
+            "type": "object",
+            "properties": {
+                "created_at": {
+                    "type": "string"
+                },
+                "participants": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/dto.ParticipantInfo"
+                    }
+                },
+                "round_id": {
+                    "type": "integer"
+                },
+                "status": {
+                    "type": "string"
+                },
+                "time_left_seconds": {
+                    "type": "integer"
+                },
+                "winners": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/dto.ParticipantInfo"
+                    }
+                }
+            }
         }
     }
 }`

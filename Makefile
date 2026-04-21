@@ -24,6 +24,5 @@ build-matchmaking:
 build-rng:
 	@docker compose build rng-stub
 
-
 down:
 	@docker compose down

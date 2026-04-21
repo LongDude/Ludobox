@@ -1,4 +1,127 @@
 basePath: /api
+definitions:
+  dto.CancelBoostResponse:
+    properties:
+      message:
+        type: string
+      refund:
+        type: integer
+      success:
+        type: boolean
+    type: object
+  dto.ErrorResponse:
+    properties:
+      code:
+        type: string
+      error:
+        type: string
+      message:
+        type: string
+    type: object
+  dto.JoinRoomRequest:
+    properties:
+      room_id:
+        type: integer
+    required:
+    - room_id
+    type: object
+  dto.JoinRoomResponse:
+    properties:
+      current_players:
+        type: integer
+      entry_price:
+        type: integer
+      min_players:
+        type: integer
+      number_in_room:
+        type: integer
+      participant_id:
+        type: integer
+      room_capacity:
+        type: integer
+      round_id:
+        type: integer
+      round_status:
+        type: string
+      timer_starts_at:
+        type: string
+    type: object
+  dto.JoinRoomWithSeatRequest:
+    properties:
+      number_in_room:
+        minimum: 1
+        type: integer
+      room_id:
+        type: integer
+    required:
+    - number_in_room
+    - room_id
+    type: object
+  dto.LeaveRoomResponse:
+    properties:
+      message:
+        type: string
+      refund:
+        type: integer
+      success:
+        type: boolean
+    type: object
+  dto.ParticipantInfo:
+    properties:
+      boost:
+        type: integer
+      exited_at:
+        type: string
+      is_bot:
+        type: boolean
+      number_in_room:
+        type: integer
+      participant_id:
+        type: integer
+      user_id:
+        description: nil для ботов
+        type: integer
+      winning_money:
+        type: integer
+    type: object
+  dto.PurchaseBoostRequest:
+    properties:
+      boost_value:
+        minimum: 1
+        type: integer
+    required:
+    - boost_value
+    type: object
+  dto.PurchaseBoostResponse:
+    properties:
+      boost_cost:
+        type: integer
+      boost_power:
+        type: integer
+      message:
+        type: string
+      success:
+        type: boolean
+    type: object
+  dto.RoundStatusResponse:
+    properties:
+      created_at:
+        type: string
+      participants:
+        items:
+          $ref: '#/definitions/dto.ParticipantInfo'
+        type: array
+      round_id:
+        type: integer
+      status:
+        type: string
+      time_left_seconds:
+        type: integer
+      winners:
+        items:
+          $ref: '#/definitions/dto.ParticipantInfo'
+        type: array
+    type: object
 host: localhost:8080
 info:
   contact: {}
@@ -21,4 +144,257 @@ paths:
       summary: Service health
       tags:
       - System
+  /internal/rounds/{roundID}/finalize:
+    post:
+      consumes:
+      - application/json
+      description: Finish round, select winners, and finalize
+      parameters:
+      - description: Round ID
+        format: int64
+        in: path
+        name: roundID
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      summary: Finalize game (internal)
+      tags:
+      - Internal
+  /internal/rounds/{roundID}/start:
+    post:
+      consumes:
+      - application/json
+      description: Transition round to active state and finalize
+      parameters:
+      - description: Round ID
+        format: int64
+        in: path
+        name: roundID
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      summary: Start game (internal)
+      tags:
+      - Internal
+  /rooms/join:
+    post:
+      consumes:
+      - application/json
+      description: User joins a room and gets assigned a seat
+      parameters:
+      - description: Join request
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/dto.JoinRoomRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/dto.JoinRoomResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "409":
+          description: Conflict
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      summary: Join room
+      tags:
+      - Rooms
+  /rooms/join-seat:
+    post:
+      consumes:
+      - application/json
+      description: User joins a room and selects a specific seat
+      parameters:
+      - description: Join with seat request
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/dto.JoinRoomWithSeatRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/dto.JoinRoomResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "409":
+          description: Conflict
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      summary: Join room with specific seat
+      tags:
+      - Rooms
+  /rooms/participants/{roundParticipantID}/boost:
+    delete:
+      consumes:
+      - application/json
+      description: User cancels their boost
+      parameters:
+      - description: Round participant ID
+        format: int64
+        in: path
+        name: roundParticipantID
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/dto.CancelBoostResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      summary: Cancel boost
+      tags:
+      - Rooms
+    post:
+      consumes:
+      - application/json
+      description: User purchases a boost for their seat
+      parameters:
+      - description: Round participant ID
+        format: int64
+        in: path
+        name: roundParticipantID
+        required: true
+        type: integer
+      - description: Purchase boost request
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/dto.PurchaseBoostRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/dto.PurchaseBoostResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "409":
+          description: Conflict
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      summary: Purchase boost
+      tags:
+      - Rooms
+  /rooms/participants/{roundParticipantID}/leave:
+    post:
+      consumes:
+      - application/json
+      description: User leaves the room before game starts
+      parameters:
+      - description: Round participant ID
+        format: int64
+        in: path
+        name: roundParticipantID
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/dto.LeaveRoomResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "409":
+          description: Conflict
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      summary: Leave room
+      tags:
+      - Rooms
+  /rounds/{roundID}:
+    get:
+      consumes:
+      - application/json
+      description: Get current status of a round
+      parameters:
+      - description: Round ID
+        format: int64
+        in: path
+        name: roundID
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/dto.RoundStatusResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      summary: Get round status
+      tags:
+      - Rounds
+  /rounds/{roundID}/events:
+    get:
+      description: Subscribe to real-time updates for a round
+      parameters:
+      - description: Round ID
+        format: int64
+        in: path
+        name: roundID
+        required: true
+        type: integer
+      responses:
+        "200":
+          description: SSE stream
+          schema:
+            type: string
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      summary: Subscribe to round events (SSE)
+      tags:
+      - Rounds
 swagger: "2.0"
