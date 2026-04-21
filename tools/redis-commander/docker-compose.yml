@@ -1,0 +1,29 @@
+services:
+  rc-game1:
+      image: rediscommander/redis-commander:latest
+      container_name: redis-commander-game-server-1
+      environment:
+        - REDIS_HOST=game-redis-1
+        - REDIS_PORT=6379
+        - REDIS_PASSWORD=password
+      ports:
+        - 9001:8081
+      networks:
+        - rooms_network
+
+  rc-game2:
+      image: rediscommander/redis-commander:latest
+      container_name: redis-commander-game-server-2
+      environment:
+        - REDIS_HOST=game-redis-2
+        - REDIS_PORT=6379
+        - REDIS_PASSWORD=password
+      ports:
+        - 9002:8081
+      networks:
+        - rooms_network
+
+networks:
+  rooms_network:
+    name: "ludobox_rooms_network"
+    external: true
