@@ -6,6 +6,7 @@ import (
 	"sync"
 	"time"
 
+	"game_server/internal/repository"
 	"game_server/internal/transport/dto"
 
 	"github.com/sirupsen/logrus"
@@ -16,12 +17,14 @@ type EventsService struct {
 	subscribers map[int64][]chan *dto.SSEEvent // roundID -> []chan
 	mu          sync.RWMutex
 	logger      *logrus.Logger
+	roomRepo    repository.RoomRepository
 }
 
-func NewEventsService(logger *logrus.Logger) *EventsService {
+func NewEventsService(roomRepo repository.RoomRepository, logger *logrus.Logger) *EventsService {
 	return &EventsService{
 		subscribers: make(map[int64][]chan *dto.SSEEvent),
 		logger:      logger,
+		roomRepo:    roomRepo,
 	}
 }
 
@@ -79,6 +82,14 @@ func (es *EventsService) PublishEvent(ctx context.Context, roundID int64, eventT
 			es.logger.Warnf("Event channel full for round %d", roundID)
 		}
 	}
+
+	if eventType == "round_timer" || es.roomRepo == nil {
+		return
+	}
+
+	if err := es.persistEvent(ctx, roundID, eventType, data); err != nil && es.logger != nil {
+		es.logger.WithError(err).Warnf("failed to persist room event %s for round %d", eventType, roundID)
+	}
 }
 
 // PublishPlayerJoined отправляет событие присоединения игрока
@@ -132,11 +143,20 @@ func (es *EventsService) PublishRoundStarted(ctx context.Context, roundID int64,
 }
 
 // PublishRoundFinalized отправляет событие завершения игры
-func (es *EventsService) PublishRoundFinalized(ctx context.Context, roundID int64, winners []dto.WinnerInfo, payouts map[int64]int64) {
+func (es *EventsService) PublishRoundFinalized(
+	ctx context.Context,
+	roundID int64,
+	winners []dto.WinnerInfo,
+	payouts map[int64]int64,
+	nextRoundID int64,
+	nextRoundDelay int,
+) {
 	es.PublishEvent(ctx, roundID, "round_finalized", dto.EventRoundFinalized{
-		RoundID: roundID,
-		Winners: winners,
-		Payouts: payouts,
+		RoundID:        roundID,
+		Winners:        winners,
+		Payouts:        payouts,
+		NextRoundID:    nextRoundID,
+		NextRoundDelay: nextRoundDelay,
 	})
 }
 
@@ -154,4 +174,18 @@ func (es *EventsService) GetSubscriberCount(roundID int64) int {
 	es.mu.RLock()
 	defer es.mu.RUnlock()
 	return len(es.subscribers[roundID])
+}
+
+func (es *EventsService) persistEvent(ctx context.Context, roundID int64, eventType string, data interface{}) error {
+	roundInfo, err := es.roomRepo.GetRoundInfo(ctx, roundID)
+	if err != nil {
+		return err
+	}
+
+	payload, err := json.Marshal(data)
+	if err != nil {
+		return err
+	}
+
+	return es.roomRepo.CreateRoomEvent(ctx, roundInfo.RoomID, &roundID, eventType, payload)
 }

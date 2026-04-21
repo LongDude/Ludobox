@@ -70,7 +70,14 @@ func (ts *TimerService) SetRoundCancelCallback(fn func(ctx context.Context, roun
 
 // StartTimer waits for min_users, then keeps the round in waiting state for the
 // configured countdown. Only after that countdown expires does the round become active.
-func (ts *TimerService) StartTimer(ctx context.Context, roundID int64, roomID int64, minUsers int, configTimeSeconds int) {
+func (ts *TimerService) StartTimer(
+	ctx context.Context,
+	roundID int64,
+	roomID int64,
+	minUsers int,
+	waitingTimeSeconds int,
+	activeTimeSeconds int,
+) {
 	_ = roomID
 
 	ts.mu.Lock()
@@ -134,7 +141,7 @@ func (ts *TimerService) StartTimer(ctx context.Context, roundID int64, roomID in
 				if !countdownActive {
 					countdownActive = true
 					startedAt := now
-					countdownDeadline = startedAt.Add(time.Duration(configTimeSeconds) * time.Second)
+					countdownDeadline = startedAt.Add(time.Duration(waitingTimeSeconds) * time.Second)
 					ts.setPhase(roundID, "waiting", countdownDeadline, &startedAt)
 					ts.logger.Infof("Round %d reached min_users (%d), starting waiting countdown", roundID, len(participants))
 				}
@@ -154,10 +161,10 @@ func (ts *TimerService) StartTimer(ctx context.Context, roundID int64, roomID in
 				}
 
 				activeStartedAt := time.Now()
-				activeDeadline := activeStartedAt.Add(time.Duration(configTimeSeconds) * time.Second)
+				activeDeadline := activeStartedAt.Add(time.Duration(activeTimeSeconds) * time.Second)
 				ts.setPhase(roundID, "active", activeDeadline, &activeStartedAt)
 				participants, _ = ts.roomRepo.GetParticipantsByRoundID(timerCtx, roundID)
-				ts.eventsService.PublishRoundStarted(timerCtx, roundID, len(participants), configTimeSeconds)
+				ts.eventsService.PublishRoundStarted(timerCtx, roundID, len(participants), activeTimeSeconds)
 
 				activeTicker := time.NewTicker(1 * time.Second)
 				defer activeTicker.Stop()

@@ -103,7 +103,6 @@ async function createRoom() {
   try {
     const room = await UserApi.createRoom({ config_id: Number(createConfigId.value) })
     successMsg.value = t('admin.roomsSection.success.created', { id: room.room_id })
-    createConfigId.value = ''
     await loadRooms()
   } catch (error: any) {
     errorMsg.value = error?.message || t('admin.roomsSection.error.create')

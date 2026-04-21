@@ -18,6 +18,8 @@ import { useUserCabinetStore } from '@/stores/userCabinetStore'
 import { useI18n } from '@/i18n'
 import { useLayoutInset } from '@/composables/useLayoutInset'
 
+type LiveRoundEvent = GameRoundEvent & { id: number }
+
 const route = useRoute()
 const router = useRouter()
 const auth = useAuthStore()
@@ -25,8 +27,6 @@ const session = useMatchSessionStore()
 const cabinet = useUserCabinetStore()
 const { t } = useI18n()
 const { LeftTabHidden: leftHidden, layoutInset } = useLayoutInset()
-
-type LiveRoundEvent = GameRoundEvent & { id: number }
 
 const roomId = computed(() => Number(route.params.roomId))
 
@@ -40,11 +40,16 @@ const errorMsg = ref('')
 const successMsg = ref('')
 const selectedSeat = ref('')
 const autoRefresh = ref(true)
+const autoAdvanceNextRound = ref(true)
 const sseConnected = ref(false)
 const sseError = ref('')
 const liveEvents = ref<LiveRoundEvent[]>([])
+const displayedRoundId = ref<number | null>(null)
+const pendingNextRoundId = ref<number | null>(null)
+const pendingNextRoundCountdown = ref(0)
 let statusTimer: number | null = null
 let roundEventsStop: (() => void) | null = null
+let nextRoundTimer: number | null = null
 let liveEventId = 0
 
 const room = computed(() => {
@@ -64,10 +69,12 @@ const sourceLabel = computed(() => {
   return t('matchmaking.play.sourceUnknown')
 })
 
-const activeRoundId = computed(() => {
+const roomRoundId = computed(() => {
   const roundId = roomState.value?.round_id || joinResult.value?.round_id || quickMatchMeta.value?.round_id || 0
   return roundId > 0 ? roundId : null
 })
+
+const activeRoundId = computed(() => displayedRoundId.value ?? roomRoundId.value ?? null)
 
 const initialParticipantId = computed(() => {
   const participantId =
@@ -82,19 +89,39 @@ const initialParticipantRoundId = computed(() => {
 
 const currentUserId = computed(() => auth.User?.id ?? null)
 
-const roomCapacity = computed(() => roomState.value?.room_capacity || joinResult.value?.room_capacity || room.value?.capacity || 0)
-const entryPrice = computed(() => roomState.value?.entry_price ?? joinResult.value?.entry_price ?? room.value?.registration_price ?? '-')
-const minPlayers = computed(() => roomState.value?.min_players ?? joinResult.value?.min_players ?? room.value?.min_users ?? '-')
+const roomCapacity = computed(
+  () => roomState.value?.room_capacity || joinResult.value?.room_capacity || room.value?.capacity || 0,
+)
+const entryPrice = computed(
+  () => roomState.value?.entry_price ?? joinResult.value?.entry_price ?? room.value?.registration_price ?? '-',
+)
+const minPlayers = computed(
+  () => roomState.value?.min_players ?? joinResult.value?.min_players ?? room.value?.min_users ?? '-',
+)
 const currentPlayers = computed(() => {
   if (roundStatus.value?.participants?.length) {
     return roundStatus.value.participants.filter((participant) => !participant.exited_at).length
   }
 
-  return roomState.value?.current_players ?? joinResult.value?.current_players ?? room.value?.current_players ?? 0
+  return (
+    roomState.value?.current_players ??
+    joinResult.value?.current_players ??
+    room.value?.current_players ??
+    0
+  )
 })
 
-const statusLabel = computed(() => roundStatus.value?.status || roomState.value?.round_status || joinResult.value?.round_status || '-')
+const currentRoomStatusLabel = computed(
+  () => roomState.value?.round_status || joinResult.value?.round_status || '',
+)
+const statusLabel = computed(() => {
+  if (roundStatus.value?.status) return roundStatus.value.status
+  if (activeRoundId.value === roomRoundId.value) return currentRoomStatusLabel.value || '-'
+  return joinResult.value?.round_status || '-'
+})
 const roundPhase = computed(() => normalizeRoundPhase(statusLabel.value))
+const currentRoundPhase = computed(() => normalizeRoundPhase(currentRoomStatusLabel.value))
+const currentRoomIsActive = computed(() => currentRoundPhase.value === 'playing')
 const roundPhases = computed(() =>
   [
     {
@@ -145,7 +172,20 @@ const winners = computed(() => roundStatus.value?.winners ?? [])
 const roomUserParticipants = computed(() =>
   (roomState.value?.current_user_participants ?? []).filter((participant) => !participant.exited_at),
 )
-const joinedParticipants = computed(() => {
+const currentRoomParticipant = computed(() => {
+  const participant = roomUserParticipants.value[0] ?? null
+  if (!participant) return null
+
+  if (activeRoundId.value === roomRoundId.value) {
+    return (
+      participants.value.find((item) => item.participant_id === participant.participant_id) ??
+      participant
+    )
+  }
+
+  return participant
+})
+const displayedOwnParticipants = computed(() => {
   const userId = currentUserId.value
   if (userId) {
     const matched = participants.value.filter(
@@ -165,39 +205,58 @@ const joinedParticipants = computed(() => {
     if (matched.length > 0) return matched
   }
 
-  return roomUserParticipants.value
+  const participantId = initialParticipantId.value
+  if (!participantId || initialParticipantRoundId.value !== activeRoundId.value) return []
+
+  const matched = participants.value.find((participant) => participant.participant_id === participantId)
+  return matched ? [matched] : []
 })
 const activeParticipant = computed(() => {
-  if (joinedParticipants.value.length > 0) {
-    return joinedParticipants.value[0] ?? null
+  if (activeRoundId.value === roomRoundId.value && currentRoomParticipant.value) {
+    return currentRoomParticipant.value
   }
 
-  const participantId = initialParticipantId.value
-  if (!participantId || initialParticipantRoundId.value !== activeRoundId.value) return null
-  return participants.value.find((participant) => participant.participant_id === participantId) ?? null
+  if (displayedOwnParticipants.value.length > 0) {
+    return displayedOwnParticipants.value[0] ?? null
+  }
+
+  return null
 })
 const activeParticipantId = computed(() => activeParticipant.value?.participant_id ?? null)
-const mySeat = computed(() => activeParticipant.value?.number_in_room ?? null)
+const currentParticipantId = computed(() => currentRoomParticipant.value?.participant_id ?? null)
+const mySeat = computed(
+  () => currentRoomParticipant.value?.number_in_room ?? activeParticipant.value?.number_in_room ?? null,
+)
 const isJoined = computed(() => {
   if (roomUserParticipants.value.length > 0) return true
-  if (roundStatus.value) return joinedParticipants.value.length > 0
-  return Boolean(initialParticipantId.value && initialParticipantRoundId.value === activeRoundId.value)
+  return Boolean(initialParticipantId.value && initialParticipantRoundId.value === roomRoundId.value)
 })
-const activeUserId = computed(() => currentUserId.value ?? activeParticipant.value?.user_id ?? null)
-const hasOwnedBoost = computed(() => {
-  const userId = activeUserId.value
-  if (userId) {
-    return participants.value.some((participant) => participant.user_id === userId && participant.boost > 0)
-  }
-
-  return Boolean(activeParticipant.value?.boost && activeParticipant.value.boost > 0)
-})
-const hasActiveParticipantBoost = computed(() => Boolean(activeParticipant.value?.boost && activeParticipant.value.boost > 0))
-const canBoost = computed(() => isJoined.value && (roomState.value?.is_boost ?? room.value?.is_boost) === true && !hasOwnedBoost.value)
+const hasOwnedBoost = computed(() =>
+  roomUserParticipants.value.some((participant) => participant.boost > 0),
+)
+const hasActiveParticipantBoost = computed(
+  () => Boolean(currentRoomParticipant.value?.boost && currentRoomParticipant.value.boost > 0),
+)
+const canManageCurrentRound = computed(
+  () => Boolean(currentParticipantId.value) && currentRoundPhase.value === 'waiting',
+)
+const canBoost = computed(
+  () =>
+    canManageCurrentRound.value &&
+    isJoined.value &&
+    (roomState.value?.is_boost ?? room.value?.is_boost) === true &&
+    !hasOwnedBoost.value,
+)
+const canLeave = computed(() => isJoined.value && !currentRoomIsActive.value)
 const boostHint = computed(() => {
   if (hasOwnedBoost.value) return t('gameRoom.controls.boostAlreadyActive')
+  if (currentRoomIsActive.value) return t('gameRoom.controls.actionsLocked')
   return canBoost.value ? t('gameRoom.controls.boostHint') : t('gameRoom.controls.boostDisabled')
 })
+const nextRoundAvailable = computed(
+  () => Boolean(pendingNextRoundId.value && pendingNextRoundId.value !== activeRoundId.value),
+)
+const roundTimerValue = computed(() => roundStatus.value?.time_left_seconds ?? '-')
 
 watch(
   () => [quickMatchMeta.value, room.value] as const,
@@ -215,6 +274,8 @@ watch(
       round_status: '',
     }
 
+    displayedRoundId.value = null
+    clearPendingNextRound()
     successMsg.value = t('gameRoom.messages.quickSessionRestored')
     void loadRoomState(true)
     void loadRoundStatus(true)
@@ -225,6 +286,10 @@ watch(
 watch(
   () => roomId.value,
   () => {
+    displayedRoundId.value = null
+    clearPendingNextRound()
+    roundStatus.value = null
+    liveEvents.value = []
     void loadRoomState(true)
   },
   { immediate: true },
@@ -235,16 +300,26 @@ watch([activeRoundId, autoRefresh, sseConnected], () => {
 })
 
 watch(
-  () => [roomId.value, activeRoundId.value] as const,
+  () => [roomId.value, roomRoundId.value] as const,
   () => {
     restartRoundEvents()
   },
   { immediate: true },
 )
 
+watch(
+  () => autoAdvanceNextRound.value,
+  (enabled) => {
+    if (enabled && nextRoundAvailable.value && pendingNextRoundCountdown.value === 0) {
+      void goToNextRound()
+    }
+  },
+)
+
 onBeforeUnmount(() => {
   stopStatusPolling()
   stopRoundEvents()
+  stopNextRoundCountdown()
 })
 
 function backToHome() {
@@ -301,6 +376,19 @@ function participantState(participant: GameParticipantInfo) {
   return t('gameRoom.participant.active')
 }
 
+function stopNextRoundCountdown() {
+  if (nextRoundTimer !== null) {
+    window.clearInterval(nextRoundTimer)
+    nextRoundTimer = null
+  }
+}
+
+function clearPendingNextRound() {
+  stopNextRoundCountdown()
+  pendingNextRoundId.value = null
+  pendingNextRoundCountdown.value = 0
+}
+
 function stopStatusPolling() {
   if (statusTimer !== null) {
     window.clearInterval(statusTimer)
@@ -314,7 +402,7 @@ function restartStatusPolling() {
   if (!activeRoundId.value || !autoRefresh.value || sseConnected.value) return
 
   statusTimer = window.setInterval(() => {
-    void loadRoundStatus(true)
+    void refreshRoundView(true)
   }, 5000)
 }
 
@@ -328,17 +416,18 @@ function stopRoundEvents() {
 
 function restartRoundEvents() {
   stopRoundEvents()
-  liveEvents.value = []
   sseError.value = ''
 
-  if (!activeRoundId.value) return
+  if (!roomRoundId.value) return
 
-  roundEventsStop = GameApi.subscribeRoundEvents(roomId.value, activeRoundId.value, {
+  roundEventsStop = GameApi.subscribeRoundEvents(roomId.value, roomRoundId.value, {
     onOpen: () => {
       sseConnected.value = true
       sseError.value = ''
       void loadRoomState(true)
-      void loadRoundStatus(true)
+      if (activeRoundId.value === roomRoundId.value) {
+        void loadRoundStatus(true)
+      }
     },
     onEvent: handleRoundEvent,
     onError: (error) => {
@@ -354,23 +443,36 @@ function restartRoundEvents() {
 function handleRoundEvent(event: GameRoundEvent) {
   if (event.type === 'round_timer') {
     const data = eventData(event)
-    if (roundStatus.value) {
+    if (roundStatus.value && activeRoundId.value === roomRoundId.value) {
       roundStatus.value = {
         ...roundStatus.value,
         status: String(data.status || roundStatus.value.status || 'waiting'),
-        time_left_seconds: Number(data.seconds_left ?? roundStatus.value.time_left_seconds ?? 0) || 0,
+        time_left_seconds:
+          Number(data.seconds_left ?? roundStatus.value.time_left_seconds ?? 0) || 0,
       }
     }
     return
   }
 
-  liveEvents.value = [
-    { ...event, id: ++liveEventId },
-    ...liveEvents.value,
-  ].slice(0, 5)
+  liveEvents.value = [{ ...event, id: ++liveEventId }, ...liveEvents.value].slice(0, 5)
 
-  void loadRoundStatus(true)
-  if (['player_joined', 'player_left', 'round_finalized'].includes(event.type)) {
+  if (event.type === 'round_finalized') {
+    const data = eventData(event)
+    const finalizedRoundId = Number(data.round_id ?? activeRoundId.value ?? 0) || 0
+    if (finalizedRoundId > 0) {
+      displayedRoundId.value = finalizedRoundId
+    }
+    scheduleNextRoundTransition(
+      Number(data.next_round_id ?? roomRoundId.value ?? 0) || null,
+      Number(data.next_round_delay ?? roomState.value?.next_round_delay ?? 0) || 0,
+      event.timestamp,
+    )
+  }
+
+  if (activeRoundId.value) {
+    void loadRoundStatus(true)
+  }
+  if (['player_joined', 'player_left', 'round_finalized', 'round_started'].includes(event.type)) {
     void loadRoomState(true)
   }
   if (['boost_purchased', 'boost_cancelled', 'player_left', 'round_finalized'].includes(event.type)) {
@@ -437,12 +539,12 @@ function eventDescription(event: GameRoundEvent) {
   }
 
   if (event.type === 'round_finalized') {
-    const winners = Array.isArray(data.winners) ? data.winners.length : 0
-    return t('gameRoom.events.roundFinalizedDetails', { winners })
+    const winnersCount = Array.isArray(data.winners) ? data.winners.length : 0
+    return t('gameRoom.events.roundFinalizedDetails', { winners: winnersCount })
   }
 
   if (event.type === 'round_timer') {
-    return `${String(data.status || 'waiting')} • ${Number(data.seconds_left ?? 0) || 0}s`
+    return `${String(data.status || 'waiting')} - ${Number(data.seconds_left ?? 0) || 0}s`
   }
 
   return t('gameRoom.events.genericDetails')
@@ -453,6 +555,8 @@ async function loadRoomState(silent = false) {
 
   try {
     roomState.value = await GameApi.getRoomState(roomId.value)
+    syncLiveEventsFromRoomState()
+    syncPendingNextRoundFromState()
   } catch (error: any) {
     if (!silent) {
       errorMsg.value = normalizeError(error, t('gameRoom.errors.status'))
@@ -470,6 +574,34 @@ async function loadRoundStatus(silent = false) {
 
   try {
     roundStatus.value = await GameApi.getRoundStatus(roomId.value, activeRoundId.value)
+    syncPendingNextRoundFromState()
+  } catch (error: any) {
+    if (!silent) {
+      errorMsg.value = normalizeError(error, t('gameRoom.errors.status'))
+    }
+  } finally {
+    if (!silent) {
+      statusLoading.value = false
+    }
+  }
+}
+
+async function refreshRoundView(silent = false) {
+  if (!roomId.value) return
+
+  if (!silent) {
+    statusLoading.value = true
+    errorMsg.value = ''
+  }
+
+  try {
+    await loadRoomState(true)
+    if (activeRoundId.value) {
+      roundStatus.value = await GameApi.getRoundStatus(roomId.value, activeRoundId.value)
+      syncPendingNextRoundFromState()
+    } else {
+      roundStatus.value = null
+    }
   } catch (error: any) {
     if (!silent) {
       errorMsg.value = normalizeError(error, t('gameRoom.errors.status'))
@@ -487,10 +619,11 @@ async function joinRoom() {
 
   try {
     joinResult.value = await GameApi.joinRoom(roomId.value)
+    displayedRoundId.value = null
+    clearPendingNextRound()
     successMsg.value = t('gameRoom.messages.joined', { seat: joinResult.value.number_in_room })
     refreshCabinetBalance()
-    await loadRoomState(true)
-    await loadRoundStatus()
+    await refreshRoundView()
   } catch (error: any) {
     errorMsg.value = normalizeError(error, t('gameRoom.errors.join'))
   } finally {
@@ -516,10 +649,11 @@ async function joinRoomWithSeat() {
 
   try {
     joinResult.value = await GameApi.joinRoomWithSeat(roomId.value, { number_in_room: seat })
+    displayedRoundId.value = null
+    clearPendingNextRound()
     successMsg.value = t('gameRoom.messages.joined', { seat: joinResult.value.number_in_room })
     refreshCabinetBalance()
-    await loadRoomState(true)
-    await loadRoundStatus()
+    await refreshRoundView()
   } catch (error: any) {
     errorMsg.value = normalizeError(error, t('gameRoom.errors.joinSeat'))
   } finally {
@@ -530,7 +664,7 @@ async function joinRoomWithSeat() {
 async function purchaseBoost() {
   clearFeedback()
 
-  const participantId = activeParticipantId.value
+  const participantId = currentParticipantId.value
   if (!participantId) {
     errorMsg.value = t('gameRoom.errors.joinFirst')
     return
@@ -549,7 +683,7 @@ async function purchaseBoost() {
       cost: response.boost_cost,
     })
     refreshCabinetBalance()
-    await loadRoundStatus()
+    await refreshRoundView()
   } catch (error: any) {
     errorMsg.value = normalizeError(error, t('gameRoom.errors.boost'))
   } finally {
@@ -560,7 +694,7 @@ async function purchaseBoost() {
 async function cancelBoost() {
   clearFeedback()
 
-  const participantId = activeParticipantId.value
+  const participantId = currentParticipantId.value
   if (!participantId) {
     errorMsg.value = t('gameRoom.errors.joinFirst')
     return
@@ -572,7 +706,7 @@ async function cancelBoost() {
     const response = await GameApi.cancelBoost(roomId.value, participantId)
     successMsg.value = t('gameRoom.messages.boostCancelled', { refund: response.refund ?? 0 })
     refreshCabinetBalance()
-    await loadRoundStatus()
+    await refreshRoundView()
   } catch (error: any) {
     errorMsg.value = normalizeError(error, t('gameRoom.errors.cancelBoost'))
   } finally {
@@ -583,7 +717,7 @@ async function cancelBoost() {
 async function leaveRoom() {
   clearFeedback()
 
-  if (!isJoined.value) {
+  if (!canLeave.value) {
     errorMsg.value = t('gameRoom.errors.joinFirst')
     return
   }
@@ -597,10 +731,10 @@ async function leaveRoom() {
     const response = await GameApi.leaveRoom(roomId.value)
     successMsg.value = t('gameRoom.messages.left', { refund: response.refund ?? 0 })
     joinResult.value = null
-    await loadRoomState(true)
-    if (activeRoundId.value) {
-      await loadRoundStatus(true)
-    } else {
+    displayedRoundId.value = null
+    clearPendingNextRound()
+    await refreshRoundView(true)
+    if (!activeRoundId.value) {
       roundStatus.value = null
       stopStatusPolling()
       stopRoundEvents()
@@ -610,6 +744,88 @@ async function leaveRoom() {
     errorMsg.value = normalizeError(error, t('gameRoom.errors.leave'))
   } finally {
     actionLoading.value = ''
+  }
+}
+
+async function goToNextRound() {
+  if (!pendingNextRoundId.value) return
+
+  displayedRoundId.value = null
+  clearPendingNextRound()
+  await refreshRoundView(true)
+}
+
+function syncLiveEventsFromRoomState() {
+  const events = roomState.value?.recent_events ?? []
+  if (!events.length) {
+    liveEvents.value = []
+    return
+  }
+
+  liveEvents.value = events.slice(0, 5).map((event) => ({
+    ...event,
+    id: ++liveEventId,
+  }))
+}
+
+function syncPendingNextRoundFromState() {
+  if (!roundStatus.value || roundStatus.value.status !== 'finished') {
+    if (!nextRoundAvailable.value) {
+      clearPendingNextRound()
+    }
+    return
+  }
+  if (!roomRoundId.value || activeRoundId.value === roomRoundId.value) {
+    clearPendingNextRound()
+    return
+  }
+
+  const history = roomState.value?.recent_events ?? []
+  const finalizedEvent = history.find((event) => {
+    if (event.type !== 'round_finalized') return false
+    const data = eventData(event)
+    return Number(data.round_id ?? 0) === activeRoundId.value
+  })
+
+  if (!finalizedEvent) {
+    pendingNextRoundId.value = roomRoundId.value
+    pendingNextRoundCountdown.value = 0
+    return
+  }
+
+  const data = eventData(finalizedEvent)
+  scheduleNextRoundTransition(
+    Number(data.next_round_id ?? roomRoundId.value ?? 0) || null,
+    Number(data.next_round_delay ?? roomState.value?.next_round_delay ?? 0) || 0,
+    finalizedEvent.timestamp,
+  )
+}
+
+function scheduleNextRoundTransition(nextRoundId: number | null, nextRoundDelay: number, timestamp: string) {
+  clearPendingNextRound()
+
+  if (!nextRoundId || nextRoundId <= 0) return
+
+  pendingNextRoundId.value = nextRoundId
+
+  const finalizedAt = new Date(timestamp).getTime()
+  const baseTime = Number.isFinite(finalizedAt) ? finalizedAt : Date.now()
+  const targetAt = baseTime + Math.max(0, nextRoundDelay) * 1000
+
+  const tick = () => {
+    const secondsLeft = Math.max(0, Math.ceil((targetAt - Date.now()) / 1000))
+    pendingNextRoundCountdown.value = secondsLeft
+    if (secondsLeft > 0) return
+
+    stopNextRoundCountdown()
+    if (autoAdvanceNextRound.value) {
+      void goToNextRound()
+    }
+  }
+
+  tick()
+  if (targetAt > Date.now()) {
+    nextRoundTimer = window.setInterval(tick, 1000)
   }
 }
 </script>
@@ -677,7 +893,7 @@ async function leaveRoom() {
         <div class="join-box" :class="{ joined: isJoined }">
           <template v-if="isJoined">
             <p class="join-title">
-              {{ t('gameRoom.entry.joinedAs', { participant: activeParticipantId ?? '-', seat: mySeat ?? '-' }) }}
+              {{ t('gameRoom.entry.joinedAs', { participant: currentParticipantId ?? '-', seat: mySeat ?? '-' }) }}
             </p>
             <p class="description">
               {{ t('gameRoom.entry.joinedHint') }}
@@ -732,7 +948,7 @@ async function leaveRoom() {
             <h2>{{ t('gameRoom.round.title') }}</h2>
             <p class="description">{{ t('gameRoom.round.description') }}</p>
           </div>
-          <button class="btn" type="button" :disabled="!activeRoundId || statusLoading" @click="loadRoundStatus()">
+          <button class="btn" type="button" :disabled="!activeRoundId || statusLoading" @click="refreshRoundView()">
             {{ statusLoading ? t('common.loading') : t('common.refresh') }}
           </button>
         </div>
@@ -748,7 +964,7 @@ async function leaveRoom() {
           </div>
           <div class="meta-item">
             <span>{{ t('gameRoom.round.timer') }}</span>
-            <strong>{{ roundStatus?.time_left_seconds ?? '-' }}</strong>
+            <strong>{{ roundTimerValue }}</strong>
           </div>
           <div class="meta-item">
             <span>{{ t('gameRoom.round.fallbackPolling') }}</span>
@@ -758,10 +974,21 @@ async function leaveRoom() {
             </label>
           </div>
           <div class="meta-item">
+            <span>{{ t('gameRoom.round.autoAdvanceNext') }}</span>
+            <label class="switch-line">
+              <input v-model="autoAdvanceNextRound" type="checkbox" />
+              <span>{{ autoAdvanceNextRound ? t('common.yes') : t('common.no') }}</span>
+            </label>
+          </div>
+          <div class="meta-item">
             <span>{{ t('gameRoom.round.liveStatus') }}</span>
             <strong :class="{ live: sseConnected }">
               {{ sseConnected ? t('gameRoom.round.liveConnected') : t('gameRoom.round.liveDisconnected') }}
             </strong>
+          </div>
+          <div v-if="nextRoundAvailable" class="meta-item">
+            <span>{{ t('gameRoom.round.nextRoundTimer') }}</span>
+            <strong>{{ pendingNextRoundCountdown }}s</strong>
           </div>
         </div>
 
@@ -815,6 +1042,19 @@ async function leaveRoom() {
             {{ winner.winning_money }}
           </span>
         </div>
+
+        <div v-if="nextRoundAvailable" class="next-round-box">
+          <div>
+            <h3>{{ t('gameRoom.round.nextRoundTitle') }}</h3>
+            <p class="description">
+              {{ t('gameRoom.round.nextRoundHint', { seconds: pendingNextRoundCountdown }) }}
+            </p>
+          </div>
+          <button class="btn btn--primary" type="button" @click="goToNextRound">
+            {{ t('gameRoom.round.goToNextRound') }}
+          </button>
+        </div>
+
         <div class="live-events">
           <h3>{{ t('gameRoom.round.liveEvents') }}</h3>
           <p v-if="sseError" class="description">{{ sseError }}</p>
@@ -863,7 +1103,7 @@ async function leaveRoom() {
             <button
               class="btn"
               type="button"
-              :disabled="!hasActiveParticipantBoost || actionLoading === 'cancel-boost'"
+              :disabled="!hasActiveParticipantBoost || !canManageCurrentRound || actionLoading === 'cancel-boost'"
               @click="cancelBoost"
             >
               {{ actionLoading === 'cancel-boost' ? t('common.loading') : t('gameRoom.controls.cancelBoost') }}
@@ -878,7 +1118,7 @@ async function leaveRoom() {
             <button
               class="btn btn--danger"
               type="button"
-              :disabled="!isJoined || actionLoading === 'leave'"
+              :disabled="!canLeave || actionLoading === 'leave'"
               @click="leaveRoom"
             >
               {{ actionLoading === 'leave' ? t('common.loading') : t('gameRoom.controls.leave') }}
@@ -953,7 +1193,8 @@ async function leaveRoom() {
 
 .panel-card,
 .control-block,
-.join-box {
+.join-box,
+.next-round-box {
   display: grid;
   gap: 1rem;
 }
@@ -1077,15 +1318,22 @@ strong.live {
 .meta-item,
 .participant-card,
 .control-block,
-.join-box {
+.join-box,
+.next-round-box {
   padding: 0.85rem;
   border-radius: 1rem;
   border: 1px solid color-mix(in oklab, var(--color-border), transparent 10%);
   background: color-mix(in oklab, var(--color-surface), white 10%);
 }
 
-.join-box.joined {
+.join-box.joined,
+.next-round-box {
   border-color: color-mix(in oklab, var(--color-success), transparent 28%);
+}
+
+.next-round-box {
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
 }
 
 .join-title {
@@ -1263,7 +1511,8 @@ input[type='number'] {
   .hero-card,
   .card-head.row,
   .meta-grid,
-  .round-timeline {
+  .round-timeline,
+  .next-round-box {
     grid-template-columns: 1fr;
   }
 

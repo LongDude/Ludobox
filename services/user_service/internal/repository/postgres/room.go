@@ -154,6 +154,8 @@ func (r *roomRepository) GetNotArchivedRooms(ctx context.Context, params domain.
 			c.winning_distribution,
 			c.commission,
 			c.time,
+			c.round_time,
+			c.next_round_delay,
 			c.min_users,
 			c.archived_at,
 			g.game_id,
@@ -379,7 +381,9 @@ func scanRoom(row rowScanner) (*domain.Room, error) {
 		numberWinners       int32
 		winningDistribution []int32
 		commission          int32
-		roundTime           int32
+		waitingTime         int32
+		activeRoundTime     int32
+		nextRoundDelay      int32
 		minUsers            int32
 		configArchivedAt    sql.NullTime
 		joinedGameID        int64
@@ -405,7 +409,9 @@ func scanRoom(row rowScanner) (*domain.Room, error) {
 		&numberWinners,
 		&winningDistribution,
 		&commission,
-		&roundTime,
+		&waitingTime,
+		&activeRoundTime,
+		&nextRoundDelay,
 		&minUsers,
 		&configArchivedAt,
 		&joinedGameID,
@@ -433,7 +439,9 @@ func scanRoom(row rowScanner) (*domain.Room, error) {
 			NumberWinners:       int(numberWinners),
 			WinningDistribution: toIntSlice(winningDistribution),
 			Commission:          int(commission),
-			Time:                int(roundTime),
+			Time:                int(waitingTime),
+			RoundTime:           int(activeRoundTime),
+			NextRoundDelay:      int(nextRoundDelay),
 			MinUsers:            int(minUsers),
 			Game: &domain.Game{
 				ID:   int(joinedGameID),
@@ -480,6 +488,8 @@ func getRoomByID(ctx context.Context, db queryRower, id int) (*domain.Room, erro
 			c.winning_distribution,
 			c.commission,
 			c.time,
+			c.round_time,
+			c.next_round_delay,
 			c.min_users,
 			c.archived_at,
 			g.game_id,

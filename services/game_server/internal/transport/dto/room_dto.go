@@ -29,8 +29,12 @@ type RoomStateResponse struct {
 	IsBoost                 bool              `json:"is_boost"`
 	BoostPower              int               `json:"boost_power"`
 	BoostPrice              int64             `json:"boost_price"`
+	WaitingTime             int               `json:"waiting_time"`
+	RoundTime               int               `json:"round_time"`
+	NextRoundDelay          int               `json:"next_round_delay"`
 	TimerStartsAt           *time.Time        `json:"timer_starts_at,omitempty"`
 	CurrentUserParticipants []ParticipantInfo `json:"current_user_participants,omitempty"`
+	RecentEvents            []SSEEvent        `json:"recent_events,omitempty"`
 }
 
 type PurchaseBoostResponse struct {
@@ -115,9 +119,11 @@ type EventRoundStarted struct {
 }
 
 type EventRoundFinalized struct {
-	RoundID int64           `json:"round_id"`
-	Winners []WinnerInfo    `json:"winners"`
-	Payouts map[int64]int64 `json:"payouts"`
+	RoundID        int64           `json:"round_id"`
+	Winners        []WinnerInfo    `json:"winners"`
+	Payouts        map[int64]int64 `json:"payouts"`
+	NextRoundID    int64           `json:"next_round_id,omitempty"`
+	NextRoundDelay int             `json:"next_round_delay,omitempty"`
 }
 
 type WinnerInfo struct {

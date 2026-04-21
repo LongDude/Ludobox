@@ -110,8 +110,12 @@ export interface GameRoomStateResponse {
   is_boost: boolean
   boost_power: number
   boost_price: number
+  waiting_time: number
+  round_time: number
+  next_round_delay: number
   timer_starts_at?: string | null
   current_user_participants?: GameParticipantInfo[]
+  recent_events?: GameRoundEvent[]
 }
 
 export interface GameParticipantInfo {
@@ -277,6 +281,8 @@ export interface ConfigUpsertRequest {
   winning_distribution: number[]
   commission: number
   time: number
+  round_time: number
+  next_round_delay: number
   min_users: number
 }
 

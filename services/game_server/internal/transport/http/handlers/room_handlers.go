@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
 	"net/http"
@@ -100,6 +101,7 @@ func roomStateResponse(
 	roomInfo *domain.RoomInfo,
 	timerService *service.TimerService,
 	userParticipants []domain.RoundParticipant,
+	recentEvents []domain.RoomEvent,
 ) dto.RoomStateResponse {
 	response := dto.RoomStateResponse{
 		RoomID:         roomInfo.Room.RoomID,
@@ -110,6 +112,9 @@ func roomStateResponse(
 		IsBoost:        roomInfo.Config.IsBoost,
 		BoostPower:     roomInfo.Config.BoostPower,
 		BoostPrice:     roomInfo.Config.BoostPrice,
+		WaitingTime:    roomInfo.Config.Time,
+		RoundTime:      roomInfo.Config.RoundTime,
+		NextRoundDelay: roomInfo.Config.NextRoundDelay,
 	}
 	if roomInfo.CurrentRoundID != nil {
 		response.RoundID = *roomInfo.CurrentRoundID
@@ -136,6 +141,9 @@ func roomStateResponse(
 			IsBot:         false,
 			ExitedAt:      participant.ExitRoomAt,
 		})
+	}
+	for _, event := range recentEvents {
+		response.RecentEvents = append(response.RecentEvents, roomEventToSSE(event))
 	}
 	return response
 }
@@ -172,7 +180,13 @@ func GetRoomState(ctx *gin.Context, a *app.App) {
 		}
 	}
 
-	ctx.JSON(http.StatusOK, roomStateResponse(roomInfo, a.TimerService, userParticipants))
+	recentEvents, err := a.RoomService.GetRecentRoomEvents(ctx.Request.Context(), roomID, 5)
+	if err != nil {
+		ctx.JSON(http.StatusInternalServerError, dto.ErrorResponse{Error: err.Error()})
+		return
+	}
+
+	ctx.JSON(http.StatusOK, roomStateResponse(roomInfo, a.TimerService, userParticipants, recentEvents))
 }
 
 // JoinRoom godoc
@@ -879,7 +893,18 @@ func InternalFinalizeGame(ctx *gin.Context, a *app.App) {
 		})
 		payouts[winner.RoundParticipantID] = winner.WinningMoney
 	}
-	a.EventsService.PublishRoundFinalized(ctx.Request.Context(), roundID, winnerInfos, payouts)
+	nextRoundID := int64(0)
+	nextRoundDelay := 0
+	roomInfo, roomErr := a.RoomService.GetRoomInfoByRound(ctx.Request.Context(), roundID)
+	if roomErr == nil && roomInfo != nil {
+		if roomInfo.CurrentRoundID != nil {
+			nextRoundID = *roomInfo.CurrentRoundID
+		}
+		if roomInfo.Config != nil {
+			nextRoundDelay = roomInfo.Config.NextRoundDelay
+		}
+	}
+	a.EventsService.PublishRoundFinalized(ctx.Request.Context(), roundID, winnerInfos, payouts, nextRoundID, nextRoundDelay)
 
 	ctx.JSON(http.StatusOK, gin.H{
 		"success": true,
@@ -928,4 +953,22 @@ func derefInt64(value *int64) int64 {
 		return 0
 	}
 	return *value
+}
+
+func roomEventToSSE(event domain.RoomEvent) dto.SSEEvent {
+	var data interface{}
+	if len(event.EventData) > 0 {
+		if err := json.Unmarshal(event.EventData, &data); err != nil {
+			data = map[string]any{}
+		}
+	}
+	if data == nil {
+		data = map[string]any{}
+	}
+
+	return dto.SSEEvent{
+		Type:      event.EventType,
+		Timestamp: event.CreatedAt,
+		Data:      data,
+	}
 }

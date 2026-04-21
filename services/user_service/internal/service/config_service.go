@@ -144,6 +144,12 @@ func validateConfig(config *domain.Config) error {
 	if config.Time <= 0 {
 		return fmt.Errorf("%w: time must be greater than 0", repository.ErrorInvalidConfig)
 	}
+	if config.RoundTime <= 0 {
+		return fmt.Errorf("%w: round_time must be greater than 0", repository.ErrorInvalidConfig)
+	}
+	if config.NextRoundDelay < 0 {
+		return fmt.Errorf("%w: next_round_delay cannot be negative", repository.ErrorInvalidConfig)
+	}
 	if config.MinUsers < 1 {
 		return fmt.Errorf("%w: min_users must be at least 1", repository.ErrorInvalidConfig)
 	}

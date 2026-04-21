@@ -46,6 +46,8 @@ func configToResponse(config *domain.Config) presenters.ConfigResponse {
 		WinningDistribution: config.WinningDistribution,
 		Commission:          config.Commission,
 		Time:                config.Time,
+		RoundTime:           config.RoundTime,
+		NextRoundDelay:      config.NextRoundDelay,
 		MinUsers:            config.MinUsers,
 		ArchivedAt:          config.ArchivedAt,
 	}
@@ -63,6 +65,8 @@ func configRequestToDomain(req presenters.ConfigUpsertRequest) *domain.Config {
 		WinningDistribution: req.WinningDistribution,
 		Commission:          req.Commission,
 		Time:                req.Time,
+		RoundTime:           req.RoundTime,
+		NextRoundDelay:      req.NextRoundDelay,
 		MinUsers:            req.MinUsers,
 	}
 }

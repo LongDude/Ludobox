@@ -118,7 +118,8 @@ func (s *RoomService) joinRoom(ctx context.Context, userID, roomID int64, reques
 	var participantID int64
 	var roundID int64
 	shouldStartTimer := false
-	configTimeSeconds := roomInfo.Config.Time
+	waitingTimeSeconds := roomInfo.Config.Time
+	activeTimeSeconds := roomInfo.Config.RoundTime
 	minUsers := roomInfo.Config.MinUsers
 
 	err = s.repo.InTransaction(ctx, func(ts repository.TransactionScope) error {
@@ -174,7 +175,8 @@ func (s *RoomService) joinRoom(ctx context.Context, userID, roomID int64, reques
 
 		if requestedSeat == nil && len(existingUserParticipants) > 0 {
 			participantID = existingUserParticipants[0].RoundParticipantID
-			configTimeSeconds = roomConfig.Time
+			waitingTimeSeconds = roomConfig.Time
+			activeTimeSeconds = roomConfig.RoundTime
 			minUsers = roomConfig.MinUsers
 			return nil
 		}
@@ -182,7 +184,8 @@ func (s *RoomService) joinRoom(ctx context.Context, userID, roomID int64, reques
 			for _, participant := range existingUserParticipants {
 				if participant.NumberInRoom == *requestedSeat {
 					participantID = participant.RoundParticipantID
-					configTimeSeconds = roomConfig.Time
+					waitingTimeSeconds = roomConfig.Time
+					activeTimeSeconds = roomConfig.RoundTime
 					minUsers = roomConfig.MinUsers
 					return nil
 				}
@@ -238,7 +241,8 @@ func (s *RoomService) joinRoom(ctx context.Context, userID, roomID int64, reques
 			return fmt.Errorf("create participant: %w", err)
 		}
 
-		expiresAt := time.Now().Add(time.Duration(roomConfig.Time)*time.Second + appcfg.ReservationGracePeriod)
+		reservationTTL := time.Duration(roomConfig.Time+roomConfig.RoundTime)*time.Second + appcfg.ReservationGracePeriod
+		expiresAt := time.Now().Add(reservationTTL)
 		if _, err := ts.ReserveEntry(ctx, pID, roomConfig.RegistrationPrice, expiresAt); err != nil {
 			return fmt.Errorf("reserve entry: %w", err)
 		}
@@ -248,7 +252,8 @@ func (s *RoomService) joinRoom(ctx context.Context, userID, roomID int64, reques
 		}
 
 		participantID = pID
-		configTimeSeconds = roomConfig.Time
+		waitingTimeSeconds = roomConfig.Time
+		activeTimeSeconds = roomConfig.RoundTime
 		minUsers = roomConfig.MinUsers
 		return nil
 	})
@@ -257,7 +262,7 @@ func (s *RoomService) joinRoom(ctx context.Context, userID, roomID int64, reques
 	}
 
 	if shouldStartTimer && s.timerService != nil {
-		s.timerService.StartTimer(context.Background(), roundID, roomID, minUsers, configTimeSeconds)
+		s.timerService.StartTimer(context.Background(), roundID, roomID, minUsers, waitingTimeSeconds, activeTimeSeconds)
 	}
 
 	s.refreshRoomCache(ctx, roomID)
@@ -312,7 +317,19 @@ func (s *RoomService) PurchaseBoost(ctx context.Context, participantID, userID i
 			return repository.ErrInsufficientBalance
 		}
 
-		expiresAt := time.Now().Add(appcfg.ReservationGracePeriod)
+		reservationTTL := appcfg.ReservationGracePeriod
+		roundInfo, err := ts.GetRoundInfo(ctx, participant.RoundsID)
+		if err != nil {
+			return fmt.Errorf("get round info: %w", err)
+		}
+		roomInfo, err := ts.GetRoomForUpdate(ctx, roundInfo.RoomID)
+		if err != nil {
+			return fmt.Errorf("get room info: %w", err)
+		}
+		if roomInfo != nil && roomInfo.Config != nil {
+			reservationTTL += time.Duration(roomInfo.Config.Time+roomInfo.Config.RoundTime) * time.Second
+		}
+		expiresAt := time.Now().Add(reservationTTL)
 		if _, err := ts.ReserveBoost(ctx, participantID, boostCost, expiresAt); err != nil {
 			return fmt.Errorf("reserve boost: %w", err)
 		}
@@ -695,6 +712,11 @@ func (s *RoomService) GetUserParticipantsByRoom(ctx context.Context, roomID, use
 	return s.repo.GetActiveParticipantsByRoomAndUser(ctx, roomID, userID)
 }
 
+// GetRecentRoomEvents returns the latest persisted events for the room.
+func (s *RoomService) GetRecentRoomEvents(ctx context.Context, roomID int64, limit int) ([]domain.RoomEvent, error) {
+	return s.repo.ListRecentRoomEvents(ctx, roomID, limit)
+}
+
 // GetRoundInfo returns the round metadata.
 func (s *RoomService) GetRoundInfo(ctx context.Context, roundID int64) (*domain.Round, error) {
 	return s.repo.GetRoundInfo(ctx, roundID)
@@ -846,6 +868,8 @@ func (s *RoomService) cacheRoomInfo(ctx context.Context, roomInfo *domain.RoomIn
 		WinningDistribution: roomInfo.Config.WinningDistribution,
 		Commission:          roomInfo.Config.Commission,
 		Time:                roomInfo.Config.Time,
+		RoundTime:           roomInfo.Config.RoundTime,
+		NextRoundDelay:      roomInfo.Config.NextRoundDelay,
 		MinUsers:            roomInfo.Config.MinUsers,
 	}
 	if err := s.roomCache.Set(ctx, fmt.Sprintf(appcfg.RedisKeyRoomConfig, roomInfo.Config.ConfigID), configData, appcfg.RedisRoomCacheTTL); err != nil {

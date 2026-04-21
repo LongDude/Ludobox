@@ -20,7 +20,7 @@ func TestStartTimerKeepsRoundWaitingUntilConfiguredCountdownExpires(t *testing.T
 	}
 
 	repo := &mockRoomRepository{scope: scope}
-	events := NewEventsService(nil)
+	events := NewEventsService(repo, nil)
 	timer := NewTimerService(repo, events, nil)
 
 	var startedCalls atomic.Int32
@@ -34,7 +34,7 @@ func TestStartTimerKeepsRoundWaitingUntilConfiguredCountdownExpires(t *testing.T
 		return nil
 	})
 
-	timer.StartTimer(context.Background(), 1, 1, 1, 1)
+	timer.StartTimer(context.Background(), 1, 1, 1, 1, 1)
 	defer timer.StopTimer(1)
 
 	time.Sleep(500 * time.Millisecond)
@@ -66,7 +66,7 @@ func TestStartTimerRetriesFinalizeUntilSuccess(t *testing.T) {
 	}
 
 	repo := &mockRoomRepository{scope: scope}
-	events := NewEventsService(nil)
+	events := NewEventsService(repo, nil)
 	timer := NewTimerService(repo, events, nil)
 
 	timer.SetGameStartCallback(func(ctx context.Context, roundID int64) error {
@@ -82,7 +82,7 @@ func TestStartTimerRetriesFinalizeUntilSuccess(t *testing.T) {
 		return scope.UpdateRoundStatus(ctx, roundID, "finished")
 	})
 
-	timer.StartTimer(context.Background(), 1, 1, 1, 1)
+	timer.StartTimer(context.Background(), 1, 1, 1, 1, 1)
 	defer timer.StopTimer(1)
 
 	deadline := time.Now().Add(7 * time.Second)

@@ -15,6 +15,8 @@ type ConfigResponse struct {
 	WinningDistribution []int         `json:"winning_distribution"`
 	Commission          int           `json:"commission"`
 	Time                int           `json:"time"`
+	RoundTime           int           `json:"round_time"`
+	NextRoundDelay      int           `json:"next_round_delay"`
 	MinUsers            int           `json:"min_users"`
 	ArchivedAt          *time.Time    `json:"archived_at,omitempty"`
 }
@@ -37,5 +39,7 @@ type ConfigUpsertRequest struct {
 	WinningDistribution []int `json:"winning_distribution"`
 	Commission          int   `json:"commission"`
 	Time                int   `json:"time"`
+	RoundTime           int   `json:"round_time"`
+	NextRoundDelay      int   `json:"next_round_delay"`
 	MinUsers            int   `json:"min_users"`
 }

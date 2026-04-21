@@ -47,6 +47,8 @@ function makeDraft(): ConfigUpsertRequest {
     winning_distribution: [100],
     commission: 12,
     time: 60,
+    round_time: 60,
+    next_round_delay: 0,
     min_users: 2,
   }
 }
@@ -112,6 +114,8 @@ function toRequest(config: ConfigResponse): ConfigUpsertRequest {
     winning_distribution: [...config.winning_distribution],
     commission: config.commission,
     time: config.time,
+    round_time: config.round_time,
+    next_round_delay: config.next_round_delay,
     min_users: config.min_users,
   }
 }
@@ -356,6 +360,14 @@ function distributionLabel(value: number, index: number) {
             <input v-model.number="form.time" class="input" type="number" min="1" />
           </label>
           <label>
+            <span>{{ t('admin.configsSection.fields.activeRoundTimer') }}</span>
+            <input v-model.number="form.round_time" class="input" type="number" min="1" />
+          </label>
+          <label>
+            <span>{{ t('admin.configsSection.fields.nextRoundDelay') }}</span>
+            <input v-model.number="form.next_round_delay" class="input" type="number" min="0" />
+          </label>
+          <label>
             <span>{{ t('admin.configsSection.fields.minimumUsers') }}</span>
             <input v-model.number="form.min_users" class="input" type="number" min="1" />
           </label>
@@ -542,6 +554,14 @@ function distributionLabel(value: number, index: number) {
               <div>
                 <dt>{{ t('admin.configsSection.meta.timer') }}</dt>
                 <dd>{{ config.time }}s</dd>
+              </div>
+              <div>
+                <dt>{{ t('admin.configsSection.meta.activeTimer') }}</dt>
+                <dd>{{ config.round_time }}s</dd>
+              </div>
+              <div>
+                <dt>{{ t('admin.configsSection.meta.nextRoundDelay') }}</dt>
+                <dd>{{ config.next_round_delay }}s</dd>
               </div>
               <div>
                 <dt>{{ t('admin.configsSection.meta.minUsers') }}</dt>

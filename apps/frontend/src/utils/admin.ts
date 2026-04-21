@@ -77,6 +77,8 @@ export function normalizeConfigDraft(config: ConfigUpsertRequest): ConfigUpsertR
     winning_distribution: normalizedDistribution,
     commission: Math.max(0, Math.floor(config.commission || 0)),
     time: Math.max(0, Math.floor(config.time || 0)),
+    round_time: Math.max(0, Math.floor(config.round_time || 0)),
+    next_round_delay: Math.max(0, Math.floor(config.next_round_delay || 0)),
     min_users: Math.max(1, Math.floor(config.min_users || 1)),
   }
 }
@@ -144,6 +146,30 @@ export function validateConfigDraft(config: ConfigUpsertRequest) {
     issues.push({
       tone: 'warning',
       message: t('admin.configsSection.validation.timerWarning'),
+    })
+  }
+  if (config.round_time <= 0) {
+    issues.push({
+      tone: 'error',
+      message: t('admin.configsSection.validation.roundTimePositive'),
+    })
+  }
+  if (config.round_time > 300) {
+    issues.push({
+      tone: 'warning',
+      message: t('admin.configsSection.validation.roundTimeWarning'),
+    })
+  }
+  if (config.next_round_delay < 0) {
+    issues.push({
+      tone: 'error',
+      message: t('admin.configsSection.validation.nextRoundDelayPositive'),
+    })
+  }
+  if (config.next_round_delay > 60) {
+    issues.push({
+      tone: 'warning',
+      message: t('admin.configsSection.validation.nextRoundDelayWarning'),
     })
   }
   if (config.min_users < 1) {
@@ -233,6 +259,21 @@ export function projectConfigEconomics(config: ConfigUpsertRequest): ConfigProje
         hint: t('admin.configsSection.metrics.startThresholdBank.hint', {
           minUsers: config.min_users,
         }),
+      },
+      {
+        label: t('admin.configsSection.metrics.waitingTimer.label'),
+        value: `${formatInteger(config.time)}s`,
+        hint: t('admin.configsSection.metrics.waitingTimer.hint'),
+      },
+      {
+        label: t('admin.configsSection.metrics.activeTimer.label'),
+        value: `${formatInteger(config.round_time)}s`,
+        hint: t('admin.configsSection.metrics.activeTimer.hint'),
+      },
+      {
+        label: t('admin.configsSection.metrics.nextRoundDelay.label'),
+        value: `${formatInteger(config.next_round_delay)}s`,
+        hint: t('admin.configsSection.metrics.nextRoundDelay.hint'),
       },
       {
         label: t('admin.configsSection.metrics.maxBoostRevenue.label'),

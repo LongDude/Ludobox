@@ -31,6 +31,8 @@ type RoomConfig struct {
 	WinningDistribution []int      `json:"winning_distribution"`
 	Commission          int        `json:"commission"`
 	Time                int        `json:"time"` // In seconds
+	RoundTime           int        `json:"round_time"`
+	NextRoundDelay      int        `json:"next_round_delay"`
 	MinUsers            int        `json:"min_users"`
 	ArchivedAt          *time.Time `json:"archived_at"`
 }

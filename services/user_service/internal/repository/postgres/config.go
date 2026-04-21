@@ -34,6 +34,8 @@ var configSortableColumns = map[string]string{
 	"number_winners":     "c.number_winners",
 	"commission":         "c.commission",
 	"time":               "c.time",
+	"round_time":         "c.round_time",
+	"next_round_delay":   "c.next_round_delay",
 	"min_users":          "c.min_users",
 	"archived_at":        "c.archived_at",
 }
@@ -56,6 +58,8 @@ var configFilterColumns = map[string]configFilterField{
 	"winning_distribution": {column: "c.winning_distribution", kind: "int_array"},
 	"commission":           {column: "c.commission", kind: "int"},
 	"time":                 {column: "c.time", kind: "int"},
+	"round_time":           {column: "c.round_time", kind: "int"},
+	"next_round_delay":     {column: "c.next_round_delay", kind: "int"},
 	"min_users":            {column: "c.min_users", kind: "int"},
 }
 
@@ -72,9 +76,11 @@ func (c *configRepository) CreateNewConfig(ctx context.Context, config *domain.C
 			winning_distribution,
 			commission,
 			time,
+			round_time,
+			next_round_delay,
 			min_users
 		)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
 		RETURNING config_id
 	`
 
@@ -92,6 +98,8 @@ func (c *configRepository) CreateNewConfig(ctx context.Context, config *domain.C
 		toInt32Slice(config.WinningDistribution),
 		config.Commission,
 		config.Time,
+		config.RoundTime,
+		config.NextRoundDelay,
 		config.MinUsers,
 	).Scan(&createdID); err != nil {
 		return nil, wrapConfigMutationError("create config", err)
@@ -209,6 +217,8 @@ func (c *configRepository) GetConfigs(ctx context.Context, params domain.ListPar
 			c.winning_distribution,
 			c.commission,
 			c.time,
+			c.round_time,
+			c.next_round_delay,
 			c.min_users,
 			c.archived_at,
 			g.game_id,
@@ -287,9 +297,11 @@ func (c *configRepository) UpdateConfigByID(ctx context.Context, id int, config 
 			winning_distribution,
 			commission,
 			time,
+			round_time,
+			next_round_delay,
 			min_users
 		)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
 		RETURNING config_id
 	`
 
@@ -307,6 +319,8 @@ func (c *configRepository) UpdateConfigByID(ctx context.Context, id int, config 
 		toInt32Slice(config.WinningDistribution),
 		config.Commission,
 		config.Time,
+		config.RoundTime,
+		config.NextRoundDelay,
 		config.MinUsers,
 	).Scan(&updatedID); err != nil {
 		return nil, wrapConfigMutationError("replace config", err)
@@ -548,6 +562,8 @@ func scanConfig(row rowScanner) (*domain.Config, error) {
 		winningDistribution []int32
 		commission          int32
 		roundTime           int32
+		activeRoundTime     int32
+		nextRoundDelay      int32
 		minUsers            int32
 		archivedAt          sql.NullTime
 		joinedGameID        int64
@@ -567,6 +583,8 @@ func scanConfig(row rowScanner) (*domain.Config, error) {
 		&winningDistribution,
 		&commission,
 		&roundTime,
+		&activeRoundTime,
+		&nextRoundDelay,
 		&minUsers,
 		&archivedAt,
 		&joinedGameID,
@@ -588,6 +606,8 @@ func scanConfig(row rowScanner) (*domain.Config, error) {
 		WinningDistribution: toIntSlice(winningDistribution),
 		Commission:          int(commission),
 		Time:                int(roundTime),
+		RoundTime:           int(activeRoundTime),
+		NextRoundDelay:      int(nextRoundDelay),
 		MinUsers:            int(minUsers),
 		Game: &domain.Game{
 			ID:   int(joinedGameID),
@@ -620,6 +640,8 @@ func getConfigByID(ctx context.Context, db queryRower, id int) (*domain.Config, 
 			c.winning_distribution,
 			c.commission,
 			c.time,
+			c.round_time,
+			c.next_round_delay,
 			c.min_users,
 			c.archived_at,
 			g.game_id,

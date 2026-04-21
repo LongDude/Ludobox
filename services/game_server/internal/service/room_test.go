@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"testing"
 	"time"
@@ -20,6 +21,7 @@ type mockTransactionScope struct {
 	roomInfo          *domain.RoomInfo
 	rounds            map[int64]*domain.Round
 	participants      map[int64]*domain.RoundParticipant
+	roomEvents        []domain.RoomEvent
 	reservations      map[int64][]*reservationData
 	balances          map[int64]int64
 	nextParticipantID int64
@@ -49,6 +51,8 @@ func newMockTransactionScope() *mockTransactionScope {
 				NumberWinners:       2,
 				WinningDistribution: []int{60, 40},
 				Time:                60,
+				RoundTime:           60,
+				NextRoundDelay:      0,
 				MinUsers:            2,
 			},
 			CurrentRoundID:     &roundID,
@@ -413,6 +417,34 @@ func (m *mockRoomRepository) GetActiveParticipantsByRoomAndUser(ctx context.Cont
 	return participants, nil
 }
 
+func (m *mockRoomRepository) CreateRoomEvent(ctx context.Context, roomID int64, roundID *int64, eventType string, eventData json.RawMessage) error {
+	m.scope.roomEvents = append(m.scope.roomEvents, domain.RoomEvent{
+		RoomEventID: int64(len(m.scope.roomEvents) + 1),
+		RoomID:      roomID,
+		RoundID:     roundID,
+		EventType:   eventType,
+		EventData:   eventData,
+		CreatedAt:   time.Now(),
+	})
+	return nil
+}
+
+func (m *mockRoomRepository) ListRecentRoomEvents(ctx context.Context, roomID int64, limit int) ([]domain.RoomEvent, error) {
+	events := make([]domain.RoomEvent, 0, limit)
+	for _, event := range m.scope.roomEvents {
+		if event.RoomID == roomID {
+			events = append(events, event)
+		}
+	}
+	if limit > 0 && len(events) > limit {
+		events = events[len(events)-limit:]
+	}
+	for left, right := 0, len(events)-1; left < right; left, right = left+1, right-1 {
+		events[left], events[right] = events[right], events[left]
+	}
+	return events, nil
+}
+
 func TestJoinRoomWithSeatSuccess(t *testing.T) {
 	ctx := context.Background()
 	scope := newMockTransactionScope()
@@ -673,6 +705,7 @@ func TestBuildPayoutsUsesActualParticipantsAndCommission(t *testing.T) {
 		RegistrationPrice:   100,
 		Commission:          10,
 		WinningDistribution: []int{60, 40},
+		RoundTime:           60,
 	}
 
 	payouts := buildPayouts(config, 2, 2)

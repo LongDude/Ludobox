@@ -29,7 +29,7 @@ func NewApp(
 	Logger *logrus.Logger,
 ) *App {
 	InternalService := service.NewInternalService(InternalRepository, Logger)
-	EventsService := service.NewEventsService(Logger)
+	EventsService := service.NewEventsService(RoomRepository, Logger)
 	RoomService := service.NewRoomService(RoomRepository, Logger, ServerID, RoomCache, cfg.RNGServiceURL)
 	TimerService := service.NewTimerService(RoomRepository, EventsService, Logger)
 	RoomService.SetTimerService(TimerService)
@@ -51,7 +51,20 @@ func NewApp(
 			})
 			payouts[winner.RoundParticipantID] = winner.WinningMoney
 		}
-		EventsService.PublishRoundFinalized(ctx, roundID, winnerInfos, payouts)
+
+		nextRoundID := int64(0)
+		nextRoundDelay := 0
+		roomInfo, roomErr := RoomService.GetRoomInfoByRound(ctx, roundID)
+		if roomErr == nil && roomInfo != nil {
+			if roomInfo.CurrentRoundID != nil {
+				nextRoundID = *roomInfo.CurrentRoundID
+			}
+			if roomInfo.Config != nil {
+				nextRoundDelay = roomInfo.Config.NextRoundDelay
+			}
+		}
+
+		EventsService.PublishRoundFinalized(ctx, roundID, winnerInfos, payouts, nextRoundID, nextRoundDelay)
 		return nil
 	})
 

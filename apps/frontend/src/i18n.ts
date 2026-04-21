@@ -219,7 +219,9 @@ const messages: Record<Locale, Record<string, string>> = {
     'admin.configsSection.fields.gameId': 'Game',
     'admin.configsSection.fields.capacity': 'Capacity',
     'admin.configsSection.fields.registrationPrice': 'Registration price',
-    'admin.configsSection.fields.roundTimer': 'Round timer (seconds)',
+    'admin.configsSection.fields.roundTimer': 'Waiting timer (seconds)',
+    'admin.configsSection.fields.activeRoundTimer': 'Active round time (seconds)',
+    'admin.configsSection.fields.nextRoundDelay': 'Next round delay (seconds)',
     'admin.configsSection.fields.minimumUsers': 'Minimum users',
     'admin.configsSection.fields.commission': 'Commission (%)',
     'admin.configsSection.fields.numberWinners': 'Number of winners',
@@ -251,7 +253,9 @@ const messages: Record<Locale, Record<string, string>> = {
     'admin.configsSection.meta.entry': 'Entry',
     'admin.configsSection.meta.winners': 'Winners',
     'admin.configsSection.meta.commission': 'Commission',
-    'admin.configsSection.meta.timer': 'Timer',
+    'admin.configsSection.meta.timer': 'Waiting timer',
+    'admin.configsSection.meta.activeTimer': 'Active timer',
+    'admin.configsSection.meta.nextRoundDelay': 'Next round delay',
     'admin.configsSection.meta.minUsers': 'Min users',
     'admin.configsSection.meta.boost': 'Boost',
     'admin.configsSection.boostSummary': '{price} / {power}%',
@@ -290,6 +294,14 @@ const messages: Record<Locale, Record<string, string>> = {
     'admin.configsSection.validation.timerPositive': 'Round timer must be greater than zero.',
     'admin.configsSection.validation.timerWarning':
       'A timer above 180 seconds increases waiting time for a quick-match flow.',
+    'admin.configsSection.validation.roundTimePositive':
+      'Active round time must be greater than zero.',
+    'admin.configsSection.validation.roundTimeWarning':
+      'An active round longer than 300 seconds slows result turnover.',
+    'admin.configsSection.validation.nextRoundDelayPositive':
+      'Next round delay cannot be negative.',
+    'admin.configsSection.validation.nextRoundDelayWarning':
+      'A next round delay above 60 seconds may feel unresponsive.',
     'admin.configsSection.validation.minUsersMin': 'Minimum users must be at least 1.',
     'admin.configsSection.validation.minUsersCapacity':
       'Minimum users cannot exceed capacity.',
@@ -316,6 +328,15 @@ const messages: Record<Locale, Record<string, string>> = {
     'admin.configsSection.metrics.startThresholdBank.label': 'Start threshold bank',
     'admin.configsSection.metrics.startThresholdBank.hint':
       '{minUsers} minimum users before bot fill and round start',
+    'admin.configsSection.metrics.waitingTimer.label': 'Waiting timer',
+    'admin.configsSection.metrics.waitingTimer.hint':
+      'Countdown before the round switches from waiting to active',
+    'admin.configsSection.metrics.activeTimer.label': 'Active timer',
+    'admin.configsSection.metrics.activeTimer.hint':
+      'Time available while the round is active',
+    'admin.configsSection.metrics.nextRoundDelay.label': 'Next round delay',
+    'admin.configsSection.metrics.nextRoundDelay.hint':
+      'Pause after results before the next round becomes primary',
     'admin.configsSection.metrics.maxBoostRevenue.label': 'Max boost revenue',
     'admin.configsSection.metrics.maxBoostRevenue.hint':
       '{capacity} potential boosts x {price}',
@@ -626,6 +647,7 @@ const messages: Record<Locale, Record<string, string>> = {
     'gameRoom.round.timer': 'Time left',
     'gameRoom.round.autoRefresh': 'Auto refresh',
     'gameRoom.round.fallbackPolling': 'Fallback polling',
+    'gameRoom.round.autoAdvanceNext': 'Auto go to next round',
     'gameRoom.round.liveStatus': 'Live events',
     'gameRoom.round.liveConnected': 'Connected',
     'gameRoom.round.liveDisconnected': 'Disconnected',
@@ -643,6 +665,11 @@ const messages: Record<Locale, Record<string, string>> = {
     'gameRoom.round.participants': 'Participants',
     'gameRoom.round.empty': 'No participant data loaded yet.',
     'gameRoom.round.winners': 'Winners',
+    'gameRoom.round.nextRoundTimer': 'Next round in',
+    'gameRoom.round.nextRoundTitle': 'Next round is ready',
+    'gameRoom.round.nextRoundHint':
+      'You can review the results now. The next round opens in {seconds}s.',
+    'gameRoom.round.goToNextRound': 'Go to next round',
     'gameRoom.participant.active': 'Active',
     'gameRoom.participant.bot': 'Bot',
     'gameRoom.participant.exited': 'Exited',
@@ -675,6 +702,7 @@ const messages: Record<Locale, Record<string, string>> = {
     'gameRoom.controls.boostHint': 'Purchase or cancel the configured boost for the current participant.',
     'gameRoom.controls.boostAlreadyActive': 'Boost is already active. Cancel it before buying another one.',
     'gameRoom.controls.boostDisabled': 'Boost is disabled or room metadata is not available.',
+    'gameRoom.controls.actionsLocked': 'Actions are locked while the room is active.',
     'gameRoom.controls.boostValue': 'Boost power',
     'gameRoom.controls.buyBoost': 'Buy boost',
     'gameRoom.controls.cancelBoost': 'Cancel boost',
@@ -755,6 +783,8 @@ const messages: Record<Locale, Record<string, string>> = {
     'gameRoom.round.status': 'Статус',
     'gameRoom.round.timer': 'Осталось времени',
     'gameRoom.round.autoRefresh': 'Автообновление',
+    'gameRoom.round.fallbackPolling': 'Запасной polling',
+    'gameRoom.round.autoAdvanceNext': 'Автопереход в новый раунд',
     'gameRoom.round.liveStatus': 'Live-события',
     'gameRoom.round.liveConnected': 'Подключено',
     'gameRoom.round.liveDisconnected': 'Отключено',
@@ -763,6 +793,11 @@ const messages: Record<Locale, Record<string, string>> = {
     'gameRoom.round.participants': 'Участники',
     'gameRoom.round.empty': 'Данные участников ещё не загружены.',
     'gameRoom.round.winners': 'Победители',
+    'gameRoom.round.nextRoundTimer': 'До нового раунда',
+    'gameRoom.round.nextRoundTitle': 'Следующий раунд готов',
+    'gameRoom.round.nextRoundHint':
+      'Можно посмотреть результаты текущего матча. Следующий раунд откроется через {seconds}с.',
+    'gameRoom.round.goToNextRound': 'Перейти к следующему раунду',
     'gameRoom.participant.active': 'Активен',
     'gameRoom.participant.bot': 'Бот',
     'gameRoom.participant.exited': 'Вышел',
@@ -778,6 +813,7 @@ const messages: Record<Locale, Record<string, string>> = {
     'gameRoom.controls.boostHint': 'Покупка или отмена настроенного буста для текущего участника.',
     'gameRoom.controls.boostAlreadyActive': 'Буст уже активен. Отмените его перед покупкой нового.',
     'gameRoom.controls.boostDisabled': 'Буст отключён или метаданные комнаты недоступны.',
+    'gameRoom.controls.actionsLocked': 'Во время active-фазы действия с комнатой заблокированы.',
     'gameRoom.controls.boostValue': 'Сила буста',
     'gameRoom.controls.buyBoost': 'Купить буст',
     'gameRoom.controls.cancelBoost': 'Отменить буст',
@@ -1078,7 +1114,9 @@ const messages: Record<Locale, Record<string, string>> = {
     'admin.configsSection.fields.gameId': 'Игра',
     'admin.configsSection.fields.capacity': 'Вместимость',
     'admin.configsSection.fields.registrationPrice': 'Цена входа',
-    'admin.configsSection.fields.roundTimer': 'Таймер раунда (секунды)',
+    'admin.configsSection.fields.roundTimer': 'Таймер ожидания (секунды)',
+    'admin.configsSection.fields.activeRoundTimer': 'Время активного раунда (секунды)',
+    'admin.configsSection.fields.nextRoundDelay': 'Пауза до нового раунда (секунды)',
     'admin.configsSection.fields.minimumUsers': 'Минимум игроков',
     'admin.configsSection.fields.commission': 'Комиссия (%)',
     'admin.configsSection.fields.numberWinners': 'Количество победителей',
@@ -1111,7 +1149,9 @@ const messages: Record<Locale, Record<string, string>> = {
     'admin.configsSection.meta.entry': 'Вход',
     'admin.configsSection.meta.winners': 'Победители',
     'admin.configsSection.meta.commission': 'Комиссия',
-    'admin.configsSection.meta.timer': 'Таймер',
+    'admin.configsSection.meta.timer': 'Таймер ожидания',
+    'admin.configsSection.meta.activeTimer': 'Активный таймер',
+    'admin.configsSection.meta.nextRoundDelay': 'Пауза до нового раунда',
     'admin.configsSection.meta.minUsers': 'Мин. игроков',
     'admin.configsSection.meta.boost': 'Буст',
     'admin.configsSection.boostSummary': '{price} / {power}%',
@@ -1155,6 +1195,14 @@ const messages: Record<Locale, Record<string, string>> = {
       'Таймер раунда должен быть больше нуля.',
     'admin.configsSection.validation.timerWarning':
       'Таймер выше 180 секунд увеличивает время ожидания в быстром матчмейкинге.',
+    'admin.configsSection.validation.roundTimePositive':
+      'Время активного раунда должно быть больше нуля.',
+    'admin.configsSection.validation.roundTimeWarning':
+      'Активный раунд дольше 300 секунд замедляет смену результатов.',
+    'admin.configsSection.validation.nextRoundDelayPositive':
+      'Пауза до нового раунда не может быть отрицательной.',
+    'admin.configsSection.validation.nextRoundDelayWarning':
+      'Пауза до нового раунда больше 60 секунд может ощущаться затянутой.',
     'admin.configsSection.validation.minUsersMin':
       'Минимальное число игроков должно быть не меньше 1.',
     'admin.configsSection.validation.minUsersCapacity':
@@ -1183,6 +1231,15 @@ const messages: Record<Locale, Record<string, string>> = {
     'admin.configsSection.metrics.startThresholdBank.label': 'Банк порога запуска',
     'admin.configsSection.metrics.startThresholdBank.hint':
       '{minUsers} минимум игроков перед добивкой ботами и стартом раунда',
+    'admin.configsSection.metrics.waitingTimer.label': 'Таймер ожидания',
+    'admin.configsSection.metrics.waitingTimer.hint':
+      'Отсчёт до перехода раунда из ожидания в active',
+    'admin.configsSection.metrics.activeTimer.label': 'Активный таймер',
+    'admin.configsSection.metrics.activeTimer.hint':
+      'Время, доступное в статусе active',
+    'admin.configsSection.metrics.nextRoundDelay.label': 'Пауза до нового раунда',
+    'admin.configsSection.metrics.nextRoundDelay.hint':
+      'Задержка после результатов перед переходом к следующему раунду',
     'admin.configsSection.metrics.maxBoostRevenue.label': 'Макс. доход от буста',
     'admin.configsSection.metrics.maxBoostRevenue.hint':
       '{capacity} потенциальных бустов x {price}',
