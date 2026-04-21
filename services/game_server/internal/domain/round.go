@@ -17,5 +17,6 @@ type RoundParticipant struct {
 	Boost              int        `json:"boost"`
 	WinningMoney       int64      `json:"winning_money"`
 	NumberInRoom       int        `json:"number_in_room"`
+	IsBot              bool       `json:"is_bot"`
 	ExitRoomAt         *time.Time `json:"exit_room_at"`
 }

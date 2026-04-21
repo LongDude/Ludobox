@@ -48,6 +48,7 @@ func NewApp(
 				ParticipantID: winner.RoundParticipantID,
 				NumberInRoom:  winner.NumberInRoom,
 				Winnings:      winner.WinningMoney,
+				IsBot:         winner.IsBot,
 			})
 			payouts[winner.RoundParticipantID] = winner.WinningMoney
 		}

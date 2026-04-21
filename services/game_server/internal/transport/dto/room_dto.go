@@ -130,6 +130,7 @@ type WinnerInfo struct {
 	ParticipantID int64 `json:"participant_id"`
 	NumberInRoom  int   `json:"number_in_room"`
 	Winnings      int64 `json:"winnings"`
+	IsBot         bool  `json:"is_bot"`
 }
 
 type ErrorResponse struct {
