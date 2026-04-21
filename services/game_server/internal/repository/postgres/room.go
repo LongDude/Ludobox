@@ -40,7 +40,7 @@ type txScope struct {
 // GetRoomsByServerID returns all rooms owned by a specific server
 func (r *roomRepo) GetRoomsByServerID(ctx context.Context, serverID int64) ([]domain.Room, error) {
 	rows, err := r.db.Query(ctx, `
-		SELECT room_id, config_id, server_id, status, archived_at
+		SELECT room_id, config_id, server_id, status, current_players, archived_at
 		FROM rooms
 		WHERE server_id = $1 AND archived_at IS NULL
 	`, serverID)
@@ -52,7 +52,7 @@ func (r *roomRepo) GetRoomsByServerID(ctx context.Context, serverID int64) ([]do
 	var rooms []domain.Room
 	for rows.Next() {
 		var room domain.Room
-		if err := rows.Scan(&room.RoomID, &room.ConfigID, &room.ServerID, &room.Status, &room.ArchivedAt); err != nil {
+		if err := rows.Scan(&room.RoomID, &room.ConfigID, &room.ServerID, &room.Status, &room.CurrentPlayers, &room.ArchivedAt); err != nil {
 			return nil, fmt.Errorf("scan room: %w", err)
 		}
 		rooms = append(rooms, room)
@@ -65,13 +65,14 @@ func (r *roomRepo) GetRoom(ctx context.Context, roomID int64) (*domain.RoomInfo,
 	// Get room info
 	var room domain.Room
 	err := r.db.QueryRow(ctx, `
-		SELECT room_id, config_id, server_id, status, archived_at
+		SELECT room_id, config_id, server_id, status, current_players, archived_at
 		FROM rooms
 		WHERE room_id = $1
-	`, roomID).Scan(&room.RoomID, &room.ConfigID, &room.ServerID, &room.Status, &room.ArchivedAt)
+		  AND archived_at IS NULL
+	`, roomID).Scan(&room.RoomID, &room.ConfigID, &room.ServerID, &room.Status, &room.CurrentPlayers, &room.ArchivedAt)
 	if err != nil {
 		if err == pgx.ErrNoRows {
-			return nil, fmt.Errorf("room not found")
+			return nil, nil
 		}
 		return nil, fmt.Errorf("query room: %w", err)
 	}
@@ -95,12 +96,14 @@ func (r *roomRepo) GetRoom(ctx context.Context, roomID int64) (*domain.RoomInfo,
 
 	// Get current round ID
 	var currentRoundID *int64
+	var currentRoundStatus *string
 	err = r.db.QueryRow(ctx, `
-		SELECT rounds_id
+		SELECT rounds_id, status
 		FROM rounds
 		WHERE room_id = $1 AND archived_at IS NULL
+		ORDER BY created_at DESC
 		LIMIT 1
-	`, roomID).Scan(&currentRoundID)
+	`, roomID).Scan(&currentRoundID, &currentRoundStatus)
 	if err != nil && err != pgx.ErrNoRows {
 		return nil, fmt.Errorf("query current round: %w", err)
 	}
@@ -122,6 +125,7 @@ func (r *roomRepo) GetRoom(ctx context.Context, roomID int64) (*domain.RoomInfo,
 		Room:                    &room,
 		Config:                  &config,
 		CurrentRoundID:          currentRoundID,
+		CurrentRoundStatus:      currentRoundStatus,
 		ActiveParticipantsCount: count,
 	}, nil
 }
@@ -153,6 +157,7 @@ func (r *roomRepo) GetCurrentRoundByRoomID(ctx context.Context, roomID int64) (*
 		SELECT rounds_id
 		FROM rounds
 		WHERE room_id = $1 AND archived_at IS NULL
+		ORDER BY created_at DESC
 		LIMIT 1
 	`, roomID).Scan(&roundID)
 	if err != nil {
@@ -168,13 +173,13 @@ func (r *roomRepo) GetCurrentRoundByRoomID(ctx context.Context, roomID int64) (*
 func (r *roomRepo) GetRoundInfo(ctx context.Context, roundID int64) (*domain.Round, error) {
 	var round domain.Round
 	err := r.db.QueryRow(ctx, `
-		SELECT rounds_id, room_id, created_at, archived_at
+		SELECT rounds_id, room_id, status, created_at, archived_at
 		FROM rounds
 		WHERE rounds_id = $1
-	`, roundID).Scan(&round.RoundsID, &round.RoomID, &round.CreatedAt, &round.ArchivedAt)
+	`, roundID).Scan(&round.RoundsID, &round.RoomID, &round.Status, &round.CreatedAt, &round.ArchivedAt)
 	if err != nil {
 		if err == pgx.ErrNoRows {
-			return nil, fmt.Errorf("round not found")
+			return nil, repository.ErrRoundArchived
 		}
 		return nil, fmt.Errorf("query round: %w", err)
 	}
@@ -191,7 +196,7 @@ func (r *roomRepo) GetParticipantByID(ctx context.Context, participantID int64) 
 	).Scan(&p.RoundParticipantID, &p.UserID, &p.RoundsID, &p.Boost, &p.WinningMoney, &p.NumberInRoom, &p.ExitRoomAt)
 	if err != nil {
 		if err == pgx.ErrNoRows {
-			return nil, fmt.Errorf("participant not found")
+			return nil, repository.ErrParticipantNotFound
 		}
 		return nil, fmt.Errorf("get participant: %w", err)
 	}
@@ -218,5 +223,33 @@ func (r *roomRepo) GetParticipantsByRoundID(ctx context.Context, roundID int64) 
 		}
 		participants = append(participants, p)
 	}
+	return participants, rows.Err()
+}
+
+func (r *roomRepo) GetActiveParticipantsByRoomAndUser(ctx context.Context, roomID, userID int64) ([]domain.RoundParticipant, error) {
+	rows, err := r.db.Query(ctx, `
+		SELECT rp.round_participants_id, rp.user_id, rp.rounds_id, rp.boost, rp.winning_money, rp.number_in_room, rp.exit_room_at
+		FROM round_participants rp
+		INNER JOIN rounds r ON r.rounds_id = rp.rounds_id
+		WHERE r.room_id = $1
+		  AND r.archived_at IS NULL
+		  AND rp.user_id = $2
+		  AND rp.exit_room_at IS NULL
+		ORDER BY rp.number_in_room
+	`, roomID, userID)
+	if err != nil {
+		return nil, fmt.Errorf("get user participants by room: %w", err)
+	}
+	defer rows.Close()
+
+	var participants []domain.RoundParticipant
+	for rows.Next() {
+		var p domain.RoundParticipant
+		if err := rows.Scan(&p.RoundParticipantID, &p.UserID, &p.RoundsID, &p.Boost, &p.WinningMoney, &p.NumberInRoom, &p.ExitRoomAt); err != nil {
+			return nil, fmt.Errorf("scan participant: %w", err)
+		}
+		participants = append(participants, p)
+	}
+
 	return participants, rows.Err()
 }

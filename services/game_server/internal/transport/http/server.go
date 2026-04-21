@@ -3,11 +3,11 @@ package http
 import (
 	"context"
 	"fmt"
-	"net/http"
-	"net/url"
 	"game_server/internal/app"
 	"game_server/internal/config"
 	"game_server/internal/transport/http/handlers"
+	"net/http"
+	"net/url"
 
 	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
@@ -71,7 +71,7 @@ func NewHTTPServer(conf *config.Config, a *app.App) *Server {
 	s.app.Use(cors.New(cors.Config{
 		AllowOrigins:     allowed,
 		AllowMethods:     []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
-		AllowHeaders:     []string{"Content-Type", "Authorization"},
+		AllowHeaders:     []string{"Content-Type", "Authorization", "X-Authenticated-User"},
 		AllowCredentials: true,
 	}))
 

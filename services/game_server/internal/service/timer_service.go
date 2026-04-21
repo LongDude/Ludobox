@@ -11,20 +11,23 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-// TimerService управляет таймерами раундов
+type timerState struct {
+	cancel   context.CancelFunc
+	deadline time.Time
+}
+
+// TimerService manages round timers.
 type TimerService struct {
 	roomRepo      repository.RoomRepository
 	eventsService *EventsService
 	logger        *logrus.Logger
 
-	// Отслеживание активных таймеров
-	timers map[int64]context.CancelFunc
+	timers map[int64]*timerState
 	mu     sync.Mutex
 
-	// Callback для запуска игры
-	onGameStart func(ctx context.Context, roundID int64) error
-	// Callback для завершения игры
+	onGameStart    func(ctx context.Context, roundID int64) error
 	onGameFinalize func(ctx context.Context, roundID int64) error
+	onRoundCancel  func(ctx context.Context, roundID int64) error
 }
 
 func NewTimerService(
@@ -32,26 +35,31 @@ func NewTimerService(
 	eventsService *EventsService,
 	logger *logrus.Logger,
 ) *TimerService {
+	if logger == nil {
+		logger = logrus.New()
+	}
+
 	return &TimerService{
 		roomRepo:      roomRepo,
 		eventsService: eventsService,
 		logger:        logger,
-		timers:        make(map[int64]context.CancelFunc),
+		timers:        make(map[int64]*timerState),
 	}
 }
 
-// SetGameStartCallback устанавливает callback для запуска игры
 func (ts *TimerService) SetGameStartCallback(fn func(ctx context.Context, roundID int64) error) {
 	ts.onGameStart = fn
 }
 
-// SetGameFinalizeCallback устанавливает callback для завершения игры
 func (ts *TimerService) SetGameFinalizeCallback(fn func(ctx context.Context, roundID int64) error) {
 	ts.onGameFinalize = fn
 }
 
-// StartTimer запускает таймер для раунда
-// Сначала ждет min_users, потом запускает таймер игры на configTime сек
+func (ts *TimerService) SetRoundCancelCallback(fn func(ctx context.Context, roundID int64) error) {
+	ts.onRoundCancel = fn
+}
+
+// StartTimer waits for min_users and then starts the configured round countdown.
 func (ts *TimerService) StartTimer(ctx context.Context, roundID int64, roomID int64, minUsers int, configTimeSeconds int) {
 	ts.mu.Lock()
 	if _, exists := ts.timers[roundID]; exists {
@@ -61,25 +69,22 @@ func (ts *TimerService) StartTimer(ctx context.Context, roundID int64, roomID in
 	}
 
 	timerCtx, cancel := context.WithCancel(ctx)
-	ts.timers[roundID] = cancel
+	ts.timers[roundID] = &timerState{
+		cancel:   cancel,
+		deadline: time.Now().Add(appcfg.RoundWaitingTimeout),
+	}
 	ts.mu.Unlock()
 
 	go func() {
-		defer func() {
-			ts.mu.Lock()
-			delete(ts.timers, roundID)
-			ts.mu.Unlock()
-		}()
+		defer ts.clearTimer(roundID)
 
-		// Фаза 1: ждём min_users за 15 минут
 		ts.logger.Infof("Timer started for round %d, waiting for min_users=%d", roundID, minUsers)
 
-		startWaitTime := time.Now()
-		waitDeadline := startWaitTime.Add(appcfg.RoundWaitingTimeout)
+		waitDeadline := time.Now().Add(appcfg.RoundWaitingTimeout)
+		ts.setDeadline(roundID, waitDeadline)
+
 		ticker := time.NewTicker(1 * time.Second)
 		defer ticker.Stop()
-
-		minUsersReached := false
 
 	waitLoop:
 		for {
@@ -88,32 +93,29 @@ func (ts *TimerService) StartTimer(ctx context.Context, roundID int64, roomID in
 				ts.logger.Infof("Round %d timer cancelled", roundID)
 				return
 			case <-ticker.C:
-				// Проверяем количество игроков
 				participants, err := ts.roomRepo.GetParticipantsByRoundID(timerCtx, roundID)
 				if err != nil {
 					ts.logger.Errorf("Error getting participants for round %d: %v", roundID, err)
 					continue
 				}
 
-				activeCount := len(participants)
-				if activeCount >= minUsers && !minUsersReached {
-					minUsersReached = true
-					ts.logger.Infof("Round %d reached min_users (%d), starting game timer", roundID, activeCount)
+				if len(participants) >= minUsers {
+					ts.logger.Infof("Round %d reached min_users (%d), starting game timer", roundID, len(participants))
 					break waitLoop
 				}
 
-				// Проверяем timeout
 				if time.Now().After(waitDeadline) {
 					ts.logger.Warnf("Round %d timeout waiting for min_users, cancelling", roundID)
-					if err := ts.cancelRound(timerCtx, roundID); err != nil {
-						ts.logger.Errorf("Error cancelling round %d: %v", roundID, err)
+					if ts.onRoundCancel != nil {
+						if err := ts.onRoundCancel(timerCtx, roundID); err != nil {
+							ts.logger.Errorf("Error cancelling round %d: %v", roundID, err)
+						}
 					}
 					return
 				}
 			}
 		}
 
-		// Фаза 2: стартуем игру
 		ts.logger.Infof("Starting game for round %d", roundID)
 		if ts.onGameStart != nil {
 			if err := ts.onGameStart(timerCtx, roundID); err != nil {
@@ -122,18 +124,18 @@ func (ts *TimerService) StartTimer(ctx context.Context, roundID int64, roomID in
 			}
 		}
 
-		// Отправляем событие
 		participants, _ := ts.roomRepo.GetParticipantsByRoundID(timerCtx, roundID)
 		ts.eventsService.PublishRoundStarted(timerCtx, roundID, len(participants), configTimeSeconds)
 
-		// Фаза 3: ждём configTime секунд
+		gameDeadline := time.Now().Add(time.Duration(configTimeSeconds) * time.Second)
+		ts.setDeadline(roundID, gameDeadline)
+
 		gameTimer := time.NewTimer(time.Duration(configTimeSeconds) * time.Second)
 		defer gameTimer.Stop()
 
 		select {
 		case <-timerCtx.Done():
 			ts.logger.Infof("Round %d game timer cancelled", roundID)
-			gameTimer.Stop()
 			return
 		case <-gameTimer.C:
 			ts.logger.Infof("Game timer expired for round %d, finalizing", roundID)
@@ -147,33 +149,47 @@ func (ts *TimerService) StartTimer(ctx context.Context, roundID int64, roomID in
 	}()
 }
 
-// StopTimer останавливает таймер раунда
 func (ts *TimerService) StopTimer(roundID int64) {
 	ts.mu.Lock()
 	defer ts.mu.Unlock()
 
-	if cancel, exists := ts.timers[roundID]; exists {
-		cancel()
-		delete(ts.timers, roundID)
-		ts.logger.Infof("Timer stopped for round %d", roundID)
+	state, exists := ts.timers[roundID]
+	if !exists {
+		return
 	}
+
+	state.cancel()
+	delete(ts.timers, roundID)
+	ts.logger.Infof("Timer stopped for round %d", roundID)
 }
 
-// cancelRound отменяет раунд (мягкое удаление) и выкидывает всех пользователей
-func (ts *TimerService) cancelRound(ctx context.Context, roundID int64) error {
-	// TODO: Реализовать отмену раунда и возврат денег всем участникам
-	// На данный момент это должно быть сделано через RoomService.LeaveRoom для каждого
-	return nil
-}
-
-// GetRemainingTime возвращает оставшееся время до завершения (для отладки)
 func (ts *TimerService) GetRemainingTime(roundID int64) (bool, time.Duration) {
 	ts.mu.Lock()
-	_, exists := ts.timers[roundID]
-	ts.mu.Unlock()
+	defer ts.mu.Unlock()
 
+	state, exists := ts.timers[roundID]
 	if !exists {
 		return false, 0
 	}
-	return true, 0 // TODO: реализовать отслеживание времени
+
+	remaining := time.Until(state.deadline)
+	if remaining < 0 {
+		remaining = 0
+	}
+	return true, remaining
+}
+
+func (ts *TimerService) setDeadline(roundID int64, deadline time.Time) {
+	ts.mu.Lock()
+	defer ts.mu.Unlock()
+
+	if state, exists := ts.timers[roundID]; exists {
+		state.deadline = deadline
+	}
+}
+
+func (ts *TimerService) clearTimer(roundID int64) {
+	ts.mu.Lock()
+	defer ts.mu.Unlock()
+	delete(ts.timers, roundID)
 }

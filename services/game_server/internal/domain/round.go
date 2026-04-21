@@ -5,6 +5,7 @@ import "time"
 type Round struct {
 	RoundsID   int64      `json:"rounds_id"`
 	RoomID     int64      `json:"room_id"`
+	Status     string     `json:"status"`
 	CreatedAt  time.Time  `json:"created_at"`
 	ArchivedAt *time.Time `json:"archived_at"`
 }

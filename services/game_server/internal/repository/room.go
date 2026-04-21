@@ -10,6 +10,14 @@ import (
 // TransactionScope предоставляет методы для работы внутри одной транзакции.
 // Сервис видит только этот интерфейс, никаких pgx/pgxpool.
 type TransactionScope interface {
+	// Room / round state
+	GetRoomForUpdate(ctx context.Context, roomID int64) (*domain.RoomInfo, error)
+	GetRoundInfo(ctx context.Context, roundID int64) (*domain.Round, error)
+	GetParticipantByID(ctx context.Context, participantID int64) (*domain.RoundParticipant, error)
+	GetParticipantsByRoundID(ctx context.Context, roundID int64) ([]domain.RoundParticipant, error)
+	CountUserActiveParticipants(ctx context.Context, roundID, userID int64) (int, error)
+	IsSeatOccupied(ctx context.Context, roundID int64, numberInRoom int) (bool, error)
+
 	// Баланс
 	GetBalanceLocked(ctx context.Context, userID int64) (int64, error)
 	UpdateBalance(ctx context.Context, userID int64, delta int64) error
@@ -46,6 +54,7 @@ type RoomRepository interface {
 	// Read-only методы (не требуют транзакции, если не указано иное)
 	GetParticipantByID(ctx context.Context, participantID int64) (*domain.RoundParticipant, error)
 	GetParticipantsByRoundID(ctx context.Context, roundID int64) ([]domain.RoundParticipant, error)
+	GetActiveParticipantsByRoomAndUser(ctx context.Context, roomID, userID int64) ([]domain.RoundParticipant, error)
 
 	// Room методы
 	GetRoomsByServerID(ctx context.Context, serverID int64) ([]domain.Room, error)

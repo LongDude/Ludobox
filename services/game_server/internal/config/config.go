@@ -21,6 +21,7 @@ type Config struct {
 	SwaggerEnabled      bool                 `env:"SWAGGER_ENABLED" env-default:"true"`
 	SwaggerUser         string               `env:"SWAGGER_USER"`
 	SwaggerPassword     string               `env:"SWAGGER_PASSWORD"`
+	RNGServiceURL       string               `env:"RNG_SERVICE_URL" env-default:"http://rng-stub:7001/winnings/distribute"`
 }
 
 type PostgresConfig struct {

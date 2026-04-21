@@ -2,11 +2,6 @@ package main
 
 import (
 	"context"
-	"os"
-	"os/signal"
-	"sync"
-	"syscall"
-	"time"
 	"game_server/internal/app"
 	"game_server/internal/config"
 	"game_server/internal/repository"
@@ -15,6 +10,11 @@ import (
 	"game_server/internal/validation"
 	"game_server/pkg/logger"
 	"game_server/pkg/storage"
+	"os"
+	"os/signal"
+	"sync"
+	"syscall"
+	"time"
 )
 
 // @title LudaBox API
@@ -43,13 +43,16 @@ func main() {
 		return
 	}
 	// ! Init redis
-	// redisClient, err := storage.RedisConnect(ctx, cfg.RedisConfig)
-	// if err != nil {
-	// 	logger.Fatalf("Failed to create conection to redis with error: %v", err)
-	// 	return
-	// }
-
-	// SessionRepo := redis.NewSessionRepository(redisClient)
+	redisClient, err := storage.RedisConnect(ctx, cfg.RedisConfig)
+	if err != nil {
+		logger.Fatalf("Failed to create conection to redis with error: %v", err)
+		return
+	}
+	defer func() {
+		if err := redisClient.Close(); err != nil {
+			logger.Warnf("Failed to close redis connection: %v", err)
+		}
+	}()
 
 	// ! Init HeartBeat
 	InternalRepo := postgres.NewInternalRepository(pgPool)
@@ -92,8 +95,8 @@ func main() {
 		}
 	}()
 
-	usecase := app.NewApp(cfg, InternalRepo, RoomRepo, registration.ServerID, logger)
-	
+	usecase := app.NewApp(cfg, InternalRepo, RoomRepo, registration.ServerID, redisClient, logger)
+
 	// Initialize rooms cache
 	initCacheCtx, initCancel := context.WithTimeout(context.Background(), 10*time.Second)
 	if err := usecase.InitializeCache(initCacheCtx); err != nil {

@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"errors"
 	"fmt"
 	"net/http"
 	"strconv"
@@ -8,6 +9,7 @@ import (
 	"time"
 
 	"game_server/internal/app"
+	"game_server/internal/repository"
 	"game_server/internal/transport/dto"
 
 	"github.com/gin-gonic/gin"
@@ -61,20 +63,17 @@ func JoinRoom(ctx *gin.Context, a *app.App) {
 	// Вызываем RoomService.JoinRoom
 	participantID, err := a.RoomService.JoinRoom(ctx.Request.Context(), userID, req.RoomID)
 	if err != nil {
-		if err.Error() == "room is full" {
-			ctx.JSON(http.StatusConflict, dto.ErrorResponse{Error: "Room is full", Code: "ROOM_FULL"})
-			return
-		}
-		if err.Error() == "insufficient balance" {
-			ctx.JSON(http.StatusPaymentRequired, dto.ErrorResponse{Error: "Insufficient balance", Code: "INSUFFICIENT_BALANCE"})
-			return
-		}
-		a.Logger.Errorf("Error joining room: %v", err)
+		renderRoomError(ctx, err)
+		return
+	}
+
+	participant, err := a.RoomService.GetParticipantInfo(ctx.Request.Context(), participantID)
+	if err != nil {
+		a.Logger.Errorf("Error getting participant info: %v", err)
 		ctx.JSON(http.StatusInternalServerError, dto.ErrorResponse{Error: err.Error()})
 		return
 	}
 
-	// Получаем информацию о раунде и комнате
 	roomInfo, err := a.RoomService.GetRoomInfo(ctx.Request.Context(), req.RoomID)
 	if err != nil {
 		a.Logger.Errorf("Error getting room info: %v", err)
@@ -88,18 +87,24 @@ func JoinRoom(ctx *gin.Context, a *app.App) {
 			ctx.Request.Context(),
 			*roomInfo.CurrentRoundID,
 			participantID,
-			1, // TODO: получить правильный номер места
+			participant.NumberInRoom,
 			roomInfo.ActiveParticipantsCount,
 		)
 	}
 
+	roundStatus := ""
+	if roomInfo.CurrentRoundStatus != nil {
+		roundStatus = *roomInfo.CurrentRoundStatus
+	}
+
 	response := dto.JoinRoomResponse{
 		ParticipantID:  participantID,
-		RoomCapacity:   int64(roomInfo.Config.Capacity),
+		NumberInRoom:   participant.NumberInRoom,
+		RoomCapacity:   roomInfo.Config.Capacity,
 		CurrentPlayers: roomInfo.ActiveParticipantsCount,
 		MinPlayers:     roomInfo.Config.MinUsers,
 		EntryPrice:     roomInfo.Config.RegistrationPrice,
-		RoundStatus:    string(roomInfo.Room.Status),
+		RoundStatus:    roundStatus,
 	}
 
 	if roomInfo.CurrentRoundID != nil {
@@ -133,8 +138,51 @@ func JoinRoomWithSeat(ctx *gin.Context, a *app.App) {
 		return
 	}
 
-	// TODO: Реализовать JoinRoomWithSeat в RoomService
-	ctx.JSON(http.StatusNotImplemented, dto.ErrorResponse{Error: "Not implemented yet"})
+	participantID, err := a.RoomService.JoinRoomWithSeat(ctx.Request.Context(), userID, req.RoomID, req.NumberInRoom)
+	if err != nil {
+		renderRoomError(ctx, err)
+		return
+	}
+
+	participant, err := a.RoomService.GetParticipantInfo(ctx.Request.Context(), participantID)
+	if err != nil {
+		a.Logger.Errorf("Error getting participant info: %v", err)
+		ctx.JSON(http.StatusInternalServerError, dto.ErrorResponse{Error: err.Error()})
+		return
+	}
+
+	roomInfo, err := a.RoomService.GetRoomInfo(ctx.Request.Context(), req.RoomID)
+	if err != nil {
+		a.Logger.Errorf("Error getting room info: %v", err)
+		ctx.JSON(http.StatusInternalServerError, dto.ErrorResponse{Error: err.Error()})
+		return
+	}
+
+	if roomInfo.CurrentRoundID != nil {
+		a.EventsService.PublishPlayerJoined(
+			ctx.Request.Context(),
+			*roomInfo.CurrentRoundID,
+			participantID,
+			participant.NumberInRoom,
+			roomInfo.ActiveParticipantsCount,
+		)
+	}
+
+	roundStatus := ""
+	if roomInfo.CurrentRoundStatus != nil {
+		roundStatus = *roomInfo.CurrentRoundStatus
+	}
+
+	ctx.JSON(http.StatusOK, dto.JoinRoomResponse{
+		ParticipantID:  participantID,
+		RoundID:        derefInt64(roomInfo.CurrentRoundID),
+		NumberInRoom:   participant.NumberInRoom,
+		RoomCapacity:   roomInfo.Config.Capacity,
+		CurrentPlayers: roomInfo.ActiveParticipantsCount,
+		MinPlayers:     roomInfo.Config.MinUsers,
+		RoundStatus:    roundStatus,
+		EntryPrice:     roomInfo.Config.RegistrationPrice,
+	})
 }
 
 // PurchaseBoost godoc
@@ -183,6 +231,11 @@ func PurchaseBoost(ctx *gin.Context, a *app.App) {
 	}
 
 	// Покупаем буст
+	if !roomInfo.Config.IsBoost {
+		ctx.JSON(http.StatusConflict, dto.ErrorResponse{Error: "Boost is disabled for room", Code: "BOOST_DISABLED"})
+		return
+	}
+
 	err = a.RoomService.PurchaseBoost(
 		ctx.Request.Context(),
 		participantID,
@@ -191,12 +244,7 @@ func PurchaseBoost(ctx *gin.Context, a *app.App) {
 		roomInfo.Config.BoostPrice,
 	)
 	if err != nil {
-		if err.Error() == "insufficient balance" {
-			ctx.JSON(http.StatusPaymentRequired, dto.ErrorResponse{Error: "Insufficient balance", Code: "INSUFFICIENT_BALANCE"})
-			return
-		}
-		a.Logger.Errorf("Error purchasing boost: %v", err)
-		ctx.JSON(http.StatusInternalServerError, dto.ErrorResponse{Error: err.Error()})
+		renderRoomError(ctx, err)
 		return
 	}
 
@@ -248,8 +296,7 @@ func CancelBoost(ctx *gin.Context, a *app.App) {
 	// Отменяем буст
 	err = a.RoomService.CancelBoost(ctx.Request.Context(), participantID, userID)
 	if err != nil {
-		a.Logger.Errorf("Error cancelling boost: %v", err)
-		ctx.JSON(http.StatusInternalServerError, dto.ErrorResponse{Error: err.Error()})
+		renderRoomError(ctx, err)
 		return
 	}
 
@@ -295,18 +342,17 @@ func LeaveRoom(ctx *gin.Context, a *app.App) {
 	// Выходим из комнаты
 	err = a.RoomService.LeaveRoom(ctx.Request.Context(), participantID, userID)
 	if err != nil {
-		if err.Error() == "game already started" {
-			ctx.JSON(http.StatusConflict, dto.ErrorResponse{Error: "Cannot leave during game", Code: "GAME_STARTED"})
-			return
-		}
-		a.Logger.Errorf("Error leaving room: %v", err)
-		ctx.JSON(http.StatusInternalServerError, dto.ErrorResponse{Error: err.Error()})
+		renderRoomError(ctx, err)
 		return
 	}
 
 	// Публикуем событие
-	// TODO: получить правильное количество активных участников
-	a.EventsService.PublishPlayerLeft(ctx.Request.Context(), participant.RoundsID, participantID, participant.NumberInRoom, 0)
+	currentPlayers := 0
+	roomInfo, err := a.RoomService.GetRoomInfoByRound(ctx.Request.Context(), participant.RoundsID)
+	if err == nil && roomInfo != nil {
+		currentPlayers = roomInfo.ActiveParticipantsCount
+	}
+	a.EventsService.PublishPlayerLeft(ctx.Request.Context(), participant.RoundsID, participantID, participant.NumberInRoom, currentPlayers)
 
 	ctx.JSON(http.StatusOK, dto.LeaveRoomResponse{
 		Success: true,
@@ -330,8 +376,55 @@ func GetRoundStatus(ctx *gin.Context, a *app.App) {
 		return
 	}
 
-	// TODO: Получить информацию о раунде из БД
-	ctx.JSON(http.StatusNotImplemented, dto.ErrorResponse{Error: "Not implemented yet"})
+	roundInfo, err := a.RoomService.GetRoundInfo(ctx.Request.Context(), roundID)
+	if err != nil {
+		if errors.Is(err, repository.ErrRoundArchived) {
+			ctx.JSON(http.StatusNotFound, dto.ErrorResponse{Error: "Round not found", Code: "ROUND_NOT_FOUND"})
+			return
+		}
+		ctx.JSON(http.StatusInternalServerError, dto.ErrorResponse{Error: err.Error()})
+		return
+	}
+
+	participants, err := a.RoomService.GetParticipantsByRound(ctx.Request.Context(), roundID)
+	if err != nil {
+		ctx.JSON(http.StatusInternalServerError, dto.ErrorResponse{Error: err.Error()})
+		return
+	}
+
+	participantInfos := make([]dto.ParticipantInfo, 0, len(participants))
+	winners := make([]dto.ParticipantInfo, 0)
+	for _, participant := range participants {
+		userID := participant.UserID
+		info := dto.ParticipantInfo{
+			ParticipantID: participant.RoundParticipantID,
+			UserID:        &userID,
+			NumberInRoom:  participant.NumberInRoom,
+			Boost:         participant.Boost,
+			WinningMoney:  participant.WinningMoney,
+			IsBot:         false,
+			ExitedAt:      participant.ExitRoomAt,
+		}
+		participantInfos = append(participantInfos, info)
+		if participant.WinningMoney > 0 {
+			winners = append(winners, info)
+		}
+	}
+
+	hasTimer, remaining := a.TimerService.GetRemainingTime(roundID)
+	timeLeftSeconds := 0
+	if hasTimer {
+		timeLeftSeconds = int(remaining / time.Second)
+	}
+
+	ctx.JSON(http.StatusOK, dto.RoundStatusResponse{
+		RoundID:         roundID,
+		Status:          roundInfo.Status,
+		Participants:    participantInfos,
+		TimeLeftSeconds: timeLeftSeconds,
+		CreatedAt:       roundInfo.CreatedAt,
+		Winners:         winners,
+	})
 }
 
 // SubscribeToRoundEvents godoc
@@ -449,7 +542,7 @@ func InternalFinalizeGame(ctx *gin.Context, a *app.App) {
 
 	winners, err := a.RoomService.FinalizeGameRound(ctx.Request.Context(), roundID)
 	if err != nil {
-		if err.Error() == "round already finalized" {
+		if errors.Is(err, repository.ErrRoundAlreadyFinalized) {
 			ctx.JSON(http.StatusConflict, dto.ErrorResponse{Error: "Round already finalized", Code: "ALREADY_FINALIZED"})
 			return
 		}
@@ -458,9 +551,57 @@ func InternalFinalizeGame(ctx *gin.Context, a *app.App) {
 		return
 	}
 
+	winnerInfos := make([]dto.WinnerInfo, 0, len(winners))
+	payouts := make(map[int64]int64, len(winners))
+	for _, winner := range winners {
+		winnerInfos = append(winnerInfos, dto.WinnerInfo{
+			ParticipantID: winner.RoundParticipantID,
+			NumberInRoom:  winner.NumberInRoom,
+			Winnings:      winner.WinningMoney,
+		})
+		payouts[winner.RoundParticipantID] = winner.WinningMoney
+	}
+	a.EventsService.PublishRoundFinalized(ctx.Request.Context(), roundID, winnerInfos, payouts)
+
 	ctx.JSON(http.StatusOK, gin.H{
 		"success": true,
 		"message": "Game finalized",
 		"winners": winners,
 	})
+}
+
+func renderRoomError(ctx *gin.Context, err error) {
+	switch {
+	case errors.Is(err, repository.ErrRoomNotFound):
+		ctx.JSON(http.StatusNotFound, dto.ErrorResponse{Error: "Room not found", Code: "ROOM_NOT_FOUND"})
+	case errors.Is(err, repository.ErrWrongGameServer):
+		ctx.JSON(http.StatusConflict, dto.ErrorResponse{Error: "Room is not served by this game server", Code: "WRONG_GAME_SERVER"})
+	case errors.Is(err, repository.ErrRoomIsFull):
+		ctx.JSON(http.StatusConflict, dto.ErrorResponse{Error: "Room is full", Code: "ROOM_FULL"})
+	case errors.Is(err, repository.ErrSeatAlreadyTaken):
+		ctx.JSON(http.StatusConflict, dto.ErrorResponse{Error: "Seat is already taken", Code: "SEAT_TAKEN"})
+	case errors.Is(err, repository.ErrMaxSeatsExceeded):
+		ctx.JSON(http.StatusConflict, dto.ErrorResponse{Error: "User cannot occupy more than half of the room", Code: "MAX_SEATS_EXCEEDED"})
+	case errors.Is(err, repository.ErrInsufficientBalance):
+		ctx.JSON(http.StatusPaymentRequired, dto.ErrorResponse{Error: "Insufficient balance", Code: "INSUFFICIENT_BALANCE"})
+	case errors.Is(err, repository.ErrParticipantNotFound):
+		ctx.JSON(http.StatusNotFound, dto.ErrorResponse{Error: "Participant not found", Code: "PARTICIPANT_NOT_FOUND"})
+	case errors.Is(err, repository.ErrParticipantAccessDenied):
+		ctx.JSON(http.StatusForbidden, dto.ErrorResponse{Error: "Participant does not belong to user", Code: "PARTICIPANT_ACCESS_DENIED"})
+	case errors.Is(err, repository.ErrGameAlreadyStarted):
+		ctx.JSON(http.StatusConflict, dto.ErrorResponse{Error: "Cannot change room after game start", Code: "GAME_STARTED"})
+	case errors.Is(err, repository.ErrBoostDisabled):
+		ctx.JSON(http.StatusConflict, dto.ErrorResponse{Error: "Boost is disabled for room", Code: "BOOST_DISABLED"})
+	case errors.Is(err, repository.ErrInvalidSeatNumber):
+		ctx.JSON(http.StatusBadRequest, dto.ErrorResponse{Error: "Invalid seat number", Code: "INVALID_SEAT"})
+	default:
+		ctx.JSON(http.StatusInternalServerError, dto.ErrorResponse{Error: err.Error()})
+	}
+}
+
+func derefInt64(value *int64) int64 {
+	if value == nil {
+		return 0
+	}
+	return *value
 }

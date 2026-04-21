@@ -59,12 +59,18 @@ func (s *txScope) ReserveBoost(ctx context.Context, participantID int64, amount 
 func (s *txScope) ReleaseAllReservations(ctx context.Context, participantID int64) (int64, error) {
 	var sum int64
 	err := s.tx.QueryRow(ctx, `
-		UPDATE user_balance_reservations 
-		SET status = 'released', archived_at = NOW()
-		WHERE round_participants_id = $1 AND status = 'active'
-		RETURNING COALESCE(SUM(amount), 0)`, participantID,
+		WITH updated AS (
+			UPDATE user_balance_reservations
+			SET status = 'released', archived_at = NOW()
+			WHERE round_participants_id = $1 AND status = 'active'
+			RETURNING amount
+		)
+		SELECT COALESCE(SUM(amount), 0) FROM updated`, participantID,
 	).Scan(&sum)
-	return sum, err
+	if err != nil {
+		return 0, fmt.Errorf("release all reservations: %w", err)
+	}
+	return sum, nil
 }
 
 func (s *txScope) ReleaseBoostReservations(ctx context.Context, participantID int64) (int64, error) {

@@ -5,6 +5,8 @@ import (
 	"game_server/internal/config"
 	"game_server/internal/repository"
 	"game_server/internal/service"
+	"game_server/internal/transport/dto"
+	"game_server/pkg/storage"
 
 	"github.com/sirupsen/logrus"
 )
@@ -23,17 +25,36 @@ func NewApp(
 	InternalRepository repository.InternalRepository,
 	RoomRepository repository.RoomRepository,
 	ServerID int64,
+	RoomCache *storage.RedisClient,
 	Logger *logrus.Logger,
 ) *App {
-	baseURL := cfg.PublicURL
-	if baseURL == "" {
-		baseURL = "http://" + cfg.Domain + ":" + cfg.HttpServerConfig.Port
-	}
 	InternalService := service.NewInternalService(InternalRepository, Logger)
 	EventsService := service.NewEventsService(Logger)
-	RoomService := service.NewRoomService(RoomRepository, Logger, ServerID)
+	RoomService := service.NewRoomService(RoomRepository, Logger, ServerID, RoomCache, cfg.RNGServiceURL)
 	TimerService := service.NewTimerService(RoomRepository, EventsService, Logger)
-	
+	RoomService.SetTimerService(TimerService)
+	TimerService.SetGameStartCallback(RoomService.StartGameRound)
+	TimerService.SetRoundCancelCallback(RoomService.CancelWaitingRound)
+	TimerService.SetGameFinalizeCallback(func(ctx context.Context, roundID int64) error {
+		winners, err := RoomService.FinalizeGameRound(ctx, roundID)
+		if err != nil {
+			return err
+		}
+
+		winnerInfos := make([]dto.WinnerInfo, 0, len(winners))
+		payouts := make(map[int64]int64, len(winners))
+		for _, winner := range winners {
+			winnerInfos = append(winnerInfos, dto.WinnerInfo{
+				ParticipantID: winner.RoundParticipantID,
+				NumberInRoom:  winner.NumberInRoom,
+				Winnings:      winner.WinningMoney,
+			})
+			payouts[winner.RoundParticipantID] = winner.WinningMoney
+		}
+		EventsService.PublishRoundFinalized(ctx, roundID, winnerInfos, payouts)
+		return nil
+	})
+
 	return &App{
 		Config:          cfg,
 		InternalService: InternalService,
