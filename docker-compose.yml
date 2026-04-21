@@ -252,6 +252,19 @@ services:
     networks:
       - rooms_network
 
+  rng-stub:
+    container_name: rng_stub
+    build:
+      context: ./services/rng_stub
+      dockerfile: ./dockerfile
+    restart: unless-stopped
+    environment:
+      - HTTP_PORT=7001
+    ports:
+      - 7001:7001
+    networks:
+      - rooms_network
+
 volumes:
   sso_postgres_data:
   sso_redis_data:
