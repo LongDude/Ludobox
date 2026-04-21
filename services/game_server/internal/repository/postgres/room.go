@@ -164,6 +164,23 @@ func (r *roomRepo) GetCurrentRoundByRoomID(ctx context.Context, roomID int64) (*
 	return &roundID, nil
 }
 
+// GetRoundInfo returns information about a round
+func (r *roomRepo) GetRoundInfo(ctx context.Context, roundID int64) (*domain.Round, error) {
+	var round domain.Round
+	err := r.db.QueryRow(ctx, `
+		SELECT rounds_id, room_id, created_at, archived_at
+		FROM rounds
+		WHERE rounds_id = $1
+	`, roundID).Scan(&round.RoundsID, &round.RoomID, &round.CreatedAt, &round.ArchivedAt)
+	if err != nil {
+		if err == pgx.ErrNoRows {
+			return nil, fmt.Errorf("round not found")
+		}
+		return nil, fmt.Errorf("query round: %w", err)
+	}
+	return &round, nil
+}
+
 // GetParticipantByID returns a single participant by ID
 func (r *roomRepo) GetParticipantByID(ctx context.Context, participantID int64) (*domain.RoundParticipant, error) {
 	var p domain.RoundParticipant

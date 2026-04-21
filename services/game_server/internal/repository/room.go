@@ -52,4 +52,5 @@ type RoomRepository interface {
 	GetRoom(ctx context.Context, roomID int64) (*domain.RoomInfo, error)
 	GetRoomConfig(ctx context.Context, configID int64) (*domain.RoomConfig, error)
 	GetCurrentRoundByRoomID(ctx context.Context, roomID int64) (*int64, error)
+	GetRoundInfo(ctx context.Context, roundID int64) (*domain.Round, error)
 }

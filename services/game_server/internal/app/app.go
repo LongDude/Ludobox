@@ -13,6 +13,8 @@ type App struct {
 	Config          *config.Config
 	InternalService service.InternalService
 	RoomService     *service.RoomService
+	EventsService   *service.EventsService
+	TimerService    *service.TimerService
 	Logger          *logrus.Logger
 }
 
@@ -28,12 +30,16 @@ func NewApp(
 		baseURL = "http://" + cfg.Domain + ":" + cfg.HttpServerConfig.Port
 	}
 	InternalService := service.NewInternalService(InternalRepository, Logger)
+	EventsService := service.NewEventsService(Logger)
 	RoomService := service.NewRoomService(RoomRepository, Logger, ServerID)
+	TimerService := service.NewTimerService(RoomRepository, EventsService, Logger)
 	
 	return &App{
 		Config:          cfg,
 		InternalService: InternalService,
 		RoomService:     RoomService,
+		EventsService:   EventsService,
+		TimerService:    TimerService,
 		Logger:          Logger,
 	}
 }

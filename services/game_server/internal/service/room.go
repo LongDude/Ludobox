@@ -263,3 +263,42 @@ func (s *RoomService) FinalizeRound(ctx context.Context, roundID int64, winners 
 		return ts.ArchiveRound(ctx, roundID)
 	})
 }
+
+// GetRoomInfo возвращает информацию о комнате
+func (s *RoomService) GetRoomInfo(ctx context.Context, roomID int64) (*domain.RoomInfo, error) {
+	return s.repo.GetRoom(ctx, roomID)
+}
+
+// GetParticipantInfo возвращает информацию об участнике
+func (s *RoomService) GetParticipantInfo(ctx context.Context, participantID int64) (*domain.RoundParticipant, error) {
+	return s.repo.GetParticipantByID(ctx, participantID)
+}
+
+// GetRoomInfoByRound возвращает информацию о комнате по раунду
+func (s *RoomService) GetRoomInfoByRound(ctx context.Context, roundID int64) (*domain.RoomInfo, error) {
+	roundInfo, err := s.repo.GetRoundInfo(ctx, roundID)
+	if err != nil {
+		return nil, fmt.Errorf("get round info: %w", err)
+	}
+	return s.repo.GetRoom(ctx, roundInfo.RoomID)
+}
+
+// StartGameRound переводит раунд в статус 'active'
+func (s *RoomService) StartGameRound(ctx context.Context, roundID int64) error {
+	return s.repo.InTransaction(ctx, func(ts repository.TransactionScope) error {
+		status, err := ts.GetRoundStatus(ctx, roundID)
+		if err != nil {
+			return fmt.Errorf("get round status: %w", err)
+		}
+		if status != "waiting" {
+			return fmt.Errorf("round is not in waiting state (status: %s)", status)
+		}
+		return ts.UpdateRoundStatus(ctx, roundID, "active")
+	})
+}
+
+// FinalizeGameRound финализирует раунд (определяет победителей, выплачивает деньги)
+func (s *RoomService) FinalizeGameRound(ctx context.Context, roundID int64) ([]domain.RoundParticipant, error) {
+	// TODO: Реализовать вызов RNG сервиса, определение победителей и выплату
+	return nil, errors.New("not implemented")
+}
