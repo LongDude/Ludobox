@@ -53,6 +53,7 @@ func main() {
 
 	// ! Init HeartBeat
 	InternalRepo := postgres.NewInternalRepository(pgPool)
+	RoomRepo := postgres.NewRoomRepository(pgPool)
 	registration, err := InternalRepo.RegisterGameServer(ctx, repository.GameServerRegistrationParams{
 		InstanceKey: cfg.InstanceID,
 		RedisHost:   cfg.RedisConfig.Host,
@@ -91,7 +92,15 @@ func main() {
 		}
 	}()
 
-	usecase := app.NewApp(cfg, InternalRepo, logger)
+	usecase := app.NewApp(cfg, InternalRepo, RoomRepo, registration.ServerID, logger)
+	
+	// Initialize rooms cache
+	initCacheCtx, initCancel := context.WithTimeout(context.Background(), 10*time.Second)
+	if err := usecase.InitializeCache(initCacheCtx); err != nil {
+		initCancel()
+		logger.Warnf("Failed to initialize rooms cache: %v", err)
+	}
+	initCancel()
 	// ! Init REST
 	server := http.NewHTTPServer(cfg, usecase)
 	logger.Info("Start HTTP server")

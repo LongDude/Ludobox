@@ -5,8 +5,6 @@ import (
 	"errors"
 	"fmt"
 
-	"game_server/internal/domain"
-
 	"github.com/jackc/pgx/v5"
 )
 
@@ -47,41 +45,65 @@ func (s *txScope) ArchiveRound(ctx context.Context, roundID int64) error {
 	return err
 }
 
-// --- Read-only методы (используют pool, а не tx) ---
-func (r *roomRepo) GetParticipantByID(ctx context.Context, participantID int64) (*domain.RoundParticipant, error) {
-	var p domain.RoundParticipant
-	err := r.db.QueryRow(ctx, `
-		SELECT round_participants_id, user_id, rounds_id, boost, winning_money, number_in_room, exit_room_at 
-		FROM round_participants WHERE round_participants_id = $1`,
-		participantID,
-	).Scan(&p.RoundParticipantID, &p.UserID, &p.RoundsID, &p.Boost, &p.WinningMoney, &p.NumberInRoom, &p.ExitRoomAt)
-	if err != nil {
-		if errors.Is(err, pgx.ErrNoRows) {
-			return nil, fmt.Errorf("participant not found")
-		}
-		return nil, fmt.Errorf("get participant: %w", err)
-	}
-	return &p, nil
+func (s *txScope) CreateRound(ctx context.Context, roomID int64) (int64, error) {
+	var id int64
+	err := s.tx.QueryRow(ctx, `
+		INSERT INTO rounds (room_id, created_at)
+		VALUES ($1, NOW())
+		RETURNING rounds_id`,
+		roomID,
+	).Scan(&id)
+	return id, err
 }
 
-func (r *roomRepo) GetParticipantsByRoundID(ctx context.Context, roundID int64) ([]domain.RoundParticipant, error) {
-	rows, err := r.db.Query(ctx, `
-		SELECT round_participants_id, user_id, rounds_id, boost, winning_money, number_in_room, exit_room_at 
-		FROM round_participants WHERE rounds_id = $1 AND exit_room_at IS NULL`,
-		roundID,
-	)
-	if err != nil {
-		return nil, fmt.Errorf("get participants: %w", err)
-	}
-	defer rows.Close()
+func (s *txScope) UpdateRoundStatus(ctx context.Context, roundID int64, status string) error {
+	_, err := s.tx.Exec(ctx, `UPDATE rounds SET status = $1 WHERE rounds_id = $2`, status, roundID)
+	return err
+}
 
-	var participants []domain.RoundParticipant
-	for rows.Next() {
-		var p domain.RoundParticipant
-		if err := rows.Scan(&p.RoundParticipantID, &p.UserID, &p.RoundsID, &p.Boost, &p.WinningMoney, &p.NumberInRoom, &p.ExitRoomAt); err != nil {
-			return nil, err
+func (s *txScope) GetActiveParticipantsCount(ctx context.Context, roundID int64) (int, error) {
+	var count int
+	err := s.tx.QueryRow(ctx, `
+		SELECT COUNT(*)
+		FROM round_participants
+		WHERE rounds_id = $1 AND exit_room_at IS NULL
+	`, roundID).Scan(&count)
+	return count, err
+}
+
+func (s *txScope) FindFreeNumberInRoom(ctx context.Context, roundID int64, capacity int) (int, error) {
+	// Find the first free number from 1 to capacity
+	for number := 1; number <= capacity; number++ {
+		var exists bool
+		err := s.tx.QueryRow(ctx, `
+			SELECT EXISTS(
+				SELECT 1
+				FROM round_participants
+				WHERE rounds_id = $1 AND number_in_room = $2 AND exit_room_at IS NULL
+			)
+		`, roundID, number).Scan(&exists)
+		if err != nil {
+			return 0, err
 		}
-		participants = append(participants, p)
+		if !exists {
+			return number, nil
+		}
 	}
-	return participants, rows.Err()
+	return 0, errors.New("no free spots in room")
+}
+
+func (s *txScope) GetRoundStatus(ctx context.Context, roundID int64) (string, error) {
+	var status string
+	err := s.tx.QueryRow(ctx, `
+		SELECT status
+		FROM rounds
+		WHERE rounds_id = $1
+	`, roundID).Scan(&status)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return "", fmt.Errorf("round not found")
+		}
+		return "", err
+	}
+	return status, nil
 }
