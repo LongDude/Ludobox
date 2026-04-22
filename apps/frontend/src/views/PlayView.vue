@@ -20,6 +20,9 @@ import { useLayoutInset } from '@/composables/useLayoutInset'
 
 type LiveRoundEvent = GameRoundEvent & { id: number }
 
+const DEFAULT_STATUS_POLLING_INTERVAL_MS = 5000
+const FINISHED_STATUS_POLLING_INTERVAL_MS = 1000
+
 const route = useRoute()
 const router = useRouter()
 const auth = useAuthStore()
@@ -261,6 +264,11 @@ const showNextRoundCountdown = computed(
   () => autoAdvanceNextRound.value && nextRoundAvailable.value && pendingNextRoundCountdown.value > 0,
 )
 const roundTimerValue = computed(() => roundStatus.value?.time_left_seconds ?? '-')
+const waitingForFinishedStatus = computed(
+  () =>
+    normalizeRoundPhase(roundStatus.value?.status ?? '') === 'playing' &&
+    Number(roundStatus.value?.time_left_seconds ?? 1) <= 0,
+)
 
 watch(
   () => [quickMatchMeta.value, room.value] as const,
@@ -299,7 +307,7 @@ watch(
   { immediate: true },
 )
 
-watch([activeRoundId, autoRefresh, sseConnected], () => {
+watch([activeRoundId, autoRefresh, sseConnected, waitingForFinishedStatus], () => {
   restartStatusPolling()
 })
 
@@ -417,11 +425,15 @@ function stopStatusPolling() {
 function restartStatusPolling() {
   stopStatusPolling()
 
-  if (!activeRoundId.value || !autoRefresh.value || sseConnected.value) return
+  if (!activeRoundId.value || !autoRefresh.value) return
+  if (sseConnected.value && !waitingForFinishedStatus.value) return
 
+  const interval = waitingForFinishedStatus.value
+    ? FINISHED_STATUS_POLLING_INTERVAL_MS
+    : DEFAULT_STATUS_POLLING_INTERVAL_MS
   statusTimer = window.setInterval(() => {
     void refreshRoundView(true)
-  }, 5000)
+  }, interval)
 }
 
 function stopRoundEvents() {
@@ -461,13 +473,17 @@ function restartRoundEvents() {
 function handleRoundEvent(event: GameRoundEvent) {
   if (event.type === 'round_timer') {
     const data = eventData(event)
+    const status = String(data.status || roundStatus.value?.status || 'waiting')
+    const secondsLeft = Number(data.seconds_left ?? roundStatus.value?.time_left_seconds ?? 0) || 0
     if (roundStatus.value && activeRoundId.value === roomRoundId.value) {
       roundStatus.value = {
         ...roundStatus.value,
-        status: String(data.status || roundStatus.value.status || 'waiting'),
-        time_left_seconds:
-          Number(data.seconds_left ?? roundStatus.value.time_left_seconds ?? 0) || 0,
+        status,
+        time_left_seconds: secondsLeft,
       }
+    }
+    if (normalizeRoundPhase(status) === 'playing' && secondsLeft <= 0) {
+      void refreshRoundView(true)
     }
     return
   }
@@ -484,6 +500,7 @@ function handleRoundEvent(event: GameRoundEvent) {
         time_left_seconds: 0,
       }
     }
+    stopStatusPolling()
     if (finalizedRoundId > 0) {
       displayedRoundId.value = finalizedRoundId
     }

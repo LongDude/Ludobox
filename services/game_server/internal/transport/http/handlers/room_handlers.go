@@ -910,6 +910,7 @@ func InternalFinalizeGame(ctx *gin.Context, a *app.App) {
 		}
 	}
 	a.EventsService.PublishRoundFinalized(ctx.Request.Context(), roundID, winnerInfos, payouts, nextRoundID, nextRoundDelay)
+	a.TimerService.StopTimer(roundID)
 
 	ctx.JSON(http.StatusOK, gin.H{
 		"success": true,
