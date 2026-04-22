@@ -51,7 +51,7 @@ async function loadGameHistory() {
       page: gameHistoryPage.value,
       page_size: gameHistoryPageSize.value,
     })
-    gameHistory.value = response.items ?? []
+    gameHistory.value = (response.items ?? []).map(normalizeHistoryItem)
     gameHistoryTotal.value = response.total ?? 0
     gameHistoryPage.value = response.page ?? gameHistoryPage.value
     gameHistoryPageSize.value = response.page_size ?? gameHistoryPageSize.value
@@ -111,8 +111,48 @@ function resultTone(result: UserGameHistoryResult) {
   return 'neutral'
 }
 
-function formatSeats(value: number[]) {
-  if (!value.length) return t('profile.history.seatsNone')
+function normalizeSeatList(value: unknown, fallbackSeat?: unknown) {
+  if (Array.isArray(value)) {
+    return value
+      .map((seat) => Number(seat))
+      .filter((seat) => Number.isFinite(seat) && seat > 0)
+  }
+
+  const fallback = Number(fallbackSeat)
+  if (Number.isFinite(fallback) && fallback > 0) {
+    return [fallback]
+  }
+
+  return []
+}
+
+function normalizeHistoryItem(item: any): UserGameHistoryItem {
+  const reservedSeats = normalizeSeatList(item?.reserved_seats, item?.seat_number)
+  const winningSeats = normalizeSeatList(item?.winning_seats)
+
+  return {
+    round_id: Number(item?.round_id ?? 0),
+    room_id: Number(item?.room_id ?? 0),
+    game_id: Number(item?.game_id ?? 0),
+    game_name: String(item?.game_name ?? ''),
+    round_status: String(item?.round_status ?? ''),
+    result: String(item?.result ?? '') as UserGameHistoryResult,
+    reserved_seats: reservedSeats,
+    winning_seats: winningSeats,
+    reserved_seats_count: Number(item?.reserved_seats_count ?? reservedSeats.length ?? 0),
+    winning_seats_count: Number(item?.winning_seats_count ?? winningSeats.length ?? 0),
+    entry_fee: Number(item?.entry_fee ?? 0),
+    boost_fee: Number(item?.boost_fee ?? 0),
+    total_spent: Number(item?.total_spent ?? (Number(item?.entry_fee ?? 0) + Number(item?.boost_fee ?? 0))),
+    winning_money: Number(item?.winning_money ?? 0),
+    net_result: Number(item?.net_result ?? 0),
+    joined_at: String(item?.joined_at ?? ''),
+    finished_at: item?.finished_at ? String(item.finished_at) : null,
+  }
+}
+
+function formatSeats(value?: number[] | null) {
+  if (!Array.isArray(value) || value.length === 0) return t('profile.history.seatsNone')
   return value.join(', ')
 }
 </script>
