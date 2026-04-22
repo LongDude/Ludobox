@@ -6,6 +6,7 @@ import { useSettingStore } from '@/stores/settingStore'
 import { useUserCabinetStore } from '@/stores/userCabinetStore'
 import { useI18n } from '@/i18n'
 import ToastCenter from '@/components/ToastCenter.vue'
+import { rankFrameClass } from '@/utils/rankFrame'
 
 defineProps<{
   showMenu?: boolean
@@ -20,6 +21,7 @@ const router = useRouter()
 const { locale, t } = useI18n()
 
 const avatarUrl = computed(() => authStore.User?.photo || '')
+const avatarRankClass = computed(() => rankFrameClass(cabinetStore.profile?.rank))
 const avatarLetter = computed(() => {
   const user = authStore.User
   const name = [user?.first_name, user?.last_name].filter(Boolean).join(' ') || user?.email || ''
@@ -134,6 +136,7 @@ async function logout() {
       <button
         v-if="authStore.isAuthenticated"
         class="action-button avatar mobile-profile-action"
+        :class="['rank-frame', avatarRankClass]"
         type="button"
         :aria-label="userName"
         @click="redirectTo('/profile')"
