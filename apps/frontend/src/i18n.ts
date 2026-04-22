@@ -1247,7 +1247,7 @@ const messages: Record<Locale, Record<string, string>> = {
     'admin.gamesSection.saveGame': 'Сохранить игру',
     'admin.gamesSection.listTitle': 'Список активных игр',
     'admin.gamesSection.listHint':
-      'Текущий admin API возвращает только неархивированные игры.',
+      'Список игр для выбора анимации.',
     'admin.gamesSection.loading': 'Загрузка игр...',
     'admin.gamesSection.badge': 'Активна',
     'admin.gamesSection.noMatches': 'Активные игры не найдены.',

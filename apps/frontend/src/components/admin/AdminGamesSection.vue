@@ -176,50 +176,11 @@ function nextPage() {
         <p class="section-copy">{{ t('admin.gamesSection.description') }}</p>
       </div>
       <div class="header-actions">
-        <button class="button ghost" @click="resetForm">{{ t('admin.gamesSection.newGame') }}</button>
         <button class="button ghost" @click="loadGames" :disabled="loading">{{ t('common.refresh') }}</button>
       </div>
     </div>
 
-    <div class="workspace">
-      <div class="editor-card">
-        <div class="editor-head">
-          <div>
-            <h3>{{ editorTitle }}</h3>
-            <p class="muted">{{ t('admin.gamesSection.editorHint') }}</p>
-          </div>
-          <span class="mode-pill">
-            {{ mode === 'edit' ? t('admin.gamesSection.editMode') : t('admin.gamesSection.createMode') }}
-          </span>
-        </div>
-
-        <label class="field">
-          <span>{{ t('admin.gamesSection.fields.name') }}</span>
-          <input
-            v-model="form.name_game"
-            class="input"
-            type="text"
-            :placeholder="t('admin.gamesSection.fields.namePlaceholder')"
-          />
-        </label>
-
-        <p v-if="errorMsg" class="state-copy error">{{ errorMsg }}</p>
-        <p v-if="successMsg" class="state-copy success">{{ successMsg }}</p>
-
-        <div class="editor-actions">
-          <button class="button ghost" @click="resetForm">{{ t('admin.gamesSection.clearForm') }}</button>
-          <button class="button primary" :disabled="saving" @click="saveGame">
-            {{
-              saving
-                ? t('common.saving')
-                : mode === 'edit'
-                  ? t('admin.gamesSection.saveGame')
-                  : t('admin.gamesSection.createGame')
-            }}
-          </button>
-        </div>
-      </div>
-
+    <div>
       <div class="list-card">
         <div class="list-head">
           <div>
@@ -238,13 +199,7 @@ function nextPage() {
             :class="{ selected: editingGameId === game.game_id }"
           >
             <div class="game-topline">
-              <strong>#{{ game.game_id }}</strong>
-              <span class="badge">{{ t('admin.gamesSection.badge') }}</span>
-            </div>
-            <h4>{{ game.name_game }}</h4>
-            <div class="game-actions">
-              <button class="button ghost" @click="editGame(game)">{{ t('common.edit') }}</button>
-              <button class="button danger" @click="archiveGame(game)">{{ t('common.archive') }}</button>
+              <strong>#{{ game.game_id }} - {{ game.name_game }}</strong>
             </div>
           </article>
 
