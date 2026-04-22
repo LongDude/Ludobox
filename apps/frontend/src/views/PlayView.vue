@@ -395,6 +395,10 @@ const waitingForFinishedStatus = computed(
     Number(roundStatus.value?.time_left_seconds ?? 1) <= 0,
 )
 
+// ==================================================================
+// Watchers
+// ==================================================================
+
 watch(
   () => [quickMatchMeta.value, room.value] as const,
   () => {
@@ -537,6 +541,10 @@ watch(
   },
   { immediate: true },
 )
+
+// ==================================================================
+// Functions
+// ==================================================================
 
 onBeforeUnmount(() => {
   stopStatusPolling()
@@ -1277,6 +1285,10 @@ function scheduleNextRoundTransition(nextRoundId: number | null, nextRoundDelay:
   const baseTime = Number.isFinite(finalizedAt) ? finalizedAt : Date.now()
   pendingNextRoundAt.value = baseTime + Math.max(0, nextRoundDelay) * 1000
   startNextRoundCountdown()
+}
+
+function formatMoney(amount: number) {
+  return amount
 }
 </script>
 
