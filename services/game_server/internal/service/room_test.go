@@ -6,6 +6,7 @@ import (
 	"errors"
 	"net/http"
 	"net/http/httptest"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -875,5 +876,63 @@ func TestCalculateRatingRewardRewardsRiskierConfigsMore(t *testing.T) {
 
 	if riskier <= safer {
 		t.Fatalf("expected riskier config to reward more rating: safe=%d risky=%d", safer, riskier)
+	}
+}
+
+func TestFinalizeGameRoundDoesNotCancelTimerContext(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	scope := newMockTransactionScope()
+	repo := &mockRoomRepository{scope: scope}
+
+	server := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+		if err := json.NewEncoder(writer).Encode(rngDistributeResponse{WinningPositions: []int{1, 2}}); err != nil {
+			t.Fatalf("encode response: %v", err)
+		}
+	}))
+	defer server.Close()
+
+	events := NewEventsService(repo, nil)
+	timer := NewTimerService(repo, events, nil)
+	var timerCancelled atomic.Bool
+	timer.mu.Lock()
+	timer.timers[1] = &timerState{
+		cancel: func() {
+			timerCancelled.Store(true)
+			cancel()
+		},
+		status:   "active",
+		deadline: time.Now().Add(time.Minute),
+	}
+	timer.mu.Unlock()
+	defer timer.StopTimer(1)
+
+	service := NewRoomService(repo, nil, 1, nil, server.URL)
+	service.httpClient = server.Client()
+	service.SetTimerService(timer)
+
+	if _, err := service.JoinRoomWithSeat(ctx, 100, 1, 1); err != nil {
+		t.Fatalf("join failed: %v", err)
+	}
+	if _, err := service.JoinRoomWithSeat(ctx, 200, 1, 2); err != nil {
+		t.Fatalf("second join failed: %v", err)
+	}
+	if err := scope.UpdateRoundStatus(ctx, 1, "active"); err != nil {
+		t.Fatalf("UpdateRoundStatus failed: %v", err)
+	}
+
+	if _, err := service.FinalizeGameRound(ctx, 1); err != nil {
+		t.Fatalf("FinalizeGameRound failed: %v", err)
+	}
+
+	if timerCancelled.Load() {
+		t.Fatal("FinalizeGameRound must not stop the timer before round_finalized can be published")
+	}
+	if ctx.Err() != nil {
+		t.Fatalf("FinalizeGameRound cancelled caller context: %v", ctx.Err())
+	}
+	if scope.rounds[1].Status != "finished" {
+		t.Fatalf("expected finished status, got %s", scope.rounds[1].Status)
 	}
 }

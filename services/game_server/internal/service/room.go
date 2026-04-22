@@ -615,9 +615,6 @@ func (s *RoomService) FinalizeRound(ctx context.Context, roundID int64, winners 
 	if err != nil {
 		return err
 	}
-	if s.timerService != nil {
-		s.timerService.StopTimer(roundID)
-	}
 	return nil
 }
 
@@ -825,9 +822,6 @@ func (s *RoomService) FinalizeGameRound(ctx context.Context, roundID int64) ([]d
 	if _, err := s.finalizeRoundAndCreateNext(ctx, roundID, payoutsByParticipant); err != nil {
 		return nil, err
 	}
-	if s.timerService != nil {
-		s.timerService.StopTimer(roundID)
-	}
 
 	return winners, nil
 }
@@ -1029,6 +1023,7 @@ func buildPayouts(config *domain.RoomConfig, winnersCount int, participantCount 
 		return nil
 	}
 
+	// Учитываем ботов
 	grossBank := config.RegistrationPrice * int64(config.Capacity)
 	commission := grossBank * int64(config.Commission) / 100
 	prizePool := grossBank - commission
