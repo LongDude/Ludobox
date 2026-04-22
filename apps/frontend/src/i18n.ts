@@ -11,7 +11,7 @@ function loadLocale(): Locale {
     const saved = localStorage.getItem(STORAGE_KEY)
     if (saved === 'en' || saved === 'ru') return saved
   } catch {}
-  return 'en'
+  return 'ru'
 }
 
 export const locale = ref<Locale>(loadLocale())
@@ -832,6 +832,7 @@ const messages: Record<Locale, Record<string, string>> = {
     'gameRoom.controls.leave': 'Leave room',
     'gameRoom.controls.leaveRoom': 'Leave room',
   },
+  // =======================================================================================
   ru: {
     'gameRoom.round.ssePrimary': 'SSE подключён. Статус раунда обновляется по live-событиям.',
     'gameRoom.round.pollingFallback': 'SSE не подключён. Запасной polling поддерживает актуальный статус.',
@@ -1627,10 +1628,10 @@ const messages: Record<Locale, Record<string, string>> = {
     'profile.history.empty': 'История игр пуста.',
     'profile.history.error.load': 'Не удалось загрузить историю игр.',
     'profile.history.gameFallback': 'Игра #{id}',
-    'profile.history.roundSummary': 'Раунд #{round} - комната #{room}',
+    'profile.history.roundSummary': '{game}, комната #{room} - раунд #{round}',
     'profile.history.meta.seats': 'Места',
     'profile.history.meta.winningSeats': 'Выигравшие места',
-    'profile.history.meta.totalSpent': 'Потрачено',
+    'profile.history.meta.totalSpent': 'Всего потрачено',
     'profile.history.meta.joined': 'Вход',
     'profile.history.meta.finished': 'Финиш',
     'profile.history.meta.entry': 'Вход',
@@ -1645,8 +1646,8 @@ const messages: Record<Locale, Record<string, string>> = {
     'profile.history.result.active': 'Активен',
     'profile.history.result.finished': 'Завершен',
     'profile.history.result.unknown': 'Неизвестно',
-    'profile.history.seatsSummary': '{count} мест: {seats}',
-    'profile.history.seatsWinningSummary': '{count} выигравших мест: {seats}',
+    'profile.history.seatsSummary': '{count} мест выбрано',
+    'profile.history.seatsWinningSummary': '{count} из {selected} мест выиграло',
     'profile.history.seatsNone': 'Нет',
   },
 }

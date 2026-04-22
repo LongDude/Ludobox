@@ -313,38 +313,21 @@ function formatSeats(value?: number[] | null) {
           <article v-for="item in gameHistory" :key="item.round_id" class="history-card">
             <div class="history-topline">
               <div>
-                <strong>{{ item.game_name || t('profile.history.gameFallback', { id: item.game_id }) }}</strong>
+                <strong>{{ formatDateTime(item.finished_at) }}</strong>
                 <p class="muted">
-                  {{ t('profile.history.roundSummary', { round: item.round_id, room: item.room_id }) }}
+                  {{ t('profile.history.roundSummary', { round: item.round_id, room: item.room_id, game: item.game_name }) }},
+                  {{ t('profile.history.seatsWinningSummary', { count: item.winning_seats_count, selected: item.reserved_seats_count}) }}
                 </p>
               </div>
+              
               <span class="result-pill" :class="resultTone(item.result)">
                 {{ resultLabel(item.result) }}
               </span>
+
             </div>
 
-            <div class="seat-summary">
-              <span>{{ t('profile.history.seatsSummary', { count: item.reserved_seats_count, seats: formatSeats(item.reserved_seats) }) }}</span>
-              <span>{{ t('profile.history.seatsWinningSummary', { count: item.winning_seats_count, seats: formatSeats(item.winning_seats) }) }}</span>
-            </div>
 
             <dl class="history-meta">
-              <div>
-                <dt>{{ t('profile.history.meta.seats') }}</dt>
-                <dd>{{ item.reserved_seats_count }}</dd>
-              </div>
-              <div>
-                <dt>{{ t('profile.history.meta.winningSeats') }}</dt>
-                <dd>{{ item.winning_seats_count }}</dd>
-              </div>
-              <div>
-                <dt>{{ t('profile.history.meta.joined') }}</dt>
-                <dd>{{ formatDateTime(item.joined_at) }}</dd>
-              </div>
-              <div>
-                <dt>{{ t('profile.history.meta.finished') }}</dt>
-                <dd>{{ formatDateTime(item.finished_at) }}</dd>
-              </div>
               <div>
                 <dt>{{ t('profile.history.meta.entry') }}</dt>
                 <dd>{{ formatMoney(item.entry_fee) }}</dd>
