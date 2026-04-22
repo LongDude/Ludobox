@@ -9,8 +9,10 @@ import { useLayoutInset } from '@/composables/useLayoutInset'
 import { useI18n } from '@/i18n'
 import { useAuthStore } from '@/stores/authStore'
 import { useUserCabinetStore } from '@/stores/userCabinetStore'
+import { rankFrameClass } from '@/utils/rankFrame'
 
 type RatingPeriod = '7d' | '30d' | '90d' | 'all'
+type ProfileTab = 'identity' | 'game' | 'rating'
 
 type ChartPoint = {
   item: UserRatingHistoryResponse['items'][number]
@@ -36,6 +38,7 @@ const ratingHistory = ref<UserRatingHistoryResponse | null>(null)
 const ratingHistoryLoading = ref(false)
 const ratingHistoryErrorMsg = ref('')
 const selectedRatingPeriod = ref<RatingPeriod>('30d')
+const activeProfileTab = ref<ProfileTab>('identity')
 
 const identityForm = reactive({
   email: '',
@@ -57,6 +60,24 @@ const periodOptions: Array<{ value: RatingPeriod; labelKey: string }> = [
   { value: 'all', labelKey: 'profile.game.period.all' },
 ]
 
+const profileTabs = computed<Array<{ key: ProfileTab; label: string; description: string }>>(() => [
+  {
+    key: 'identity',
+    label: t('profile.tabs.identity'),
+    description: t('profile.tabs.identityDescription'),
+  },
+  {
+    key: 'game',
+    label: t('profile.tabs.game'),
+    description: t('profile.tabs.gameDescription'),
+  },
+  {
+    key: 'rating',
+    label: t('profile.tabs.rating'),
+    description: t('profile.tabs.ratingDescription'),
+  },
+])
+
 onMounted(async () => {
   if (auth.isAuthenticated && !auth.User) {
     try {
@@ -77,6 +98,7 @@ const fullName = computed(() => {
 })
 
 const avatarUrl = computed(() => auth.User?.photo || '')
+const avatarRankClass = computed(() => rankFrameClass(cabinet.profile?.rank))
 
 const avatarLetter = computed(() => {
   const user = auth.User
@@ -410,8 +432,23 @@ async function logout() {
     :style="{ '--layout-inset': layoutInset }"
   >
     <div class="container">
-      <div class="profile-grid">
-        <section class="panel-card">
+      <div class="profile-shell">
+        <nav class="profile-tabs" :aria-label="t('profile.tabs.label')">
+          <button
+            v-for="tab in profileTabs"
+            :key="tab.key"
+            class="profile-tab"
+            :class="{ active: activeProfileTab === tab.key }"
+            type="button"
+            :aria-selected="activeProfileTab === tab.key"
+            @click="activeProfileTab = tab.key"
+          >
+            <strong>{{ tab.label }}</strong>
+            <span>{{ tab.description }}</span>
+          </button>
+        </nav>
+
+        <section v-if="activeProfileTab === 'identity'" class="panel-card identity-card">
           <div class="card-head">
             <div>
               <p class="eyebrow">{{ t('profile.identityEyebrow') }}</p>
@@ -421,7 +458,7 @@ async function logout() {
           </div>
 
           <div class="profile-header">
-            <div class="avatar">
+            <div class="avatar rank-frame" :class="avatarRankClass">
               <img
                 v-if="avatarUrl"
                 :src="avatarUrl"
@@ -526,14 +563,14 @@ async function logout() {
           </div>
         </section>
 
-        <section class="panel-card">
+        <section v-else-if="activeProfileTab === 'game'" class="panel-card game-card">
           <div class="card-head">
             <div>
               <p class="eyebrow accent">{{ t('profile.game.eyebrow') }}</p>
               <h2>{{ t('profile.game.title') }}</h2>
               <p class="section-copy">{{ t('profile.game.description') }}</p>
             </div>
-            <button class="btn" :disabled="cabinet.loading || ratingHistoryLoading" @click="refreshGameProfile">
+            <button class="btn" :disabled="cabinet.loading" @click="refreshGameProfile">
               {{ t('common.refresh') }}
             </button>
           </div>
@@ -563,6 +600,81 @@ async function logout() {
                 <span class="summary-label">{{ t('profile.game.rank') }}</span>
                 <strong>{{ ratingRankLabel }}</strong>
               </article>
+            </div>
+
+            <div class="feedback">
+              <span v-if="gameSuccessMsg" class="ok">{{ gameSuccessMsg }}</span>
+              <span v-if="activeGameError" class="err">{{ activeGameError }}</span>
+            </div>
+
+            <form class="game-editor" @submit.prevent="saveNickname">
+              <label>
+                <span>{{ t('profile.game.nickname') }}</span>
+                <input
+                  v-model="gameForm.nickname"
+                  type="text"
+                  :placeholder="t('profile.game.nicknamePlaceholder')"
+                />
+              </label>
+              <div class="inline-actions">
+                <button class="btn btn--primary" type="submit" :disabled="nicknameSaving">
+                  {{ nicknameSaving ? t('common.saving') : t('profile.game.saveNickname') }}
+                </button>
+              </div>
+            </form>
+
+            <form class="game-editor" @submit.prevent="applyBalanceDelta">
+              <label>
+                <span>{{ t('profile.game.delta') }}</span>
+                <input
+                  v-model="gameForm.delta"
+                  type="number"
+                  step="1"
+                  :placeholder="t('profile.game.deltaPlaceholder')"
+                />
+              </label>
+              <p class="helper">{{ t('profile.game.deltaHelp') }}</p>
+              <div class="inline-actions">
+                <button class="btn btn--primary" type="submit" :disabled="balanceSaving">
+                  {{ balanceSaving ? t('common.saving') : t('profile.game.applyDelta') }}
+                </button>
+              </div>
+            </form>
+          </template>
+
+          <div v-else class="state-block">
+            <p class="state-copy error">
+              {{ activeGameError || t('profile.game.msg.failedLoad') }}
+            </p>
+          </div>
+        </section>
+
+        <section v-else class="panel-card rating-card">
+          <div class="card-head">
+            <div>
+              <p class="eyebrow accent">{{ t('profile.rating.eyebrow') }}</p>
+              <h2>{{ t('profile.game.ratingHistoryTitle') }}</h2>
+              <p class="section-copy">{{ t('profile.game.ratingHistoryDescription') }}</p>
+            </div>
+            <button class="btn" :disabled="ratingHistoryLoading" @click="loadRatingHistory()">
+              {{ t('common.refresh') }}
+            </button>
+          </div>
+
+          <p v-if="cabinet.loading && !cabinet.profile" class="state-copy">
+            {{ t('profile.game.loading') }}
+          </p>
+
+          <template v-else-if="cabinet.profile">
+            <div class="rating-summary">
+              <article class="summary-card">
+                <span class="summary-label">{{ t('profile.game.rating') }}</span>
+                <strong>{{ formattedRating }}</strong>
+              </article>
+              <article class="summary-card">
+                <span class="summary-label">{{ t('profile.game.rank') }}</span>
+                <strong>{{ ratingRankLabel }}</strong>
+              </article>
               <article class="summary-card">
                 <span class="summary-label">{{ t('profile.game.periodGain') }}</span>
                 <strong :class="{ positive: (ratingHistory?.period_change ?? 0) > 0 }">
@@ -573,10 +685,6 @@ async function logout() {
 
             <section class="rating-history">
               <div class="rating-head">
-                <div>
-                  <h3>{{ t('profile.game.ratingHistoryTitle') }}</h3>
-                  <p class="helper">{{ t('profile.game.ratingHistoryDescription') }}</p>
-                </div>
                 <div class="period-switch">
                   <button
                     v-for="option in periodOptions"
@@ -640,45 +748,6 @@ async function logout() {
                 </div>
               </div>
             </section>
-
-            <div class="feedback">
-              <span v-if="gameSuccessMsg" class="ok">{{ gameSuccessMsg }}</span>
-              <span v-if="activeGameError" class="err">{{ activeGameError }}</span>
-            </div>
-
-            <form class="game-editor" @submit.prevent="saveNickname">
-              <label>
-                <span>{{ t('profile.game.nickname') }}</span>
-                <input
-                  v-model="gameForm.nickname"
-                  type="text"
-                  :placeholder="t('profile.game.nicknamePlaceholder')"
-                />
-              </label>
-              <div class="inline-actions">
-                <button class="btn btn--primary" type="submit" :disabled="nicknameSaving">
-                  {{ nicknameSaving ? t('common.saving') : t('profile.game.saveNickname') }}
-                </button>
-              </div>
-            </form>
-
-            <form class="game-editor" @submit.prevent="applyBalanceDelta">
-              <label>
-                <span>{{ t('profile.game.delta') }}</span>
-                <input
-                  v-model="gameForm.delta"
-                  type="number"
-                  step="1"
-                  :placeholder="t('profile.game.deltaPlaceholder')"
-                />
-              </label>
-              <p class="helper">{{ t('profile.game.deltaHelp') }}</p>
-              <div class="inline-actions">
-                <button class="btn btn--primary" type="submit" :disabled="balanceSaving">
-                  {{ balanceSaving ? t('common.saving') : t('profile.game.applyDelta') }}
-                </button>
-              </div>
-            </form>
           </template>
 
           <div v-else class="state-block">
@@ -695,7 +764,7 @@ async function logout() {
 <style scoped>
 .profile-area {
   position: fixed;
-  inset: var(--layout-inset, 60px 20px 20px 310px);
+  inset: var(--layout-inset, 92px 20px 20px 304px);
   display: grid;
   align-items: start;
   overflow: auto;
@@ -703,22 +772,75 @@ async function logout() {
 }
 
 .profile-area.collapsed {
-  --layout-inset: 60px 20px 20px 80px;
+  --layout-inset: 92px 20px 20px 120px;
 }
 
 .container {
   max-width: 1100px;
-  margin: auto;
+  margin: 25px auto;
   width: 100%;
 }
 
-.profile-grid {
+.profile-shell {
   display: grid;
-  grid-template-columns: minmax(0, 1.15fr) minmax(21rem, 0.85fr);
   gap: 1rem;
+  justify-items: center;
+}
+
+.profile-tabs {
+  width: 100%;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.75rem;
+}
+
+.profile-tab {
+  appearance: none;
+  min-width: 0;
+  display: grid;
+  gap: 0.25rem;
+  padding: 0.95rem 1rem;
+  border-radius: 1.15rem;
+  border: 1px solid color-mix(in oklab, var(--color-border), transparent 10%);
+  background:
+    linear-gradient(180deg, color-mix(in oklab, var(--color-surface), white 14%), var(--color-surface));
+  color: var(--color-text);
+  text-align: left;
+  cursor: pointer;
+  box-shadow: var(--shadow-sm);
+  transition:
+    transform var(--transition-fast) ease,
+    border-color var(--transition-fast) ease,
+    background var(--transition-fast) ease;
+}
+
+.profile-tab:hover {
+  transform: translateY(-1px);
+  border-color: color-mix(in oklab, var(--color-primary-secondary), transparent 18%);
+}
+
+.profile-tab.active {
+  border-color: color-mix(in oklab, var(--color-primary-secondary), transparent 8%);
+  background:
+    radial-gradient(circle at top right, rgba(14, 165, 233, 0.2), transparent 46%),
+    linear-gradient(135deg, color-mix(in oklab, var(--color-surface), white 20%), var(--color-surface));
+}
+
+.profile-tab strong {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.profile-tab span {
+  color: var(--color-muted);
+  font-size: 0.86rem;
+  line-height: 1.35;
 }
 
 .panel-card {
+  width: 100%;
+  justify-self: center;
   display: grid;
   gap: 1rem;
   padding: 1.35rem;
@@ -728,6 +850,20 @@ async function logout() {
     radial-gradient(circle at top left, color-mix(in oklab, #0ea5e9, white 88%), transparent 26%),
     linear-gradient(180deg, color-mix(in oklab, var(--color-surface), white 16%), var(--color-surface));
   box-shadow: var(--shadow-md);
+}
+
+.identity-card,
+.game-card,
+.rating-card {
+  align-self: start;
+}
+
+.identity-card {
+  max-width: 760px;
+}
+
+.game-card {
+  max-width: 820px;
 }
 
 .card-head,
@@ -784,7 +920,6 @@ async function logout() {
   width: 72px;
   height: 72px;
   border-radius: 50%;
-  border: 2px solid color-mix(in oklab, var(--color-primary-secondary), transparent 15%);
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -883,7 +1018,7 @@ async function logout() {
 }
 
 .rating-summary {
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(12rem, 1fr));
 }
 
 .summary-card {
@@ -1030,12 +1165,6 @@ input[type='number'] {
   gap: 0.75rem;
 }
 
-@media (max-width: 1100px) {
-  .profile-grid {
-    grid-template-columns: 1fr;
-  }
-}
-
 @media (max-width: 960px) {
   .profile-area,
   .profile-area.collapsed {
@@ -1046,6 +1175,10 @@ input[type='number'] {
 }
 
 @media (max-width: 760px) {
+  .profile-tabs {
+    grid-template-columns: 1fr;
+  }
+
   .panel-card {
     padding: 1rem;
   }

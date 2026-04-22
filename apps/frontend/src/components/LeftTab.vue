@@ -4,7 +4,9 @@ import { useRoute, useRouter } from 'vue-router'
 import { storeToRefs } from 'pinia'
 import { useSettingStore } from '@/stores/settingStore'
 import { useAuthStore } from '@/stores/authStore'
+import { useUserCabinetStore } from '@/stores/userCabinetStore'
 import { useI18n } from '@/i18n'
+import { rankFrameClass } from '@/utils/rankFrame'
 
 interface NavItem {
   key: string
@@ -14,6 +16,7 @@ interface NavItem {
 }
 
 const authStore = useAuthStore()
+const cabinetStore = useUserCabinetStore()
 const { t } = useI18n()
 const route = useRoute()
 const router = useRouter()
@@ -83,6 +86,9 @@ const profileRole = computed(() => {
   if (primaryRole === 'user') return t('roles.user')
   return authStore.roles[0] || t('roles.user')
 })
+
+const avatarUrl = computed(() => authStore.User?.photo || '')
+const avatarRankClass = computed(() => rankFrameClass(cabinetStore.profile?.rank))
 
 const avatarLetter = computed(() => {
   const user = authStore.User
@@ -259,7 +265,10 @@ function isActive(path: string) {
 
       <div v-if="authStore.isAuthenticated" class="profile-card">
         <button class="profile-button" type="button" @click="redirectTo('/profile')">
-          <span class="profile-avatar">{{ avatarLetter }}</span>
+          <span class="profile-avatar rank-frame" :class="avatarRankClass">
+            <img v-if="avatarUrl" :src="avatarUrl" alt="" class="profile-avatar-image" />
+            <span v-else>{{ avatarLetter }}</span>
+          </span>
           <span v-if="!LeftTabHidden" class="profile-copy">
             <strong>{{ profileName }}</strong>
             <small>{{ profileRole }}</small>
@@ -505,9 +514,17 @@ function isActive(path: string) {
   width: 2.4rem;
   height: 2.4rem;
   border-radius: 50%;
+  overflow: hidden;
   font-weight: 700;
   background: color-mix(in oklab, var(--color-primary-secondary), transparent 78%);
   color: var(--color-text);
+}
+
+.profile-avatar-image {
+  width: 100%;
+  height: 100%;
+  display: block;
+  object-fit: cover;
 }
 
 @media (max-width: 960px) {
