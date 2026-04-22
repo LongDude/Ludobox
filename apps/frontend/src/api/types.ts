@@ -457,5 +457,6 @@ export interface AdminEvent {
   resource?: AdminEventResource | ''
   action: string
   id?: number
+  data?: Record<string, unknown> | null
   timestamp: string
 }

@@ -1,11 +1,11 @@
 <script setup lang="ts">
-import { computed, onMounted, ref, watch } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { UserApi } from '@/api/useUserApi'
-import type { AdminEventResource, GameServerResponse, RoomResponse } from '@/api/types'
-import { useDeferredAdminReload } from '@/composables/useDeferredAdminReload'
+import type { AdminEvent, AdminEventResource, GameServerResponse, RoomResponse } from '@/api/types'
 import { useI18n } from '@/i18n'
 
 type AdminEventVersions = Partial<Record<AdminEventResource, number>>
+type AdminLatestEvents = Partial<Record<AdminEventResource, AdminEvent | null>>
 
 interface ServerBucket {
   server: GameServerResponse
@@ -15,15 +15,20 @@ interface ServerBucket {
   completedCount: number
 }
 
+const OVERVIEW_METADATA_RELOAD_DELAY_MS = 700
+
 const props = defineProps<{
   adminEventVersions?: AdminEventVersions
+  adminLatestEvents?: AdminLatestEvents
 }>()
 
 const loading = ref(false)
+const backgroundRefreshing = ref(false)
 const errorMsg = ref('')
 const servers = ref<GameServerResponse[]>([])
 const rooms = ref<RoomResponse[]>([])
 const { locale, t } = useI18n()
+let overviewReloadTimer: ReturnType<typeof setTimeout> | undefined
 
 const roomsByServer = computed(() => {
   const byServer = new Map<number, RoomResponse[]>()
@@ -61,31 +66,70 @@ const overviewStats = computed(() => ({
 }))
 
 const idleServers = computed(() => buckets.value.filter((bucket) => bucket.rooms.length === 0).length)
+const hasOverviewData = computed(() => servers.value.length > 0 || rooms.value.length > 0)
+const refreshDisabled = computed(() => loading.value || backgroundRefreshing.value)
 
 onMounted(async () => {
   await loadOverview()
 })
 
-const scheduleOverviewReload = useDeferredAdminReload(loadOverview)
+onBeforeUnmount(() => {
+  clearOverviewReloadTimer()
+})
 
 watch(
   () =>
     [
-      props.adminEventVersions?.rooms,
-      props.adminEventVersions?.servers,
-      props.adminEventVersions?.configs,
-      props.adminEventVersions?.games,
+      props.adminLatestEvents?.rooms,
+      props.adminLatestEvents?.servers,
+      props.adminLatestEvents?.configs,
+      props.adminLatestEvents?.games,
     ] as const,
-  (versions, previousVersions) => {
-    if (versions.some((version, index) => version !== previousVersions[index])) {
+  ([roomEvent, serverEvent, configEvent, gameEvent], previousEvents) => {
+    if (roomEvent && roomEvent !== previousEvents[0]) {
+      applyRoomEvent(roomEvent)
+    }
+    if (serverEvent && serverEvent !== previousEvents[1]) {
+      applyServerEvent(serverEvent)
+    }
+    if ((configEvent && configEvent !== previousEvents[2]) || (gameEvent && gameEvent !== previousEvents[3])) {
       scheduleOverviewReload()
     }
   },
 )
 
-async function loadOverview() {
-  loading.value = true
-  errorMsg.value = ''
+function clearOverviewReloadTimer() {
+  if (!overviewReloadTimer) return
+  clearTimeout(overviewReloadTimer)
+  overviewReloadTimer = undefined
+}
+
+function scheduleOverviewReload() {
+  if (overviewReloadTimer) return
+
+  overviewReloadTimer = setTimeout(() => {
+    overviewReloadTimer = undefined
+    void loadOverview({ silent: true })
+  }, OVERVIEW_METADATA_RELOAD_DELAY_MS)
+}
+
+async function loadOverview(options: { silent?: boolean } = {}) {
+  if (loading.value || backgroundRefreshing.value) {
+    if (options.silent) scheduleOverviewReload()
+    return
+  }
+
+  const silent = Boolean(options.silent)
+  if (silent) {
+    backgroundRefreshing.value = true
+  } else {
+    clearOverviewReloadTimer()
+    loading.value = true
+  }
+
+  if (!silent || !hasOverviewData.value) {
+    errorMsg.value = ''
+  }
 
   try {
     const [allServers, allRooms] = await Promise.all([loadAllServers(), loadAllRooms()])
@@ -93,9 +137,15 @@ async function loadOverview() {
     servers.value = allServers
     rooms.value = allRooms
   } catch (error: any) {
-    errorMsg.value = error?.message || t('admin.overviewSection.error.load')
+    if (!silent || !hasOverviewData.value) {
+      errorMsg.value = error?.message || t('admin.overviewSection.error.load')
+    }
   } finally {
-    loading.value = false
+    if (silent) {
+      backgroundRefreshing.value = false
+    } else {
+      loading.value = false
+    }
   }
 }
 
@@ -151,6 +201,90 @@ async function loadAllRooms() {
 
 function isAvailableServer(server: GameServerResponse) {
   return !server.archived_at && server.status.trim().toLowerCase() === 'up'
+}
+
+function applyServerEvent(event: AdminEvent) {
+  const server = normalizeServerEventData(event)
+  if (!server) return
+
+  if (event.action === 'delete' || server.archived_at) {
+    servers.value = servers.value.filter((item) => item.server_id !== server.server_id)
+    return
+  }
+
+  upsertById(servers.value, server, 'server_id')
+}
+
+function applyRoomEvent(event: AdminEvent) {
+  const room = normalizeRoomEventData(event)
+  if (!room) return
+
+  if (event.action === 'delete' || room.archived_at) {
+    rooms.value = rooms.value.filter((item) => item.room_id !== room.room_id)
+    return
+  }
+
+  const existing = rooms.value.find((item) => item.room_id === room.room_id)
+  upsertById(
+    rooms.value,
+    {
+      ...existing,
+      ...room,
+      config: existing?.config ?? room.config ?? null,
+      server_name: room.server_name ?? existing?.server_name ?? null,
+    },
+    'room_id',
+  )
+}
+
+function normalizeServerEventData(event: AdminEvent): GameServerResponse | null {
+  const data = event.data
+  const serverId = Number(data?.server_id ?? event.id ?? 0)
+  if (!serverId) return null
+
+  return {
+    server_id: serverId,
+    instance_key: String(data?.instance_key ?? ''),
+    redis_host: String(data?.redis_host ?? ''),
+    status: String(data?.status ?? ''),
+    started_at: stringOrNull(data?.started_at),
+    last_heartbeat_at: stringOrNull(data?.last_heartbeat_at),
+    archived_at: stringOrNull(data?.archived_at),
+  }
+}
+
+function normalizeRoomEventData(event: AdminEvent): RoomResponse | null {
+  const data = event.data
+  const roomId = Number(data?.room_id ?? event.id ?? 0)
+  if (!roomId) return null
+
+  return {
+    room_id: roomId,
+    config_id: Number(data?.config_id ?? 0),
+    server_id: Number(data?.server_id ?? 0),
+    current_players: Number(data?.current_players ?? 0),
+    status: normalizeRoomStatus(data?.status),
+    archived_at: stringOrNull(data?.archived_at),
+    config: null,
+    server_name: stringOrNull(data?.server_name),
+  }
+}
+
+function normalizeRoomStatus(value: unknown): RoomResponse['status'] {
+  return value === 'in_game' || value === 'completed' ? value : 'open'
+}
+
+function stringOrNull(value: unknown) {
+  return typeof value === 'string' && value ? value : null
+}
+
+function upsertById<T extends Record<K, number>, K extends keyof T>(items: T[], next: T, key: K) {
+  const index = items.findIndex((item) => item[key] === next[key])
+  if (index >= 0) {
+    items.splice(index, 1, next)
+  } else {
+    items.push(next)
+  }
 }
 
 function roomSummary(room: RoomResponse) {
@@ -219,7 +353,7 @@ function formatTimestamp(value?: string | null) {
         <h2>{{ t('admin.overviewSection.title') }}</h2>
         <p class="section-copy">{{ t('admin.overviewSection.description') }}</p>
       </div>
-      <button class="button ghost" @click="loadOverview" :disabled="loading">
+      <button class="button ghost" @click="loadOverview()" :disabled="refreshDisabled">
         {{ t('common.refresh') }}
       </button>
     </div>
@@ -243,10 +377,10 @@ function formatTimestamp(value?: string | null) {
       </article>
     </div>
 
-    <p v-if="loading" class="state-copy">{{ t('admin.overviewSection.loading') }}</p>
-    <p v-else-if="errorMsg" class="state-copy error">{{ errorMsg }}</p>
+    <p v-if="loading && !hasOverviewData" class="state-copy">{{ t('admin.overviewSection.loading') }}</p>
+    <p v-else-if="errorMsg && !hasOverviewData" class="state-copy error">{{ errorMsg }}</p>
 
-    <div v-else class="server-grid">
+    <div v-else class="server-grid" :class="{ refreshing: backgroundRefreshing }">
       <article v-for="bucket in buckets" :key="bucket.server.server_id" class="server-card">
         <div class="server-head">
           <div>
@@ -396,6 +530,11 @@ function formatTimestamp(value?: string | null) {
 
 .server-grid {
   grid-template-columns: repeat(auto-fit, minmax(18rem, 1fr));
+}
+
+.server-grid.refreshing {
+  opacity: 0.92;
+  transition: opacity var(--transition-fast) ease;
 }
 
 .server-card {

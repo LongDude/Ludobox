@@ -2,11 +2,16 @@ package service
 
 import (
 	"context"
+	"database/sql"
 	"encoding/json"
+	"errors"
 	"fmt"
+	"strconv"
+	"strings"
 	"sync"
 	"time"
 
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/sirupsen/logrus"
@@ -15,11 +20,12 @@ import (
 const adminEventsChannel = "admin_user_service_events"
 
 type AdminEvent struct {
-	Type      string    `json:"type"`
-	Resource  string    `json:"resource"`
-	Action    string    `json:"action"`
-	ID        int64     `json:"id"`
-	Timestamp time.Time `json:"timestamp"`
+	Type      string          `json:"type"`
+	Resource  string          `json:"resource"`
+	Action    string          `json:"action"`
+	ID        int64           `json:"id"`
+	Data      json.RawMessage `json:"data,omitempty" swaggertype:"object"`
+	Timestamp time.Time       `json:"timestamp"`
 }
 
 type AdminEvents interface {
@@ -207,8 +213,219 @@ func (s *AdminEventService) listenOnce(ctx context.Context) error {
 			continue
 		}
 
+		s.enrichAdminEvent(ctx, &event)
 		s.Publish(event)
 	}
+}
+
+func (s *AdminEventService) enrichAdminEvent(ctx context.Context, event *AdminEvent) {
+	if event == nil || s.pool == nil || event.ID <= 0 || event.Action == "delete" {
+		return
+	}
+
+	data, err := s.loadAdminEventData(ctx, *event)
+	if err != nil {
+		s.logWarnf("skip admin event payload enrichment for %s/%d: %v", event.Resource, event.ID, err)
+		return
+	}
+	if len(data) == 0 {
+		return
+	}
+
+	event.Data = data
+}
+
+func (s *AdminEventService) loadAdminEventData(ctx context.Context, event AdminEvent) (json.RawMessage, error) {
+	switch event.Resource {
+	case "servers":
+		return s.loadServerEventData(ctx, event.ID)
+	case "rooms":
+		return s.loadRoomEventData(ctx, event.ID)
+	case "games":
+		return s.loadGameEventData(ctx, event.ID)
+	case "configs":
+		return s.loadConfigEventData(ctx, event.ID)
+	default:
+		return nil, nil
+	}
+}
+
+func (s *AdminEventService) loadServerEventData(ctx context.Context, id int64) (json.RawMessage, error) {
+	const query = `
+		SELECT server_id, instance_key, redis_host, status, started_at, last_heartbeat_at, archived_at
+		FROM game_servers
+		WHERE server_id = $1
+	`
+
+	var (
+		serverID        int64
+		instanceKey     string
+		redisHost       string
+		status          string
+		startedAt       sql.NullTime
+		lastHeartbeatAt sql.NullTime
+		archivedAt      sql.NullTime
+	)
+	err := s.pool.QueryRow(ctx, query, id).Scan(
+		&serverID,
+		&instanceKey,
+		&redisHost,
+		&status,
+		&startedAt,
+		&lastHeartbeatAt,
+		&archivedAt,
+	)
+	if err != nil {
+		return nil, ignoreMissingAdminEventRow(err)
+	}
+
+	payload := map[string]any{
+		"server_id":    serverID,
+		"instance_key": instanceKey,
+		"redis_host":   redisHost,
+		"status":       status,
+	}
+	putTime(payload, "started_at", startedAt)
+	putTime(payload, "last_heartbeat_at", lastHeartbeatAt)
+	putTime(payload, "archived_at", archivedAt)
+	return marshalAdminEventData(payload)
+}
+
+func (s *AdminEventService) loadRoomEventData(ctx context.Context, id int64) (json.RawMessage, error) {
+	const query = `
+		SELECT r.room_id, r.config_id, r.server_id, r.current_players, r.status, r.archived_at, gs.instance_key
+		FROM rooms r
+		LEFT JOIN game_servers gs ON gs.server_id = r.server_id
+		WHERE r.room_id = $1
+	`
+
+	var (
+		roomID         int64
+		configID       int64
+		serverID       int64
+		currentPlayers int32
+		status         string
+		archivedAt     sql.NullTime
+		serverName     sql.NullString
+	)
+	err := s.pool.QueryRow(ctx, query, id).Scan(
+		&roomID,
+		&configID,
+		&serverID,
+		&currentPlayers,
+		&status,
+		&archivedAt,
+		&serverName,
+	)
+	if err != nil {
+		return nil, ignoreMissingAdminEventRow(err)
+	}
+
+	payload := map[string]any{
+		"room_id":         roomID,
+		"config_id":       configID,
+		"server_id":       serverID,
+		"current_players": currentPlayers,
+		"status":          status,
+	}
+	putTime(payload, "archived_at", archivedAt)
+	if serverName.Valid {
+		payload["server_name"] = serverName.String
+	}
+	return marshalAdminEventData(payload)
+}
+
+func (s *AdminEventService) loadGameEventData(ctx context.Context, id int64) (json.RawMessage, error) {
+	const query = `
+		SELECT game_id, name_game, archived_at
+		FROM games
+		WHERE game_id = $1
+	`
+
+	var (
+		gameID     int64
+		name       string
+		archivedAt sql.NullTime
+	)
+	err := s.pool.QueryRow(ctx, query, id).Scan(&gameID, &name, &archivedAt)
+	if err != nil {
+		return nil, ignoreMissingAdminEventRow(err)
+	}
+
+	payload := map[string]any{
+		"game_id":   gameID,
+		"name_game": name,
+	}
+	putTime(payload, "archived_at", archivedAt)
+	return marshalAdminEventData(payload)
+}
+
+func (s *AdminEventService) loadConfigEventData(ctx context.Context, id int64) (json.RawMessage, error) {
+	const query = `
+		SELECT
+			config_id, game_id, capacity, registration_price, is_boost, boost_price, boost_power,
+			number_winners, winning_distribution, commission, time, round_time, next_round_delay,
+			min_users, archived_at
+		FROM config
+		WHERE config_id = $1
+	`
+
+	var (
+		configID            int64
+		gameID              int64
+		capacity            int32
+		registrationPrice   int64
+		isBoost             bool
+		boostPrice          int64
+		boostPower          int32
+		numberWinners       int32
+		winningDistribution []int32
+		commission          int32
+		waitingTime         int32
+		roundTime           int32
+		nextRoundDelay      int32
+		minUsers            int32
+		archivedAt          sql.NullTime
+	)
+	err := s.pool.QueryRow(ctx, query, id).Scan(
+		&configID,
+		&gameID,
+		&capacity,
+		&registrationPrice,
+		&isBoost,
+		&boostPrice,
+		&boostPower,
+		&numberWinners,
+		&winningDistribution,
+		&commission,
+		&waitingTime,
+		&roundTime,
+		&nextRoundDelay,
+		&minUsers,
+		&archivedAt,
+	)
+	if err != nil {
+		return nil, ignoreMissingAdminEventRow(err)
+	}
+
+	payload := map[string]any{
+		"config_id":            configID,
+		"game_id":              gameID,
+		"capacity":             capacity,
+		"registration_price":   registrationPrice,
+		"is_boost":             isBoost,
+		"boost_price":          boostPrice,
+		"boost_power":          boostPower,
+		"number_winners":       numberWinners,
+		"winning_distribution": winningDistribution,
+		"commission":           commission,
+		"time":                 waitingTime,
+		"round_time":           roundTime,
+		"next_round_delay":     nextRoundDelay,
+		"min_users":            minUsers,
+	}
+	putTime(payload, "archived_at", archivedAt)
+	return marshalAdminEventData(payload)
 }
 
 func parseAdminEventNotification(notification *pgconn.Notification) (AdminEvent, error) {
@@ -216,11 +433,53 @@ func parseAdminEventNotification(notification *pgconn.Notification) (AdminEvent,
 		return AdminEvent{}, fmt.Errorf("notification is nil")
 	}
 
+	payload := strings.TrimSpace(notification.Payload)
+	if payload == "" {
+		return AdminEvent{}, fmt.Errorf("notification payload is empty")
+	}
+
+	if strings.HasPrefix(payload, "{") {
+		return parseAdminEventJSONPayload(payload)
+	}
+
+	return parseAdminEventTextPayload(payload)
+}
+
+func parseAdminEventJSONPayload(payload string) (AdminEvent, error) {
 	var event AdminEvent
-	if err := json.Unmarshal([]byte(notification.Payload), &event); err != nil {
+	if err := json.Unmarshal([]byte(payload), &event); err != nil {
 		return AdminEvent{}, fmt.Errorf("decode payload: %w", err)
 	}
 
+	return normalizeAdminEvent(event), nil
+}
+
+func parseAdminEventTextPayload(payload string) (AdminEvent, error) {
+	parts := strings.Split(payload, "|")
+	if len(parts) != 4 {
+		return AdminEvent{}, fmt.Errorf("decode text payload: expected 4 fields, got %d", len(parts))
+	}
+
+	id, err := strconv.ParseInt(parts[2], 10, 64)
+	if err != nil {
+		return AdminEvent{}, fmt.Errorf("decode text payload id: %w", err)
+	}
+
+	timestamp, err := time.Parse(time.RFC3339Nano, parts[3])
+	if err != nil {
+		return AdminEvent{}, fmt.Errorf("decode text payload timestamp: %w", err)
+	}
+
+	return normalizeAdminEvent(AdminEvent{
+		Type:      "admin_resource_changed",
+		Resource:  parts[0],
+		Action:    parts[1],
+		ID:        id,
+		Timestamp: timestamp.UTC(),
+	}), nil
+}
+
+func normalizeAdminEvent(event AdminEvent) AdminEvent {
 	if event.Type == "" {
 		event.Type = "admin_resource_changed"
 	}
@@ -228,7 +487,28 @@ func parseAdminEventNotification(notification *pgconn.Notification) (AdminEvent,
 		event.Timestamp = time.Now().UTC()
 	}
 
-	return event, nil
+	return event
+}
+
+func putTime(payload map[string]any, key string, value sql.NullTime) {
+	if value.Valid {
+		payload[key] = value.Time.UTC()
+	}
+}
+
+func marshalAdminEventData(payload map[string]any) (json.RawMessage, error) {
+	data, err := json.Marshal(payload)
+	if err != nil {
+		return nil, err
+	}
+	return json.RawMessage(data), nil
+}
+
+func ignoreMissingAdminEventRow(err error) error {
+	if errors.Is(err, pgx.ErrNoRows) {
+		return nil
+	}
+	return err
 }
 
 func (s *AdminEventService) logInfo(message string) {

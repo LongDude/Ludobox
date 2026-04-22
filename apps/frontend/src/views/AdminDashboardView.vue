@@ -2,7 +2,7 @@
 import { computed, onMounted, onUnmounted, reactive } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { UserApi } from '@/api/useUserApi'
-import type { AdminEventResource } from '@/api/types'
+import type { AdminEvent, AdminEventResource } from '@/api/types'
 import LeftTab from '@/components/LeftTab.vue'
 import UpTab from '@/components/UpTab.vue'
 import { useLayoutInset } from '@/composables/useLayoutInset'
@@ -15,6 +15,7 @@ import AdminServerOverviewSection from '@/components/admin/AdminServerOverviewSe
 
 type AdminTab = 'overview' | 'games' | 'users' | 'configs' | 'rooms'
 type AdminEventVersions = Record<AdminEventResource, number>
+type AdminLatestEvents = Partial<Record<AdminEventResource, AdminEvent | null>>
 
 interface TabMeta {
   key: AdminTab
@@ -97,9 +98,17 @@ const adminEventVersions = reactive<AdminEventVersions>({
   rooms: 0,
   servers: 0,
 })
-const activeComponentProps = computed(() =>
-  activeTab.value === 'users' ? {} : { adminEventVersions },
-)
+const adminLatestEvents = reactive<AdminLatestEvents>({
+  games: null,
+  configs: null,
+  rooms: null,
+  servers: null,
+})
+const activeComponentProps = computed(() => {
+  if (activeTab.value === 'users') return {}
+  if (activeTab.value === 'overview') return { adminEventVersions, adminLatestEvents }
+  return { adminEventVersions }
+})
 
 const adminEventResources: AdminEventResource[] = ['games', 'configs', 'rooms', 'servers']
 let stopAdminEvents: (() => void) | null = null
@@ -110,6 +119,7 @@ onMounted(() => {
       if (event.type !== 'admin_resource_changed') return
       if (!isAdminEventResource(event.resource)) return
 
+      adminLatestEvents[event.resource] = event
       adminEventVersions[event.resource] += 1
     },
     onError(error) {

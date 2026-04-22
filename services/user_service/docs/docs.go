@@ -2212,6 +2212,9 @@ const docTemplate = `{
                 "action": {
                     "type": "string"
                 },
+                "data": {
+                    "type": "object"
+                },
                 "id": {
                     "type": "integer"
                 },
