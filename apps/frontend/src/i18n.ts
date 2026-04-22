@@ -520,6 +520,14 @@ const messages: Record<Locale, Record<string, string>> = {
     'profile.game.rank.gold': 'Gold',
     'profile.game.rank.platinum': 'Platinum',
     'profile.game.rank.diamond': 'Diamond',
+    'profile.game.rankTooltip.bronze': 'Bronze: 0-499 rating. Entry rank for new players.',
+    'profile.game.rankTooltip.silver': 'Silver: 500-1499 rating. Stable progress after early wins.',
+    'profile.game.rankTooltip.gold': 'Gold: 1500-2999 rating. Strong performance in regular rooms.',
+    'profile.game.rankTooltip.platinum':
+      'Platinum: 3000-4999 rating. High-tier rank for consistent winners.',
+    'profile.game.rankTooltip.diamond': 'Diamond: 5000+ rating. Top rank for the strongest players.',
+    'profile.game.rankTooltip.unranked':
+      'Rank is calculated from current rating after profile data loads.',
     'profile.game.ratingHistoryTitle': 'Rating trend',
     'profile.game.ratingHistoryDescription':
       'Wins in riskier rooms bring more rating. Track how your rank changed over the selected period.',
@@ -1518,6 +1526,18 @@ const messages: Record<Locale, Record<string, string>> = {
     'profile.game.rank.gold': 'Золото',
     'profile.game.rank.platinum': 'Платина',
     'profile.game.rank.diamond': 'Алмаз',
+    'profile.game.rankTooltip.bronze':
+      'Бронза: 0-499 рейтинга. Стартовый ранг для новых игроков.',
+    'profile.game.rankTooltip.silver':
+      'Серебро: 500-1499 рейтинга. Устойчивый прогресс после первых побед.',
+    'profile.game.rankTooltip.gold':
+      'Золото: 1500-2999 рейтинга. Сильная игра в обычных комнатах.',
+    'profile.game.rankTooltip.platinum':
+      'Платина: 3000-4999 рейтинга. Высокий ранг для стабильных победителей.',
+    'profile.game.rankTooltip.diamond':
+      'Алмаз: 5000+ рейтинга. Максимальный ранг для сильнейших игроков.',
+    'profile.game.rankTooltip.unranked':
+      'Ранг рассчитывается по текущему рейтингу после загрузки профиля.',
     'profile.game.ratingHistoryTitle': 'Динамика рейтинга',
     'profile.game.ratingHistoryDescription':
       'Победы в более рискованных комнатах дают больше рейтинга. Здесь видно, как менялся ваш ранг за выбранный период.',

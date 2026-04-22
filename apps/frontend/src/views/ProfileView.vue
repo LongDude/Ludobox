@@ -9,7 +9,7 @@ import { useLayoutInset } from '@/composables/useLayoutInset'
 import { useI18n } from '@/i18n'
 import { useAuthStore } from '@/stores/authStore'
 import { useUserCabinetStore } from '@/stores/userCabinetStore'
-import { rankFrameClass } from '@/utils/rankFrame'
+import { normalizeRank, rankFrameClass, rankTextClass } from '@/utils/rankFrame'
 
 type RatingPeriod = '7d' | '30d' | '90d' | 'all'
 type ProfileTab = 'identity' | 'game' | 'rating'
@@ -122,6 +122,8 @@ const formattedRating = computed(() => {
 })
 
 const ratingRankLabel = computed(() => translateRank(cabinet.profile?.rank))
+const ratingRankTextClass = computed(() => rankTextClass(cabinet.profile?.rank))
+const ratingRankTooltip = computed(() => translateRankTooltip(cabinet.profile?.rank))
 
 const periodGainLabel = computed(() => formatSignedNumber(ratingHistory.value?.period_change ?? 0))
 
@@ -222,6 +224,10 @@ function translateRank(rank?: UserRank) {
   if (normalized === 'platinum') return t('profile.game.rank.platinum')
   if (normalized === 'diamond') return t('profile.game.rank.diamond')
   return rank
+}
+
+function translateRankTooltip(rank?: UserRank) {
+  return t(`profile.game.rankTooltip.${normalizeRank(rank)}`)
 }
 
 function formatSignedNumber(value: number) {
@@ -598,7 +604,15 @@ async function logout() {
               </article>
               <article class="summary-card">
                 <span class="summary-label">{{ t('profile.game.rank') }}</span>
-                <strong>{{ ratingRankLabel }}</strong>
+                <span
+                  class="rank-with-tooltip"
+                  :class="ratingRankTextClass"
+                  tabindex="0"
+                  :aria-label="ratingRankTooltip"
+                >
+                  <strong>{{ ratingRankLabel }}</strong>
+                  <span class="rank-tooltip" role="tooltip">{{ ratingRankTooltip }}</span>
+                </span>
               </article>
             </div>
 
@@ -673,7 +687,15 @@ async function logout() {
               </article>
               <article class="summary-card">
                 <span class="summary-label">{{ t('profile.game.rank') }}</span>
-                <strong>{{ ratingRankLabel }}</strong>
+                <span
+                  class="rank-with-tooltip"
+                  :class="ratingRankTextClass"
+                  tabindex="0"
+                  :aria-label="ratingRankTooltip"
+                >
+                  <strong>{{ ratingRankLabel }}</strong>
+                  <span class="rank-tooltip" role="tooltip">{{ ratingRankTooltip }}</span>
+                </span>
               </article>
               <article class="summary-card">
                 <span class="summary-label">{{ t('profile.game.periodGain') }}</span>
@@ -1034,6 +1056,82 @@ async function logout() {
   font-size: 1.15rem;
 }
 
+.rank-with-tooltip {
+  position: relative;
+  width: fit-content;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  color: var(--rank-text-color, var(--color-text));
+  outline: none;
+}
+
+.rank-with-tooltip strong {
+  color: currentColor;
+}
+
+.rank-text--bronze {
+  --rank-text-color: #b45309;
+}
+
+.rank-text--silver {
+  --rank-text-color: #64748b;
+}
+
+.rank-text--gold {
+  --rank-text-color: #d97706;
+}
+
+.rank-text--platinum {
+  --rank-text-color: #0891b2;
+}
+
+.rank-text--diamond {
+  --rank-text-color: #7c3aed;
+}
+
+.rank-help {
+  width: 1.25rem;
+  height: 1.25rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  border: 1px solid color-mix(in oklab, currentColor, transparent 42%);
+  background: color-mix(in oklab, currentColor, transparent 88%);
+  font-size: 0.75rem;
+  font-weight: 800;
+}
+
+.rank-tooltip {
+  position: absolute;
+  z-index: 5;
+  left: 0;
+  bottom: calc(100% + 0.55rem);
+  width: max-content;
+  max-width: min(320px, 70vw);
+  padding: 0.7rem 0.8rem;
+  border-radius: 0.85rem;
+  border: 1px solid color-mix(in oklab, currentColor, transparent 68%);
+  background: color-mix(in oklab, var(--color-surface), black 4%);
+  color: var(--color-text);
+  box-shadow: var(--shadow-md);
+  font-size: 0.84rem;
+  line-height: 1.35;
+  opacity: 0;
+  pointer-events: none;
+  transform: translateY(0.35rem);
+  transition:
+    opacity var(--transition-fast) ease,
+    transform var(--transition-fast) ease;
+}
+
+.rank-with-tooltip:hover .rank-tooltip,
+.rank-with-tooltip:focus-visible .rank-tooltip {
+  opacity: 1;
+  transform: translateY(0);
+}
+
 .summary-label {
   color: var(--color-muted);
   font-size: 0.85rem;
@@ -1118,6 +1216,7 @@ input[type='number'] {
 }
 
 .chart-shell {
+  justify-items: center;
   padding: 0.95rem;
   border-radius: 1.15rem;
   border: 1px solid color-mix(in oklab, var(--color-border), transparent 12%);
@@ -1126,8 +1225,14 @@ input[type='number'] {
 
 .rating-chart {
   width: 100%;
-  height: 220px;
+  max-width: 720px;
+  height: clamp(150px, 20vw, 220px);
   overflow: visible;
+}
+
+.chart-axis,
+.chart-footnote {
+  width: 100%;
 }
 
 .chart-line {

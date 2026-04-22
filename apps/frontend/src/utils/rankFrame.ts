@@ -10,3 +10,7 @@ export function normalizeRank(rank?: UserRank | null) {
 export function rankFrameClass(rank?: UserRank | null) {
   return `rank-frame--${normalizeRank(rank)}`
 }
+
+export function rankTextClass(rank?: UserRank | null) {
+  return `rank-text--${normalizeRank(rank)}`
+}
