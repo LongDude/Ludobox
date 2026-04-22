@@ -892,10 +892,18 @@ func InternalFinalizeGame(ctx *gin.Context, a *app.App) {
 	winnerInfos := make([]dto.WinnerInfo, 0, len(winners))
 	payouts := make(map[int64]int64, len(winners))
 	for _, winner := range winners {
+		var userID *int64
+		if !winner.IsBot && winner.UserID > 0 {
+			value := winner.UserID
+			userID = &value
+		}
 		winnerInfos = append(winnerInfos, dto.WinnerInfo{
 			ParticipantID: winner.RoundParticipantID,
+			UserID:        userID,
+			Nickname:      winner.NickName,
 			NumberInRoom:  winner.NumberInRoom,
 			Winnings:      winner.WinningMoney,
+			GrossWinnings: winner.GrossWinningMoney,
 			IsBot:         winner.IsBot,
 		})
 		payouts[winner.RoundParticipantID] = winner.WinningMoney

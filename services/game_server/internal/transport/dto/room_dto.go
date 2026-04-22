@@ -128,10 +128,13 @@ type EventRoundFinalized struct {
 }
 
 type WinnerInfo struct {
-	ParticipantID int64 `json:"participant_id"`
-	NumberInRoom  int   `json:"number_in_room"`
-	Winnings      int64 `json:"winnings"`
-	IsBot         bool  `json:"is_bot"`
+	ParticipantID int64   `json:"participant_id"`
+	UserID        *int64  `json:"user_id,omitempty"`
+	Nickname      *string `json:"nickname,omitempty"`
+	NumberInRoom  int     `json:"number_in_room"`
+	Winnings      int64   `json:"winnings"`
+	GrossWinnings int64   `json:"gross_winnings"`
+	IsBot         bool    `json:"is_bot"`
 }
 
 type ErrorResponse struct {

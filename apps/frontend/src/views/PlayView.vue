@@ -8,9 +8,11 @@ import { GameApi } from '@/api/useMatchApi'
 import type {
   GameJoinRoomResponse,
   GameParticipantInfo,
+  GameRoundFinalizedEventData,
   GameRoomStateResponse,
   GameRoundEvent,
   GameRoundStatusResponse,
+  GameWinnerInfo,
 } from '@/api/types'
 import { useAuthStore } from '@/stores/authStore'
 import { useMatchSessionStore } from '@/stores/matchSessionStore'
@@ -181,7 +183,36 @@ const participants = computed(() =>
   ),
 )
 
-const winners = computed(() => roundStatus.value?.winners ?? [])
+const finalizedRoundData = computed<GameRoundFinalizedEventData | null>(() => {
+  const targetRoundId = activeRoundId.value
+  if (!targetRoundId) return null
+
+  const recentEvents = [...liveEvents.value, ...(roomState.value?.recent_events ?? [])]
+  for (const event of recentEvents) {
+    if (event.type !== 'round_finalized') continue
+    const normalized = normalizeRoundFinalizedEventData(event.data, activeRoundId.value)
+    if (normalized && normalized.round_id === targetRoundId) {
+      return normalized
+    }
+  }
+
+  return null
+})
+const winners = computed<GameWinnerInfo[]>(() => {
+  if (finalizedRoundData.value?.winners?.length) {
+    return finalizedRoundData.value.winners
+  }
+
+  return (roundStatus.value?.winners ?? []).map((winner) => ({
+    participant_id: winner.participant_id,
+    user_id: winner.user_id ?? null,
+    nickname: winner.nickname ?? null,
+    number_in_room: winner.number_in_room,
+    winnings: winner.winning_money,
+    gross_winnings: winner.winning_money,
+    is_bot: winner.is_bot,
+  }))
+})
 const roomUserParticipants = computed(() => {
   if (activeRoundId.value !== roomRoundId.value) return []
   return (roomState.value?.current_user_participants ?? []).filter((participant) => !participant.exited_at)
@@ -754,6 +785,75 @@ function eventTitle(event: GameRoundEvent) {
 function eventData(event: GameRoundEvent) {
   if (!event.data || typeof event.data !== 'object') return {}
   return event.data as Record<string, unknown>
+}
+
+function normalizeWinnerInfo(value: unknown): GameWinnerInfo | null {
+  if (!value || typeof value !== 'object') return null
+
+  const winner = value as Record<string, unknown>
+  const participantId = Number(winner.participant_id ?? 0)
+  const numberInRoom = Number(winner.number_in_room ?? 0)
+  const userID = Number(winner.user_id ?? 0)
+  const nickname =
+    typeof winner.nickname === 'string' && winner.nickname.trim().length > 0
+      ? winner.nickname.trim()
+      : null
+
+  if (!Number.isFinite(participantId) || !Number.isFinite(numberInRoom) || numberInRoom <= 0) {
+    return null
+  }
+
+  return {
+    participant_id: participantId,
+    user_id: Number.isFinite(userID) && userID > 0 ? userID : null,
+    nickname,
+    number_in_room: numberInRoom,
+    winnings: Number(winner.winnings ?? winner.winning_money ?? 0) || 0,
+    gross_winnings: Number(winner.gross_winnings ?? winner.winnings ?? winner.winning_money ?? 0) || 0,
+    is_bot: Boolean(winner.is_bot),
+  }
+}
+
+function normalizeRoundFinalizedEventData(
+  value: unknown,
+  fallbackRoundId: number | null = null,
+): GameRoundFinalizedEventData | null {
+  if (!value || typeof value !== 'object') return null
+
+  const payload = value as Record<string, unknown>
+  const winners = Array.isArray(payload.winners)
+    ? payload.winners
+        .map((winner) => normalizeWinnerInfo(winner))
+        .filter((winner): winner is GameWinnerInfo => Boolean(winner))
+        .sort((left, right) => left.number_in_room - right.number_in_room)
+    : []
+
+  const roundId = Number(payload.round_id ?? fallbackRoundId ?? 0)
+  if (!Number.isFinite(roundId) || roundId <= 0) return null
+
+  return {
+    round_id: roundId,
+    winners,
+    payouts:
+      payload.payouts && typeof payload.payouts === 'object'
+        ? (payload.payouts as Record<string, number>)
+        : undefined,
+    next_round_id: Number(payload.next_round_id ?? 0) || null,
+    next_round_delay: Number(payload.next_round_delay ?? 0) || null,
+  }
+}
+
+function winnerLabel(winner: GameWinnerInfo) {
+  if (winner.nickname) return winner.nickname
+  if (winner.user_id) return t('gameRoom.participant.user', { id: winner.user_id })
+  return t('gameRoom.participant.id', { id: winner.participant_id })
+}
+
+function isOwnWinner(winner: GameWinnerInfo) {
+  if (winner.is_bot) return false
+  return (
+    ownedParticipantIds.value.has(winner.participant_id) || ownedSeatNumbers.value.has(winner.number_in_room)
+  )
 }
 
 function eventDescription(event: GameRoundEvent) {
@@ -1423,10 +1523,27 @@ function scheduleNextRoundTransition(nextRoundId: number | null, nextRoundDelay:
 
         <div v-if="winners.length" class="winners">
           <h3>{{ t('gameRoom.round.winners') }}</h3>
-          <span v-for="winner in winners" :key="winner.participant_id" class="winner-chip">
-            {{ t('gameRoom.participant.seat', { seat: winner.number_in_room }) }} -
-            {{ winner.winning_money }}
-          </span>
+          <div class="winner-list">
+            <article
+              v-for="winner in winners"
+              :key="`${winner.participant_id}:${winner.number_in_room}`"
+              class="winner-card"
+              :class="{ own: isOwnWinner(winner), bot: winner.is_bot }"
+            >
+              <div class="winner-head">
+                <strong>{{ t('gameRoom.participant.seat', { seat: winner.number_in_room }) }}</strong>
+                <span v-if="isOwnWinner(winner)" class="own-badge">
+                  {{ t('gameRoom.participant.you') }}
+                </span>
+                <span v-else-if="winner.is_bot" class="winner-bot">
+                  {{ t('gameRoom.round.winnerBot') }}
+                </span>
+              </div>
+              <span v-if="!winner.is_bot">{{ winnerLabel(winner) }}</span>
+              <span>{{ t('gameRoom.round.winnerGross', { value: formatMoney(winner.gross_winnings) }) }}</span>
+              <span>{{ t('gameRoom.round.winnerNet', { value: formatMoney(winner.winnings) }) }}</span>
+            </article>
+          </div>
         </div>
 
         <div v-if="nextRoundAvailable" class="next-round-box">
@@ -1583,8 +1700,7 @@ function scheduleNextRoundTransition(nextRoundId: number | null, nextRoundDelay:
 }
 
 .hero-pills,
-.actions,
-.winner-chip {
+.actions {
   display: inline-flex;
   align-items: center;
   gap: 0.65rem;
@@ -1651,7 +1767,6 @@ label span,
 }
 
 .source-pill,
-.winner-chip,
 .own-badge {
   justify-content: center;
   border-radius: 999px;
@@ -1790,11 +1905,49 @@ label,
 .join-flow,
 .participants,
 .winners,
+.winner-list,
 .participant-list,
 .live-events,
 .event-list {
   display: grid;
   gap: 0.55rem;
+}
+
+.winner-list {
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+}
+
+.winner-card {
+  display: grid;
+  gap: 0.45rem;
+  padding: 0.85rem;
+  border-radius: 1rem;
+  border: 1px solid color-mix(in oklab, var(--color-border), transparent 10%);
+  background: color-mix(in oklab, var(--color-surface), white 10%);
+}
+
+.winner-card.own {
+  border-color: color-mix(in oklab, var(--color-success), transparent 18%);
+  background:
+    radial-gradient(circle at top right, color-mix(in oklab, var(--color-success), transparent 76%), transparent 55%),
+    color-mix(in oklab, var(--color-success), transparent 92%);
+}
+
+.winner-card.bot {
+  opacity: 0.88;
+}
+
+.winner-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.65rem;
+  flex-wrap: wrap;
+}
+
+.winner-bot {
+  color: var(--color-muted);
+  font-weight: 600;
 }
 
 .own-seat-card {

@@ -776,6 +776,9 @@ const messages: Record<Locale, Record<string, string>> = {
     'gameRoom.round.participants': 'Participants',
     'gameRoom.round.empty': 'No participant data loaded yet.',
     'gameRoom.round.winners': 'Winners',
+    'gameRoom.round.winnerGross': 'Gross {value}',
+    'gameRoom.round.winnerNet': 'Credited {value}',
+    'gameRoom.round.winnerBot': '(bot)',
     'gameRoom.round.nextRoundTimer': 'Next round in',
     'gameRoom.round.nextRoundTitle': 'Next round is ready',
     'gameRoom.round.nextRoundHint':
@@ -935,6 +938,9 @@ const messages: Record<Locale, Record<string, string>> = {
     'gameRoom.round.participants': 'Участники',
     'gameRoom.round.empty': 'Данные участников ещё не загружены.',
     'gameRoom.round.winners': 'Победители',
+    'gameRoom.round.winnerGross': 'До комиссии {value}',
+    'gameRoom.round.winnerNet': 'Начислено {value}',
+    'gameRoom.round.winnerBot': '(бот)',
     'gameRoom.round.nextRoundTimer': 'До нового раунда',
     'gameRoom.round.nextRoundTitle': 'Следующий раунд готов',
     'gameRoom.round.nextRoundHint':
@@ -1621,7 +1627,10 @@ const messages: Record<Locale, Record<string, string>> = {
     'profile.history.empty': 'История игр пуста.',
     'profile.history.error.load': 'Не удалось загрузить историю игр.',
     'profile.history.gameFallback': 'Игра #{id}',
-    'profile.history.roundSummary': 'Раунд #{round} - комната #{room} - место #{seat}',
+    'profile.history.roundSummary': 'Раунд #{round} - комната #{room}',
+    'profile.history.meta.seats': 'Места',
+    'profile.history.meta.winningSeats': 'Выигравшие места',
+    'profile.history.meta.totalSpent': 'Потрачено',
     'profile.history.meta.joined': 'Вход',
     'profile.history.meta.finished': 'Финиш',
     'profile.history.meta.entry': 'Вход',
@@ -1636,6 +1645,9 @@ const messages: Record<Locale, Record<string, string>> = {
     'profile.history.result.active': 'Активен',
     'profile.history.result.finished': 'Завершен',
     'profile.history.result.unknown': 'Неизвестно',
+    'profile.history.seatsSummary': '{count} мест: {seats}',
+    'profile.history.seatsWinningSummary': '{count} выигравших мест: {seats}',
+    'profile.history.seatsNone': 'Нет',
   },
 }
 

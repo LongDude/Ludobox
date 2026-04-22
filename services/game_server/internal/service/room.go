@@ -848,6 +848,7 @@ func (s *RoomService) FinalizeGameRound(ctx context.Context, roundID int64) ([]d
 	}
 
 	payouts := buildPayouts(roomInfo.Config, len(winningPositions), len(participants))
+	grossPayouts := buildGrossPayouts(roomInfo.Config, len(winningPositions))
 	payoutsByParticipant := make(map[int64]int64, len(winningPositions))
 	winners := make([]domain.RoundParticipant, 0, len(winningPositions))
 	participantsBySeat := make(map[int]domain.RoundParticipant, len(participantsWithBots))
@@ -861,6 +862,9 @@ func (s *RoomService) FinalizeGameRound(ctx context.Context, roundID int64) ([]d
 			return nil, fmt.Errorf("winning position %d does not have an active participant", winningPosition)
 		}
 		participant.WinningMoney = payouts[idx]
+		if idx < len(grossPayouts) {
+			participant.GrossWinningMoney = grossPayouts[idx]
+		}
 		if !participant.IsBot {
 			payoutsByParticipant[participant.RoundParticipantID] = payouts[idx]
 		}
@@ -1169,8 +1173,20 @@ func buildPayouts(config *domain.RoomConfig, winnersCount int, participantCount 
 	grossBank := config.RegistrationPrice * int64(config.Capacity)
 	commission := grossBank * int64(config.Commission) / 100
 	prizePool := grossBank - commission
+	return buildDistributedPayouts(prizePool, config.WinningDistribution, winnersCount)
+}
+
+func buildGrossPayouts(config *domain.RoomConfig, winnersCount int) []int64 {
+	if winnersCount == 0 {
+		return nil
+	}
+
+	grossBank := config.RegistrationPrice * int64(config.Capacity)
+	return buildDistributedPayouts(grossBank, config.WinningDistribution, winnersCount)
+}
+
+func buildDistributedPayouts(totalBank int64, distribution []int, winnersCount int) []int64 {
 	payouts := make([]int64, winnersCount)
-	distribution := config.WinningDistribution
 	if len(distribution) > winnersCount {
 		distribution = distribution[:winnersCount]
 	}
@@ -1178,7 +1194,7 @@ func buildPayouts(config *domain.RoomConfig, winnersCount int, participantCount 
 	assigned := int64(0)
 	for idx := 0; idx < winnersCount; idx++ {
 		if idx == winnersCount-1 {
-			payouts[idx] = prizePool - assigned
+			payouts[idx] = totalBank - assigned
 			continue
 		}
 
@@ -1186,7 +1202,7 @@ func buildPayouts(config *domain.RoomConfig, winnersCount int, participantCount 
 		if idx < len(distribution) {
 			share = distribution[idx]
 		}
-		payouts[idx] = prizePool * int64(share) / 100
+		payouts[idx] = totalBank * int64(share) / 100
 		assigned += payouts[idx]
 	}
 

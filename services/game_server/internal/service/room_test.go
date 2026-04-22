@@ -796,6 +796,26 @@ func TestBuildPayoutsUsesActualParticipantsAndCommission(t *testing.T) {
 	}
 }
 
+func TestBuildGrossPayoutsKeepsPreCommissionDistribution(t *testing.T) {
+	config := &domain.RoomConfig{
+		Capacity:            2,
+		RegistrationPrice:   100,
+		Commission:          10,
+		WinningDistribution: []int{60, 40},
+	}
+
+	payouts := buildGrossPayouts(config, 2)
+	if len(payouts) != 2 {
+		t.Fatalf("unexpected payouts length: got %d want 2", len(payouts))
+	}
+	if payouts[0] != 120 {
+		t.Fatalf("unexpected first gross payout: got %d want 120", payouts[0])
+	}
+	if payouts[1] != 80 {
+		t.Fatalf("unexpected second gross payout: got %d want 80", payouts[1])
+	}
+}
+
 func TestRequestWinningPositionsMapsWinnersToActualSeatNumbers(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
 		if request.URL.Path != "/winnings/distribute" {

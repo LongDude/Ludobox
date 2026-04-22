@@ -247,6 +247,24 @@ export interface GameRoundEvent {
   data: unknown
 }
 
+export interface GameWinnerInfo {
+  participant_id: number
+  user_id?: number | null
+  nickname?: string | null
+  number_in_room: number
+  winnings: number
+  gross_winnings: number
+  is_bot: boolean
+}
+
+export interface GameRoundFinalizedEventData {
+  round_id: number
+  winners: GameWinnerInfo[]
+  payouts?: Record<string, number>
+  next_round_id?: number | null
+  next_round_delay?: number | null
+}
+
 export interface UserResponse {
   id?: number
   email: string

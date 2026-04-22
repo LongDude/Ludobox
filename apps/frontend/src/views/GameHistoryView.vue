@@ -51,10 +51,17 @@ async function loadGameHistory() {
       page: gameHistoryPage.value,
       page_size: gameHistoryPageSize.value,
     })
-    gameHistory.value = (response.items ?? []).map(normalizeHistoryItem)
-    gameHistoryTotal.value = response.total ?? 0
-    gameHistoryPage.value = response.page ?? gameHistoryPage.value
-    gameHistoryPageSize.value = response.page_size ?? gameHistoryPageSize.value
+    const normalizedItems = (response.items ?? []).map(normalizeHistoryItem)
+    const aggregatedItems = aggregateHistoryItems(normalizedItems)
+    const responsePage = response.page ?? gameHistoryPage.value
+    const responsePageSize = response.page_size ?? gameHistoryPageSize.value
+    const duplicateCount = Math.max(0, normalizedItems.length - aggregatedItems.length)
+    const adjustedTotal = Math.max(aggregatedItems.length, Number(response.total ?? aggregatedItems.length) - duplicateCount)
+    const visibleTotalFloor = Math.max(aggregatedItems.length, (Math.max(1, responsePage) - 1) * responsePageSize + aggregatedItems.length)
+    gameHistory.value = aggregatedItems
+    gameHistoryTotal.value = Math.max(adjustedTotal, visibleTotalFloor)
+    gameHistoryPage.value = responsePage
+    gameHistoryPageSize.value = responsePageSize
   } catch (error: any) {
     historyErrorMsg.value = error?.message || t('profile.history.error.load')
   } finally {
@@ -149,6 +156,101 @@ function normalizeHistoryItem(item: any): UserGameHistoryItem {
     joined_at: String(item?.joined_at ?? ''),
     finished_at: item?.finished_at ? String(item.finished_at) : null,
   }
+}
+
+function aggregateHistoryItems(items: UserGameHistoryItem[]) {
+  const grouped = new Map<string, UserGameHistoryItem>()
+
+  for (const item of items) {
+    const key = [item.round_id, item.room_id, item.game_id].join(':')
+    const existing = grouped.get(key)
+    if (!existing) {
+      grouped.set(key, {
+        ...item,
+        reserved_seats: [...item.reserved_seats].sort((left, right) => left - right),
+        winning_seats: [...item.winning_seats].sort((left, right) => left - right),
+      })
+      continue
+    }
+
+    const reservedSeats = [...new Set([...existing.reserved_seats, ...item.reserved_seats])].sort(
+      (left, right) => left - right,
+    )
+    const winningSeats = [...new Set([...existing.winning_seats, ...item.winning_seats])].sort(
+      (left, right) => left - right,
+    )
+
+    grouped.set(key, {
+      ...existing,
+      round_status: pickRoundStatus(existing.round_status, item.round_status),
+      result: pickRoundResult(existing.result, item.result, winningSeats.length),
+      reserved_seats: reservedSeats,
+      winning_seats: winningSeats,
+      reserved_seats_count: reservedSeats.length,
+      winning_seats_count: winningSeats.length,
+      entry_fee: existing.entry_fee + item.entry_fee,
+      boost_fee: existing.boost_fee + item.boost_fee,
+      total_spent: existing.total_spent + item.total_spent,
+      winning_money: existing.winning_money + item.winning_money,
+      net_result: existing.net_result + item.net_result,
+      joined_at: pickEarlierDate(existing.joined_at, item.joined_at),
+      finished_at: pickLaterDate(existing.finished_at, item.finished_at),
+    })
+  }
+
+  return [...grouped.values()].sort((left, right) => {
+    const rightTime = Date.parse(right.finished_at ?? right.joined_at ?? '') || 0
+    const leftTime = Date.parse(left.finished_at ?? left.joined_at ?? '') || 0
+    return rightTime - leftTime
+  })
+}
+
+function pickRoundStatus(current: string, next: string) {
+  const currentValue = String(current || '').toLowerCase()
+  const nextValue = String(next || '').toLowerCase()
+  if (currentValue === nextValue) return current
+  if (['finished', 'finalized', 'completed'].includes(currentValue)) return current
+  if (['finished', 'finalized', 'completed'].includes(nextValue)) return next
+  if (currentValue === 'active' || nextValue === 'active') return currentValue === 'active' ? current : next
+  if (currentValue === 'waiting' || nextValue === 'waiting') return currentValue === 'waiting' ? current : next
+  return current || next
+}
+
+function pickRoundResult(
+  current: UserGameHistoryResult,
+  next: UserGameHistoryResult,
+  winningSeatsCount: number,
+): UserGameHistoryResult {
+  if (winningSeatsCount > 0 || current === 'won' || next === 'won') return 'won'
+
+  const priority = ['active', 'waiting', 'lost', 'finished', 'left', 'cancelled']
+  for (const value of priority) {
+    if (current === value || next === value) return value
+  }
+
+  return current || next || 'unknown'
+}
+
+function pickEarlierDate(current?: string | null, next?: string | null) {
+  if (!current) return next ?? ''
+  if (!next) return current
+
+  const currentTime = Date.parse(current)
+  const nextTime = Date.parse(next)
+  if (Number.isNaN(currentTime)) return current
+  if (Number.isNaN(nextTime)) return next
+  return currentTime <= nextTime ? current : next
+}
+
+function pickLaterDate(current?: string | null, next?: string | null) {
+  if (!current) return next ?? null
+  if (!next) return current
+
+  const currentTime = Date.parse(current)
+  const nextTime = Date.parse(next)
+  if (Number.isNaN(currentTime)) return current
+  if (Number.isNaN(nextTime)) return next
+  return currentTime >= nextTime ? current : next
 }
 
 function formatSeats(value?: number[] | null) {
