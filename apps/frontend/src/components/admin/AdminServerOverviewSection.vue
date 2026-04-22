@@ -5,7 +5,6 @@ import type { AdminEvent, AdminEventResource, GameServerResponse, RoomResponse }
 import { useI18n } from '@/i18n'
 
 type AdminEventVersions = Partial<Record<AdminEventResource, number>>
-type AdminLatestEvents = Partial<Record<AdminEventResource, AdminEvent | null>>
 
 interface ServerBucket {
   server: GameServerResponse
@@ -19,7 +18,7 @@ const OVERVIEW_METADATA_RELOAD_DELAY_MS = 700
 
 const props = defineProps<{
   adminEventVersions?: AdminEventVersions
-  adminLatestEvents?: AdminLatestEvents
+  adminEvents?: AdminEvent[]
 }>()
 
 const loading = ref(false)
@@ -29,6 +28,7 @@ const servers = ref<GameServerResponse[]>([])
 const rooms = ref<RoomResponse[]>([])
 const { locale, t } = useI18n()
 let overviewReloadTimer: ReturnType<typeof setTimeout> | undefined
+let processedAdminEvents = 0
 
 const roomsByServer = computed(() => {
   const byServer = new Map<number, RoomResponse[]>()
@@ -78,22 +78,32 @@ onBeforeUnmount(() => {
 })
 
 watch(
-  () =>
-    [
-      props.adminLatestEvents?.rooms,
-      props.adminLatestEvents?.servers,
-      props.adminLatestEvents?.configs,
-      props.adminLatestEvents?.games,
-    ] as const,
-  ([roomEvent, serverEvent, configEvent, gameEvent], previousEvents) => {
-    if (roomEvent && roomEvent !== previousEvents[0]) {
-      applyRoomEvent(roomEvent)
+  () => props.adminEvents?.length ?? 0,
+  (length) => {
+    const events = props.adminEvents ?? []
+    const nextEvents = events.slice(processedAdminEvents, length)
+    processedAdminEvents = length
+
+    for (const event of nextEvents) {
+      applyAdminEvent(event)
     }
-    if (serverEvent && serverEvent !== previousEvents[1]) {
-      applyServerEvent(serverEvent)
+  },
+)
+
+watch(
+  () => props.adminEvents,
+  (events) => {
+    if (!events?.length) {
+      processedAdminEvents = 0
+      return
     }
-    if ((configEvent && configEvent !== previousEvents[2]) || (gameEvent && gameEvent !== previousEvents[3])) {
-      scheduleOverviewReload()
+
+    if (processedAdminEvents > events.length) {
+      processedAdminEvents = 0
+      for (const event of events) {
+        applyAdminEvent(event)
+      }
+      processedAdminEvents = events.length
     }
   },
 )
@@ -201,6 +211,20 @@ async function loadAllRooms() {
 
 function isAvailableServer(server: GameServerResponse) {
   return !server.archived_at && server.status.trim().toLowerCase() === 'up'
+}
+
+function applyAdminEvent(event: AdminEvent) {
+  if (event.resource === 'rooms') {
+    applyRoomEvent(event)
+    return
+  }
+  if (event.resource === 'servers') {
+    applyServerEvent(event)
+    return
+  }
+  if (event.resource === 'configs' || event.resource === 'games') {
+    scheduleOverviewReload()
+  }
 }
 
 function applyServerEvent(event: AdminEvent) {

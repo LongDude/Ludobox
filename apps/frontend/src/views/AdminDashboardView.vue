@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, onUnmounted, reactive } from 'vue'
+import { computed, onMounted, onUnmounted, reactive, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { UserApi } from '@/api/useUserApi'
 import type { AdminEvent, AdminEventResource } from '@/api/types'
@@ -15,7 +15,6 @@ import AdminServerOverviewSection from '@/components/admin/AdminServerOverviewSe
 
 type AdminTab = 'overview' | 'games' | 'users' | 'configs' | 'rooms'
 type AdminEventVersions = Record<AdminEventResource, number>
-type AdminLatestEvents = Partial<Record<AdminEventResource, AdminEvent | null>>
 
 interface TabMeta {
   key: AdminTab
@@ -98,15 +97,10 @@ const adminEventVersions = reactive<AdminEventVersions>({
   rooms: 0,
   servers: 0,
 })
-const adminLatestEvents = reactive<AdminLatestEvents>({
-  games: null,
-  configs: null,
-  rooms: null,
-  servers: null,
-})
+const overviewAdminEvents = ref<AdminEvent[]>([])
 const activeComponentProps = computed(() => {
   if (activeTab.value === 'users') return {}
-  if (activeTab.value === 'overview') return { adminEventVersions, adminLatestEvents }
+  if (activeTab.value === 'overview') return { adminEventVersions, adminEvents: overviewAdminEvents.value }
   return { adminEventVersions }
 })
 
@@ -119,13 +113,19 @@ onMounted(() => {
       if (event.type !== 'admin_resource_changed') return
       if (!isAdminEventResource(event.resource)) return
 
-      adminLatestEvents[event.resource] = event
+      if (activeTab.value === 'overview') {
+        overviewAdminEvents.value = [...overviewAdminEvents.value, event]
+      }
       adminEventVersions[event.resource] += 1
     },
     onError(error) {
       console.warn('Admin SSE connection failed', error)
     },
   })
+})
+
+watch(activeTab, () => {
+  overviewAdminEvents.value = []
 })
 
 onUnmounted(() => {
