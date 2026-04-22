@@ -3,8 +3,6 @@ services:
     image: haproxy:2.9-alpine
     container_name: haproxy_rooms
     restart: unless-stopped
-    env_file:
-      - ./services/sso/.env
     environment:
       HAPROXY_LOOPBACK_HOST: 127.0.0.1
       HAPROXY_LOOPBACK_PORT: "80"
@@ -34,11 +32,13 @@ services:
     container_name: sso_postgres
     restart: unless-stopped
     ports:
-      - "15432:5432"
-    env_file:
-      - ./services/sso/.env
+      - "${SSO_POSTGRES_HOST_PORT}:5432"
+    environment:
+      POSTGRES_USER: ${SSO_POSTGRES_USER}
+      POSTGRES_PASSWORD: ${SSO_POSTGRES_PASSWORD}
+      POSTGRES_DB: ${SSO_POSTGRES_DB}
     healthcheck:
-      test: ["CMD", "pg_isready", "-U", "postgres"]
+      test: ["CMD", "pg_isready", "-U", "${SSO_POSTGRES_USER}"]
       interval: 5s
       retries: 10
     volumes:
@@ -50,8 +50,8 @@ services:
     image: redis:8-alpine
     container_name: sso_redis
     restart: unless-stopped
-    env_file:
-      - ./services/sso/.env
+    environment:
+      REDIS_PASSWORD: ${SSO_REDIS_PASSWORD}
     command:
       - sh
       - -c
@@ -66,10 +66,13 @@ services:
     build:
       context: ./services/sso
       dockerfile: ./tools/migrator/dockerfile
-    env_file:
-      - ./services/sso/.env
     environment:
       POSTGRES_HOST: sso-postgres
+      POSTGRES_PORT: 5432
+      POSTGRES_USER: ${SSO_POSTGRES_USER}
+      POSTGRES_PASSWORD: ${SSO_POSTGRES_PASSWORD}
+      POSTGRES_DB: ${SSO_POSTGRES_DB}
+      POSTGRES_SSL: ${POSTGRES_SSL}
     depends_on:
       sso-postgres:
         condition: service_healthy
@@ -82,8 +85,49 @@ services:
       context: ./services/sso
       dockerfile: ./dockerfile
     restart: unless-stopped
-    env_file:
-      - ./services/sso/.env
+    environment:
+      DOMAIN: ${DOMAIN}
+      PUBLIC_URL: ${PUBLIC_URL}
+      ALLOWED_REDIRECT_URLS: ${ALLOWED_REDIRECT_URLS}
+      ALLOWED_CORS_ORIGINS: ${ALLOWED_CORS_ORIGINS}
+      DEFAULT_ADMIN_EMAILS: ${DEFAULT_ADMIN_EMAILS}
+      POSTGRES_HOST: sso-postgres
+      POSTGRES_PORT: 5432
+      POSTGRES_USER: ${SSO_POSTGRES_USER}
+      POSTGRES_PASSWORD: ${SSO_POSTGRES_PASSWORD}
+      POSTGRES_DB: ${SSO_POSTGRES_DB}
+      POSTGRES_SSL: ${POSTGRES_SSL}
+      REDIS_HOST: sso-redis
+      REDIS_PORT: 6379
+      REDIS_PASSWORD: ${SSO_REDIS_PASSWORD}
+      REDIS_DB: ${SSO_REDIS_DB}
+      SMTP_HOST: ${SMTP_HOST}
+      SMTP_PORT: ${SMTP_PORT}
+      SMTP_USERNAME: ${SMTP_USERNAME}
+      SMTP_PASSWORD: ${SMTP_PASSWORD}
+      FROM_EMAIL: ${FROM_EMAIL}
+      SMTP_JWT_SECRET: ${SMTP_JWT_SECRET}
+      JWT_SECRET_KEY: ${JWT_SECRET_KEY}
+      ACCESS_TOKEN_TTL: ${ACCESS_TOKEN_TTL}
+      REFRESH_TOKEN_TTL: ${REFRESH_TOKEN_TTL}
+      COOKIE_PATH: ${COOKIE_PATH}
+      COOKIE_SECURE: ${COOKIE_SECURE}
+      COOKIE_HTTP_ONLY: ${COOKIE_HTTP_ONLY}
+      COOKIE_SAME_SITE: ${COOKIE_SAME_SITE}
+      COOKIE_MAX_AGE: ${COOKIE_MAX_AGE}
+      HTTP_PORT: ${SSO_HTTP_PORT}
+      SWAGGER_ENABLED: ${SWAGGER_ENABLED}
+      SWAGGER_USER: ${SWAGGER_USER}
+      SWAGGER_PASSWORD: ${SWAGGER_PASSWORD}
+      SWAGGER_BASE_PATH: ${SSO_SWAGGER_BASE_PATH}
+      GRPC_PORT: ${SSO_GRPC_PORT}
+      GRPC_TIMEOUT: ${SSO_GRPC_TIMEOUT}
+      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID}
+      GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET}
+      YANDEX_CLIENT_ID: ${YANDEX_CLIENT_ID}
+      YANDEX_CLIENT_SECRET: ${YANDEX_CLIENT_SECRET}
+      VK_CLIENT_ID: ${VK_CLIENT_ID}
+      VK_CLIENT_SECRET: ${VK_CLIENT_SECRET}
     depends_on:
       sso-postgres:
         condition: service_healthy
@@ -98,10 +142,12 @@ services:
     image: postgres:17
     container_name: rooms_shared_postgres
     restart: unless-stopped
-    env_file:
-      - .env
+    environment:
+      POSTGRES_USER: ${SHARED_POSTGRES_USER}
+      POSTGRES_PASSWORD: ${SHARED_POSTGRES_PASSWORD}
+      POSTGRES_DB: ${SHARED_POSTGRES_DB}
     healthcheck:
-      test: ["CMD", "pg_isready", "-U", "postgres"]
+      test: ["CMD", "pg_isready", "-U", "${SHARED_POSTGRES_USER}"]
       interval: 5s
       retries: 10
     volumes:
@@ -113,8 +159,8 @@ services:
     image: redis:8-alpine
     container_name: game_redis_1
     restart: unless-stopped
-    env_file:
-      - ./services/game_server/.env
+    environment:
+      REDIS_PASSWORD: ${GAME_REDIS_PASSWORD}
     command:
       - sh
       - -c
@@ -128,8 +174,8 @@ services:
     image: redis:8-alpine
     container_name: game_redis_2
     restart: unless-stopped
-    env_file:
-      - ./services/game_server/.env
+    environment:
+      REDIS_PASSWORD: ${GAME_REDIS_PASSWORD}
     command:
       - sh
       - -c
@@ -143,8 +189,12 @@ services:
     image: redis:8-alpine
     container_name: matchmaking_redis
     restart: unless-stopped
-    env_file:
-      - ./services/matchmaking/.env
+    environment:
+      REDIS_PASSWORD: ${MATCHMAKING_REDIS_PASSWORD}
+    command:
+      - sh
+      - -c
+      - redis-server --appendonly yes --requirepass "$$REDIS_PASSWORD"
     volumes:
       - matchmaking_redis_data:/data
     networks:
@@ -154,8 +204,12 @@ services:
     image: redis:8-alpine
     container_name: user_redis
     restart: unless-stopped
-    env_file:
-      - ./services/user_service/.env
+    environment:
+      REDIS_PASSWORD: ${USER_REDIS_PASSWORD}
+    command:
+      - sh
+      - -c
+      - redis-server --appendonly yes --requirepass "$$REDIS_PASSWORD"
     volumes:
       - user_redis_data:/data
     networks:
@@ -166,10 +220,13 @@ services:
     build:
       context: .
       dockerfile: ./tools/migrator/dockerfile
-    env_file:
-      - .env
     environment:
       POSTGRES_HOST: shared-postgres
+      POSTGRES_PORT: 5432
+      POSTGRES_USER: ${SHARED_POSTGRES_USER}
+      POSTGRES_PASSWORD: ${SHARED_POSTGRES_PASSWORD}
+      POSTGRES_DB: ${SHARED_POSTGRES_DB}
+      POSTGRES_SSL: ${POSTGRES_SSL}
     depends_on:
       shared-postgres:
         condition: service_healthy
@@ -182,10 +239,34 @@ services:
       context: ./services/game_server
       dockerfile: ./dockerfile
     restart: unless-stopped
-    env_file:
-      - ./services/game_server/.env
     environment:
+      DOMAIN: ${DOMAIN}
+      PUBLIC_URL: ${PUBLIC_URL}
+      ALLOWED_REDIRECT_URLS: ${ALLOWED_REDIRECT_URLS}
+      ALLOWED_CORS_ORIGINS: ${ALLOWED_CORS_ORIGINS}
+      DEFAULT_ADMIN_EMAILS: ${DEFAULT_ADMIN_EMAILS}
+      POSTGRES_HOST: shared-postgres
+      POSTGRES_PORT: 5432
+      POSTGRES_USER: ${SHARED_POSTGRES_USER}
+      POSTGRES_PASSWORD: ${SHARED_POSTGRES_PASSWORD}
+      POSTGRES_DB: ${SHARED_POSTGRES_DB}
+      POSTGRES_SSL: ${POSTGRES_SSL}
       REDIS_HOST: game-redis-1
+      REDIS_PORT: 6379
+      REDIS_PASSWORD: ${GAME_REDIS_PASSWORD}
+      REDIS_DB: ${GAME_REDIS_DB}
+      COOKIE_PATH: ${COOKIE_PATH}
+      COOKIE_SECURE: ${COOKIE_SECURE}
+      COOKIE_HTTP_ONLY: ${COOKIE_HTTP_ONLY}
+      COOKIE_SAME_SITE: ${COOKIE_SAME_SITE}
+      COOKIE_MAX_AGE: ${COOKIE_MAX_AGE}
+      HTTP_PORT: ${GAME_SERVER_HTTP_PORT}
+      SWAGGER_ENABLED: ${SWAGGER_ENABLED}
+      SWAGGER_USER: ${SWAGGER_USER}
+      SWAGGER_PASSWORD: ${SWAGGER_PASSWORD}
+      SWAGGER_BASE_PATH: ${GAME_SERVER_SWAGGER_BASE_PATH}
+      RNG_SERVICE_URL: ${RNG_SERVICE_URL}
+      GAME_SERVER_HEARTBEAT_INTERVAL: ${GAME_SERVER_HEARTBEAT_INTERVAL}
       INSTANCE_ID: game-server-core-1
     depends_on:
       shared-postgres:
@@ -203,10 +284,34 @@ services:
       context: ./services/game_server
       dockerfile: ./dockerfile
     restart: unless-stopped
-    env_file:
-      - ./services/game_server/.env
     environment:
+      DOMAIN: ${DOMAIN}
+      PUBLIC_URL: ${PUBLIC_URL}
+      ALLOWED_REDIRECT_URLS: ${ALLOWED_REDIRECT_URLS}
+      ALLOWED_CORS_ORIGINS: ${ALLOWED_CORS_ORIGINS}
+      DEFAULT_ADMIN_EMAILS: ${DEFAULT_ADMIN_EMAILS}
+      POSTGRES_HOST: shared-postgres
+      POSTGRES_PORT: 5432
+      POSTGRES_USER: ${SHARED_POSTGRES_USER}
+      POSTGRES_PASSWORD: ${SHARED_POSTGRES_PASSWORD}
+      POSTGRES_DB: ${SHARED_POSTGRES_DB}
+      POSTGRES_SSL: ${POSTGRES_SSL}
       REDIS_HOST: game-redis-2
+      REDIS_PORT: 6379
+      REDIS_PASSWORD: ${GAME_REDIS_PASSWORD}
+      REDIS_DB: ${GAME_REDIS_DB}
+      COOKIE_PATH: ${COOKIE_PATH}
+      COOKIE_SECURE: ${COOKIE_SECURE}
+      COOKIE_HTTP_ONLY: ${COOKIE_HTTP_ONLY}
+      COOKIE_SAME_SITE: ${COOKIE_SAME_SITE}
+      COOKIE_MAX_AGE: ${COOKIE_MAX_AGE}
+      HTTP_PORT: ${GAME_SERVER_HTTP_PORT}
+      SWAGGER_ENABLED: ${SWAGGER_ENABLED}
+      SWAGGER_USER: ${SWAGGER_USER}
+      SWAGGER_PASSWORD: ${SWAGGER_PASSWORD}
+      SWAGGER_BASE_PATH: ${GAME_SERVER_SWAGGER_BASE_PATH}
+      RNG_SERVICE_URL: ${RNG_SERVICE_URL}
+      GAME_SERVER_HEARTBEAT_INTERVAL: ${GAME_SERVER_HEARTBEAT_INTERVAL}
       INSTANCE_ID: game-server-core-2
     depends_on:
       shared-postgres:
@@ -223,8 +328,34 @@ services:
       context: ./services/matchmaking
       dockerfile: ./dockerfile
     restart: unless-stopped
-    env_file:
-      - ./services/matchmaking/.env
+    environment:
+      DOMAIN: ${DOMAIN}
+      PUBLIC_URL: ${PUBLIC_URL}
+      ALLOWED_REDIRECT_URLS: ${ALLOWED_REDIRECT_URLS}
+      ALLOWED_CORS_ORIGINS: ${ALLOWED_CORS_ORIGINS}
+      DEFAULT_ADMIN_EMAILS: ${DEFAULT_ADMIN_EMAILS}
+      POSTGRES_HOST: shared-postgres
+      POSTGRES_PORT: 5432
+      POSTGRES_USER: ${SHARED_POSTGRES_USER}
+      POSTGRES_PASSWORD: ${SHARED_POSTGRES_PASSWORD}
+      POSTGRES_DB: ${SHARED_POSTGRES_DB}
+      POSTGRES_SSL: ${POSTGRES_SSL}
+      REDIS_HOST: matchmaking-redis
+      REDIS_PORT: 6379
+      REDIS_PASSWORD: ${MATCHMAKING_REDIS_PASSWORD}
+      REDIS_DB: ${MATCHMAKING_REDIS_DB}
+      COOKIE_PATH: ${COOKIE_PATH}
+      COOKIE_SECURE: ${COOKIE_SECURE}
+      COOKIE_HTTP_ONLY: ${COOKIE_HTTP_ONLY}
+      COOKIE_SAME_SITE: ${COOKIE_SAME_SITE}
+      COOKIE_MAX_AGE: ${COOKIE_MAX_AGE}
+      HTTP_PORT: ${MATCHMAKING_HTTP_PORT}
+      SWAGGER_ENABLED: ${SWAGGER_ENABLED}
+      SWAGGER_USER: ${SWAGGER_USER}
+      SWAGGER_PASSWORD: ${SWAGGER_PASSWORD}
+      SWAGGER_BASE_PATH: ${MATCHMAKING_SWAGGER_BASE_PATH}
+      GAME_SERVER_STALE_AFTER: ${GAME_SERVER_STALE_AFTER}
+      MATCHMAKING_RECOMMENDATION_CACHE_TTL: ${MATCHMAKING_RECOMMENDATION_CACHE_TTL}
     depends_on:
       shared-postgres:
         condition: service_healthy
@@ -240,8 +371,30 @@ services:
       context: ./services/user_service
       dockerfile: ./dockerfile
     restart: unless-stopped
-    env_file:
-      - ./services/user_service/.env
+    environment:
+      DOMAIN: ${DOMAIN}
+      PUBLIC_URL: ${PUBLIC_URL}
+      ALLOWED_REDIRECT_URLS: ${ALLOWED_REDIRECT_URLS}
+      ALLOWED_CORS_ORIGINS: ${ALLOWED_CORS_ORIGINS}
+      DEFAULT_ADMIN_EMAILS: ${DEFAULT_ADMIN_EMAILS}
+      POSTGRES_HOST: shared-postgres
+      POSTGRES_PORT: 5432
+      POSTGRES_USER: ${SHARED_POSTGRES_USER}
+      POSTGRES_PASSWORD: ${SHARED_POSTGRES_PASSWORD}
+      POSTGRES_DB: ${SHARED_POSTGRES_DB}
+      POSTGRES_SSL: ${POSTGRES_SSL}
+      REDIS_HOST: user-redis
+      REDIS_PORT: 6379
+      REDIS_PASSWORD: ${USER_REDIS_PASSWORD}
+      REDIS_DB: ${USER_REDIS_DB}
+      HTTP_PORT: ${USER_SERVICE_HTTP_PORT}
+      SWAGGER_ENABLED: ${SWAGGER_ENABLED}
+      SWAGGER_USER: ${SWAGGER_USER}
+      SWAGGER_PASSWORD: ${SWAGGER_PASSWORD}
+      SWAGGER_BASE_PATH: ${USER_SERVICE_SWAGGER_BASE_PATH}
+      SSO_AUTHENTICATE_URL: ${SSO_AUTHENTICATE_URL}
+      MATCHMAKING_SELECT_SERVER_URL: ${MATCHMAKING_SELECT_SERVER_URL}
+      INTERNAL_PROXY_TOKEN: ${INTERNAL_PROXY_TOKEN}
     depends_on:
       shared-postgres:
         condition: service_healthy
@@ -259,9 +412,119 @@ services:
       dockerfile: ./dockerfile
     restart: unless-stopped
     environment:
-      - HTTP_PORT=7001
+      HTTP_PORT: ${RNG_STUB_HTTP_PORT}
     ports:
-      - 7001:7001
+      - "${RNG_STUB_HTTP_PORT}:${RNG_STUB_HTTP_PORT}"
+    networks:
+      - rooms_network
+
+  frontend-dev:
+    container_name: frontend_dev
+    profiles: ["frontend-dev"]
+    build:
+      context: ./apps/frontend
+      target: dev
+      args:
+        VITE_API_BASE_URL: ${VITE_API_BASE_URL}
+        VITE_FRONTEND_BASE_URL: ${FRONTEND_DEV_BASE_URL}
+        VITE_SSO_CLIENT_ID_URL: ${VITE_SSO_CLIENT_ID_URL}
+    environment:
+      CHOKIDAR_USEPOLLING: "1"
+      VITE_API_BASE_URL: ${VITE_API_BASE_URL}
+      VITE_FRONTEND_BASE_URL: ${FRONTEND_DEV_BASE_URL}
+      VITE_SSO_CLIENT_ID_URL: ${VITE_SSO_CLIENT_ID_URL}
+    ports:
+      - "${FRONTEND_DEV_PORT}:80"
+    volumes:
+      - ./apps/frontend:/app
+      - frontend_node_modules:/app/node_modules
+    networks:
+      - rooms_network
+
+  frontend-prod:
+    container_name: frontend_prod
+    profiles: ["frontend-prod"]
+    build:
+      context: ./apps/frontend
+      target: prod
+      args:
+        VITE_API_BASE_URL: ${VITE_API_BASE_URL}
+        VITE_FRONTEND_BASE_URL: ${FRONTEND_BASE_URL}
+        VITE_SSO_CLIENT_ID_URL: ${VITE_SSO_CLIENT_ID_URL}
+    ports:
+      - "${FRONTEND_PORT}:80"
+    networks:
+      - rooms_network
+
+  pgadmin:
+    image: dpage/pgadmin4:7.2
+    container_name: pgadmin
+    profiles: ["tools-pgadmin"]
+    restart: unless-stopped
+    environment:
+      PGADMIN_DEFAULT_EMAIL: ${PGADMIN_DEFAULT_EMAIL}
+      PGADMIN_DEFAULT_PASSWORD: ${PGADMIN_DEFAULT_PASSWORD}
+      PGADMIN_LISTEN_PORT: 80
+    volumes:
+      - pgadmin_data:/var/lib/pgadmin
+    ports:
+      - "${PGADMIN_PORT}:80"
+    networks:
+      - rooms_network
+
+  redis-commander-game-1:
+    image: rediscommander/redis-commander:latest
+    container_name: redis_commander_game_1
+    profiles: ["tools-redis"]
+    restart: unless-stopped
+    environment:
+      REDIS_HOST: game-redis-1
+      REDIS_PORT: 6379
+      REDIS_PASSWORD: ${GAME_REDIS_PASSWORD}
+    ports:
+      - "${REDIS_COMMANDER_GAME_1_PORT}:8081"
+    networks:
+      - rooms_network
+
+  redis-commander-game-2:
+    image: rediscommander/redis-commander:latest
+    container_name: redis_commander_game_2
+    profiles: ["tools-redis"]
+    restart: unless-stopped
+    environment:
+      REDIS_HOST: game-redis-2
+      REDIS_PORT: 6379
+      REDIS_PASSWORD: ${GAME_REDIS_PASSWORD}
+    ports:
+      - "${REDIS_COMMANDER_GAME_2_PORT}:8081"
+    networks:
+      - rooms_network
+
+  redis-commander-matchmaking:
+    image: rediscommander/redis-commander:latest
+    container_name: redis_commander_matchmaking
+    profiles: ["tools-redis"]
+    restart: unless-stopped
+    environment:
+      REDIS_HOST: matchmaking-redis
+      REDIS_PORT: 6379
+      REDIS_PASSWORD: ${MATCHMAKING_REDIS_PASSWORD}
+    ports:
+      - "${REDIS_COMMANDER_MATCHMAKING_PORT}:8081"
+    networks:
+      - rooms_network
+
+  redis-commander-user:
+    image: rediscommander/redis-commander:latest
+    container_name: redis_commander_user
+    profiles: ["tools-redis"]
+    restart: unless-stopped
+    environment:
+      REDIS_HOST: user-redis
+      REDIS_PORT: 6379
+      REDIS_PASSWORD: ${USER_REDIS_PASSWORD}
+    ports:
+      - "${REDIS_COMMANDER_USER_PORT}:8081"
     networks:
       - rooms_network
 
@@ -273,7 +536,10 @@ volumes:
   game_redis_2_data:
   matchmaking_redis_data:
   user_redis_data:
+  frontend_node_modules:
+  pgadmin_data:
 
 networks:
   rooms_network:
+    name: ludobox_rooms_network
     driver: bridge

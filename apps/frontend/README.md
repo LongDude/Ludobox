@@ -1,112 +1,73 @@
-﻿# LudoBox Frontend
+# Frontend
 
-Фронтенд веб‑приложения для проведения лотерей построенный на микросервисной архитектуре на Vue 3 со входом через SSO, ролями (USER, ADMIN). Проект собран на Vite и TypeScript, использует Pinia, Vue Router и Axios. 
+`apps/frontend` — клиентское приложение Ludobox на Vue 3, Vite и TypeScript. В общем локальном контуре фронтенд подключён к корневому `docker-compose.yml` через отдельные профили и использует переменные `VITE_*` из корневого `.env`.
 
 ## Стек
 
-- Vue 3 + TypeScript, Vite 7
-- Pinia, Vue Router 4
+- Vue 3
+- TypeScript
+- Vite
+- Pinia
+- Vue Router
 - Axios
-- Vitest + jsdom
-- ESLint 9 + Prettier
+- Vitest
 
-## Быстрый старт (локально)
+## Профили в корневом Compose
 
-1. Требования: Node.js ^20.19.0 или >=22.12.0.
-2. Установите зависимости:
+- `frontend-dev` — dev-сервер с hot reload.
+- `frontend-prod` — production-сборка и раздача через nginx.
 
-```bash
-npm install
-```
-
-3. Настройте переменные окружения (см. раздел «Переменные окружения») в `.env` или `.env.local`.
-4. Запуск в режиме разработки:
+Команды из корня проекта:
 
 ```bash
-npm run dev
+make frontend-up
+make frontend-up-prod
+make frontend-down
 ```
 
-Vite поднимется на http://localhost:5173 (по умолчанию).
+Порты задаются в корневом `.env`:
 
-## Docker (dev/prod)
-
-### Dev
-
-```bash
-docker compose --profile dev up --build
-```
-
-Dev‑сервер доступен на http://localhost (порт 80).
-
-Полезно знать:
-
-- Изменения в `src/`, `public/`, `index.html` применяются сразу (HMR).
-- Изменения в `.env` или `vite.config.ts` требуют перезапуска контейнера.
-- Если изменили `package.json`/`package-lock.json`, выполните установку в контейнере:
-
-```bash
-docker compose --profile dev run --rm frontend-dev npm install
-```
-
-### Prod
-
-```bash
-docker compose --profile prod up --build
-```
-
-Nginx раздаёт статику на http://localhost (порт 80).
-
-## Скрипты npm
-
-- `dev` — запуск dev‑сервера Vite
-- `build` — проверка типов и сборка (`vue-tsc` + `vite build`)
-- `preview` — предпросмотр собранного приложения
-- `test:unit` — юнит‑тесты (Vitest)
-- `type-check` — отдельная проверка типов (vue-tsc)
-- `lint` — ESLint с авто‑исправлением
-- `format` — Prettier форматирует `src/`
-
-## Архитектура и ключевые файлы
-
-- `src/main.ts` — инициализация приложения, Pinia и Router; установка темы и попытка авто‑аутентификации при старте.
-- `src/router/index.ts` — маршруты и глобальные гард‑перехватчики (auth, роли, редиректы).
-- `src/stores/` — Pinia‑хранилища (auth/chat/paper/settings/toast).
-- `src/api/` — слой API на Axios:
-  - `src/api/base/useBaseApi.ts` — клиент для SSO с перехватом 401 → refresh.
-  - `src/api/base/useLudaApi.ts` — клиент для LudoBox API.
-  - `src/api/useSSOApi.ts` — методы SSO.
-  - `src/api/useLudaApi.ts` — методы LudoBox API.
-- `src/views/` — страницы приложения.
-- `src/components/` — UI‑компоненты (панели, тосты, диалоги).
-- `src/i18n.ts` — простая i18n (en/ru).
-- `src/assets/theme.css` — тема и CSS‑переменные.
+- `FRONTEND_DEV_PORT`
+- `FRONTEND_PORT`
 
 ## Переменные окружения
 
-Файл `.env` в репозитории содержит пример значений для локальной разработки:
+Для общего запуска фронтенда используются значения из корневого `.env`:
 
-```env
-VITE_API_BASE_URL=http://localhost:5173
-VITE_FRONTEND_BASE_URL=http://localhost:5173
-VITE_SSO_CLIENT_ID_URL=https://domain/api
+- `VITE_API_BASE_URL`
+- `VITE_SSO_CLIENT_ID_URL`
+- `FRONTEND_DEV_BASE_URL`
+- `FRONTEND_BASE_URL`
+
+Эти переменные пробрасываются:
+
+- в `frontend-dev` как `VITE_FRONTEND_BASE_URL=${FRONTEND_DEV_BASE_URL}`;
+- в `frontend-prod` как `VITE_FRONTEND_BASE_URL=${FRONTEND_BASE_URL}` на стадии сборки;
+- `VITE_API_BASE_URL` и `VITE_SSO_CLIENT_ID_URL` используются в обоих профилях одинаково.
+
+## Локальный запуск без корневого Compose
+
+Из директории `apps/frontend`:
+
+```bash
+npm install
+npm run dev
 ```
 
-Назначение:
+Для standalone-запуска можно продолжать использовать локальный `dotenv` или собственный `.env.local`.
 
-- `VITE_FRONTEND_BASE_URL` — базовый URL фронтенда (для redirect URL OAuth).
-- `VITE_SSO_CLIENT_ID_URL` — базовый URL SSO‑сервиса.
-- `VITE_API_BASE_URL` — зарезервирован для общего базового URL.
+## Основные директории
 
-## Сборка и деплой
+- `src/views/` — страницы приложения.
+- `src/components/` — UI-компоненты.
+- `src/stores/` — Pinia stores.
+- `src/api/` — интеграция с backend API.
+- `src/assets/` — базовые стили и статические ассеты.
 
-1. Соберите проект: `npm run build` — результат в `dist/`.
-2. Раздавайте как статический сайт (Nginx/Apache/облако).
-3. Для продакшна используйте `.env.production` и корректно настройте CORS/куки на бэкенде.
+## Проверка качества
 
-## Submission workflow
-
-- Источник ролей на клиенте — SSO `/auth/authenticate`.
-
-## Лицензия
-
-Проект распространяется по лицензии Apache 2.0. См. файл `LICENSE`.
+```bash
+npm run test:unit
+npm run lint
+npm run build
+```
