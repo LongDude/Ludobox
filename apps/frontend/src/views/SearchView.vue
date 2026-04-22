@@ -404,23 +404,23 @@ function enterRoom(room: RoomRecommendationResponse) {
             </div>
 
             <dl class="room-meta">
-              <div>
+              <div class="room-meta__item">
                 <dt>{{ t('matchmaking.results.meta.entry') }}</dt>
                 <dd>{{ room.registration_price }}</dd>
               </div>
-              <div>
+              <div class="room-meta__item">
                 <dt>{{ t('matchmaking.results.meta.capacity') }}</dt>
                 <dd>{{ room.capacity }}</dd>
               </div>
-              <div>
+              <div class="room-meta__item">
                 <dt>{{ t('matchmaking.results.meta.players') }}</dt>
                 <dd>{{ room.current_players }}</dd>
               </div>
-              <div>
+              <div class="room-meta__item">
                 <dt>{{ t('matchmaking.results.meta.minimumUsers') }}</dt>
                 <dd>{{ room.min_users }}</dd>
               </div>
-              <div>
+              <div class="room-meta__item">
                 <dt>{{ t('matchmaking.results.meta.boost') }}</dt>
                 <dd>{{ formatBoost(room) }}</dd>
               </div>
@@ -621,8 +621,9 @@ select {
 }
 
 .room-card--list {
-  grid-template-columns: minmax(0, 1.4fr) minmax(280px, 1fr) auto;
+  grid-template-columns: minmax(0, 1.25fr) minmax(0, 1.6fr) auto;
   align-items: center;
+  gap: 0.75rem 1rem;
 }
 
 .room-head {
@@ -637,9 +638,28 @@ select {
   gap: 0.75rem;
 }
 
-.room-meta div {
+.room-meta__item {
   display: grid;
   gap: 0.2rem;
+}
+
+.room-card--list .room-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem 1rem;
+}
+
+.room-card--list .room-meta__item {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 0.35rem;
+  min-width: 0;
+}
+
+.room-card--list .room-meta dt,
+.room-card--list .room-meta dd {
+  white-space: nowrap;
 }
 
 dd {

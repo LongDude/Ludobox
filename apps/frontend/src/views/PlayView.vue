@@ -1247,7 +1247,10 @@ function scheduleNextRoundTransition(nextRoundId: number | null, nextRoundDelay:
               >
                 <div>
                   <strong>{{ t('gameRoom.participant.seat', { seat: participant.number_in_room }) }}</strong>
-                  <span>{{ t('gameRoom.participant.id', { id: participant.participant_id }) }}</span>
+                  <span v-if="participant.nickname">{{ participant.nickname }}</span>
+                  <span v-else-if="participant.user_id">
+                    {{ t('gameRoom.participant.user', { id: participant.user_id }) }}
+                  </span>
                   <span v-if="participant.boost > 0">
                     {{ t('gameRoom.entry.boostActiveSeat', { seat: participant.number_in_room }) }}
                   </span>
@@ -1403,7 +1406,6 @@ function scheduleNextRoundTransition(nextRoundId: number | null, nextRoundDelay:
                 {{ t('gameRoom.participant.you') }}
               </span>
               <strong>{{ t('gameRoom.participant.seat', { seat: participant.number_in_room }) }}</strong>
-              <span>{{ t('gameRoom.participant.id', { id: participant.participant_id }) }}</span>
               <span v-if="participant.nickname">
                 {{ participant.nickname }}
               </span>
