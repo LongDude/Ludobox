@@ -1,9 +1,9 @@
 help:
-	@echo 'down - stop all processes'
-	@echo "game1 - Redis commander for game server 1"
-	@echo "game2 - Redis commander for game server 2"
-	@echo "matchmaking - Matchmaking server"
-	@echo "user - User server (ludobox core)"
+	@echo 'down - остановить все контейнеры'
+	@echo "game1 - Клиент Redis для микросервера game-server-1"
+	@echo "game2 - Клиент Redis для микросервера game-server-2"
+	@echo "matchmaking - Клиент Redis для сервера организации матчей"
+	@echo "user - Клиент Redis для сервера обработки пользователей"
 
 down:
 	@docker compose down
