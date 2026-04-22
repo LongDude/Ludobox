@@ -133,9 +133,32 @@ function normalizeSeatList(value: unknown, fallbackSeat?: unknown) {
   return []
 }
 
+function inferWinningSeats(item: any, reservedSeats: number[]) {
+  const explicitWinningSeats = normalizeSeatList(item?.winning_seats)
+  if (explicitWinningSeats.length > 0) {
+    return explicitWinningSeats
+  }
+
+  const legacySeat = normalizeSeatList(undefined, item?.seat_number)
+  const winningSeatsCount = Number(item?.winning_seats_count ?? 0)
+  const winningMoney = Number(item?.winning_money ?? 0)
+  const result = String(item?.result ?? '').toLowerCase()
+  const isWinningItem = winningMoney > 0 || result === 'won' || winningSeatsCount > 0
+
+  if (legacySeat.length > 0 && isWinningItem) {
+    return legacySeat
+  }
+
+  if (reservedSeats.length === 1 && isWinningItem) {
+    return reservedSeats
+  }
+
+  return []
+}
+
 function normalizeHistoryItem(item: any): UserGameHistoryItem {
   const reservedSeats = normalizeSeatList(item?.reserved_seats, item?.seat_number)
-  const winningSeats = normalizeSeatList(item?.winning_seats)
+  const winningSeats = inferWinningSeats(item, reservedSeats)
 
   return {
     round_id: Number(item?.round_id ?? 0),
