@@ -1,10 +1,9 @@
 help:
-	@echo "up-dev"
-	@echo "up-prod"
-	@echo "down"
-	@echo "down-dev"
-	@echo "down-prod"
-
+	@echo "up-dev - запустить клиентскую часть в dev-окружении"
+	@echo "up-prod - запустить клиентскую часть в рабочем окружении"
+	@echo "down - завершить работу всех контейнеров клиентской части"
+	@echo "down-dev - завершить работу контейнеров клиентской части dev-окружения"
+	@echo "down-prod - завершить работу контейнеров клиентской части рабочего окружения"
 
 up-prod:
 	@docker compose --profile prod up -d
