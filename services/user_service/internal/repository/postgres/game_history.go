@@ -12,7 +12,7 @@ import (
 const gameHistoryResultExpression = `
 	CASE
 		WHEN item.winning_money > 0 THEN 'won'
-		WHEN item.has_left THEN 'left'
+		WHEN item.has_left AND item.reserved_seats_count = 0 THEN 'left'
 		WHEN item.round_status = 'cancelled' THEN 'cancelled'
 		WHEN item.round_status = 'finished' THEN 'lost'
 		ELSE item.round_status
@@ -63,8 +63,8 @@ func (r *gameHistoryRepository) GetUserGameHistory(ctx context.Context, userID i
 		WITH participant_fees AS (
 			SELECT
 				round_participants_id,
-				COALESCE(SUM(amount) FILTER (WHERE reservation_type = 'entry_fee' AND status <> 'released'), 0) AS entry_fee,
-				COALESCE(SUM(amount) FILTER (WHERE reservation_type = 'boost' AND status <> 'released'), 0) AS boost_fee
+				COALESCE(SUM(amount) FILTER (WHERE reservation_type = 'entry_fee' AND status IN ('active', 'committed')), 0) AS entry_fee,
+				COALESCE(SUM(amount) FILTER (WHERE reservation_type = 'boost' AND status IN ('active', 'committed')), 0) AS boost_fee
 			FROM user_balance_reservations
 			GROUP BY round_participants_id
 		),
@@ -75,16 +75,21 @@ func (r *gameHistoryRepository) GetUserGameHistory(ctx context.Context, userID i
 				g.game_id,
 				g.name_game,
 				rd.status::TEXT AS round_status,
-				COALESCE(array_agg(rp.number_in_room ORDER BY rp.number_in_room), '{}'::INT[]) AS reserved_seats,
 				COALESCE(
-					array_agg(rp.number_in_room ORDER BY rp.number_in_room) FILTER (WHERE rp.winning_money > 0),
+					array_agg(rp.number_in_room ORDER BY rp.number_in_room)
+						FILTER (WHERE rp.exit_room_at IS NULL),
+					'{}'::INT[]
+				) AS reserved_seats,
+				COALESCE(
+					array_agg(rp.number_in_room ORDER BY rp.number_in_room)
+						FILTER (WHERE rp.exit_room_at IS NULL AND rp.winning_money > 0),
 					'{}'::INT[]
 				) AS winning_seats,
-				COUNT(*)::INT AS reserved_seats_count,
-				COUNT(*) FILTER (WHERE rp.winning_money > 0)::INT AS winning_seats_count,
+				COUNT(*) FILTER (WHERE rp.exit_room_at IS NULL)::INT AS reserved_seats_count,
+				COUNT(*) FILTER (WHERE rp.exit_room_at IS NULL AND rp.winning_money > 0)::INT AS winning_seats_count,
 				COALESCE(SUM(fees.entry_fee), 0) AS entry_fee,
 				COALESCE(SUM(fees.boost_fee), 0) AS boost_fee,
-				COALESCE(SUM(rp.winning_money), 0) AS winning_money,
+				COALESCE(SUM(rp.winning_money) FILTER (WHERE rp.exit_room_at IS NULL), 0) AS winning_money,
 				MIN(rd.created_at) AS joined_at,
 				MAX(rd.archived_at) AS finished_at,
 				BOOL_OR(rp.exit_room_at IS NOT NULL AND (rd.archived_at IS NULL OR rp.exit_room_at <= rd.archived_at)) AS has_left
