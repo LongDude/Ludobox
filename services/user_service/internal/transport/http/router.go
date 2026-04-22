@@ -17,6 +17,7 @@ func MainRouter(r *gin.RouterGroup, a *app.App) {
 	r.PUT("/user/balance", func(ctx *gin.Context) { handlers.UpdateUserBalanceByID(ctx, a) })
 	r.GET("/user/balance/events", func(ctx *gin.Context) { handlers.SubscribeUserBalanceEvents(ctx, a) })
 	r.GET("/user/history/games", func(ctx *gin.Context) { handlers.GetUserGameHistory(ctx, a) })
+	r.GET("/user/history/rating", func(ctx *gin.Context) { handlers.GetUserRatingHistory(ctx, a) })
 }
 func AdminRouter(r *gin.RouterGroup, a *app.App) {
 	admin := r.Group("", middlewares.AdminOnly(a))

@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"time"
 
+	"game_server/internal/domain"
 	"game_server/internal/repository"
 
 	"github.com/jackc/pgx/v5"
@@ -26,6 +27,50 @@ func (s *txScope) GetBalanceLocked(ctx context.Context, userID int64) (int64, er
 func (s *txScope) UpdateBalance(ctx context.Context, userID int64, delta int64) error {
 	_, err := s.tx.Exec(ctx, `UPDATE users SET balance = balance + $1 WHERE user_id = $2`, delta, userID)
 	return err
+}
+
+func (s *txScope) ApplyUserRatingReward(ctx context.Context, reward domain.UserRatingReward) error {
+	var ratingAfter int64
+	err := s.tx.QueryRow(ctx, `
+		UPDATE users
+		SET rating = rating + $1
+		WHERE user_id = $2
+		RETURNING rating
+	`, reward.Delta, reward.UserID).Scan(&ratingAfter)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return fmt.Errorf("update user rating: user %d not found", reward.UserID)
+		}
+		return fmt.Errorf("update user rating: %w", err)
+	}
+
+	_, err = s.tx.Exec(ctx, `
+		INSERT INTO user_rating_history (
+			user_id,
+			round_participants_id,
+			rounds_id,
+			room_id,
+			game_id,
+			source,
+			delta,
+			rating_after
+		)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+	`,
+		reward.UserID,
+		reward.ParticipantID,
+		reward.RoundID,
+		reward.RoomID,
+		reward.GameID,
+		reward.Source,
+		reward.Delta,
+		ratingAfter,
+	)
+	if err != nil {
+		return fmt.Errorf("insert user rating history: %w", err)
+	}
+
+	return nil
 }
 
 func (s *txScope) ReserveEntry(ctx context.Context, participantID int64, amount int64, expiresAt time.Time) (int64, error) {

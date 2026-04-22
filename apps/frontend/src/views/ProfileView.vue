@@ -3,11 +3,20 @@ import { computed, onMounted, reactive, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import LeftTab from '@/components/LeftTab.vue'
 import UpTab from '@/components/UpTab.vue'
+import { UserApi } from '@/api/useUserApi'
+import type { UserRatingHistoryRequest, UserRatingHistoryResponse, UserRank, UserUpdateRequest } from '@/api/types'
+import { useLayoutInset } from '@/composables/useLayoutInset'
+import { useI18n } from '@/i18n'
 import { useAuthStore } from '@/stores/authStore'
 import { useUserCabinetStore } from '@/stores/userCabinetStore'
-import type { UserUpdateRequest } from '@/api/types'
-import { useI18n } from '@/i18n'
-import { useLayoutInset } from '@/composables/useLayoutInset'
+
+type RatingPeriod = '7d' | '30d' | '90d' | 'all'
+
+type ChartPoint = {
+  item: UserRatingHistoryResponse['items'][number]
+  x: number
+  y: number
+}
 
 const auth = useAuthStore()
 const cabinet = useUserCabinetStore()
@@ -23,6 +32,10 @@ const nicknameSaving = ref(false)
 const balanceSaving = ref(false)
 const gameSuccessMsg = ref('')
 const gameErrorMsg = ref('')
+const ratingHistory = ref<UserRatingHistoryResponse | null>(null)
+const ratingHistoryLoading = ref(false)
+const ratingHistoryErrorMsg = ref('')
+const selectedRatingPeriod = ref<RatingPeriod>('30d')
 
 const identityForm = reactive({
   email: '',
@@ -37,6 +50,13 @@ const gameForm = reactive({
   delta: '' as string | number,
 })
 
+const periodOptions: Array<{ value: RatingPeriod; labelKey: string }> = [
+  { value: '7d', labelKey: 'profile.game.period.7d' },
+  { value: '30d', labelKey: 'profile.game.period.30d' },
+  { value: '90d', labelKey: 'profile.game.period.90d' },
+  { value: 'all', labelKey: 'profile.game.period.all' },
+]
+
 onMounted(async () => {
   if (auth.isAuthenticated && !auth.User) {
     try {
@@ -46,6 +66,7 @@ onMounted(async () => {
 
   if (auth.isAuthenticated) {
     void cabinet.ensureLoaded().catch(() => {})
+    void loadRatingHistory(false)
   }
 })
 
@@ -69,6 +90,60 @@ const formattedBalance = computed(() => {
   if (!profile) return '-'
 
   return new Intl.NumberFormat(locale.value === 'ru' ? 'ru-RU' : 'en-US').format(profile.balance)
+})
+
+const formattedRating = computed(() => {
+  const profile = cabinet.profile
+  if (!profile) return '-'
+
+  return new Intl.NumberFormat(locale.value === 'ru' ? 'ru-RU' : 'en-US').format(profile.rating)
+})
+
+const ratingRankLabel = computed(() => translateRank(cabinet.profile?.rank))
+
+const periodGainLabel = computed(() => formatSignedNumber(ratingHistory.value?.period_change ?? 0))
+
+const latestRatingUpdate = computed(() => {
+  const items = ratingHistory.value?.items ?? []
+  return items.length > 0 ? items[items.length - 1] : null
+})
+
+const chartPoints = computed<ChartPoint[]>(() => {
+  const items = ratingHistory.value?.items ?? []
+  if (items.length === 0) return []
+
+  const width = 100
+  const height = 100
+  const minRating = Math.min(...items.map((item) => item.rating_after))
+  const maxRating = Math.max(...items.map((item) => item.rating_after))
+  const range = Math.max(maxRating - minRating, 1)
+
+  return items.map((item, index) => {
+    const x = items.length === 1 ? width / 2 : (index / (items.length - 1)) * width
+    const y = height - ((item.rating_after - minRating) / range) * height
+    return { item, x, y }
+  })
+})
+
+const chartPolyline = computed(() => chartPoints.value.map((point) => `${point.x},${point.y}`).join(' '))
+
+const chartArea = computed(() => {
+  const points = chartPoints.value
+  if (points.length === 0) return ''
+
+  const first = points[0]
+  const last = points[points.length - 1]
+  return `0,100 ${first.x},${first.y} ${points.map((point) => `${point.x},${point.y}`).join(' ')} ${last.x},100`
+})
+
+const chartStartLabel = computed(() => {
+  const first = ratingHistory.value?.items?.[0]
+  return first ? formatRatingDate(first.created_at) : ''
+})
+
+const chartEndLabel = computed(() => {
+  const last = latestRatingUpdate.value
+  return last ? formatRatingDate(last.created_at) : ''
 })
 
 const activeGameError = computed(() => gameErrorMsg.value || cabinet.error || '')
@@ -95,11 +170,76 @@ watch(
   { immediate: true },
 )
 
+watch(selectedRatingPeriod, () => {
+  if (!auth.isAuthenticated) return
+  void loadRatingHistory(false)
+})
+
+watch(
+  () => cabinet.profile?.rating,
+  (next, previous) => {
+    if (!auth.isAuthenticated || next === undefined || next === previous) return
+    void loadRatingHistory(false)
+  },
+)
+
 function displayRole(role: string) {
   const normalized = role.toLowerCase()
   if (normalized === 'admin') return t('roles.admin')
   if (normalized === 'user') return t('roles.user')
   return role
+}
+
+function translateRank(rank?: UserRank) {
+  if (!rank) return '-'
+
+  const normalized = rank.toLowerCase()
+  if (normalized === 'bronze') return t('profile.game.rank.bronze')
+  if (normalized === 'silver') return t('profile.game.rank.silver')
+  if (normalized === 'gold') return t('profile.game.rank.gold')
+  if (normalized === 'platinum') return t('profile.game.rank.platinum')
+  if (normalized === 'diamond') return t('profile.game.rank.diamond')
+  return rank
+}
+
+function formatSignedNumber(value: number) {
+  const formatter = new Intl.NumberFormat(locale.value === 'ru' ? 'ru-RU' : 'en-US')
+  if (value > 0) return `+${formatter.format(value)}`
+  return formatter.format(value)
+}
+
+function formatRatingDate(value: string) {
+  const date = new Date(value)
+  return new Intl.DateTimeFormat(locale.value === 'ru' ? 'ru-RU' : 'en-US', {
+    day: '2-digit',
+    month: 'short',
+  }).format(date)
+}
+
+function formatRatingDateTime(value: string) {
+  const date = new Date(value)
+  return new Intl.DateTimeFormat(locale.value === 'ru' ? 'ru-RU' : 'en-US', {
+    dateStyle: 'medium',
+    timeStyle: 'short',
+  }).format(date)
+}
+
+function buildRatingHistoryRequest(period: RatingPeriod): UserRatingHistoryRequest {
+  const now = new Date()
+  const end = now.toISOString()
+
+  if (period === 'all') {
+    return { date_to: end }
+  }
+
+  const start = new Date(now)
+  const days = period === '7d' ? 7 : period === '30d' ? 30 : 90
+  start.setDate(start.getDate() - days)
+
+  return {
+    date_from: start.toISOString(),
+    date_to: end,
+  }
 }
 
 function resetIdentityForm() {
@@ -175,9 +315,35 @@ async function refreshGameProfile() {
   gameErrorMsg.value = ''
 
   try {
-    await cabinet.refresh()
+    await Promise.all([cabinet.refresh(), loadRatingHistory(false)])
   } catch (error: any) {
     gameErrorMsg.value = error?.message || t('profile.game.msg.failedLoad')
+  }
+}
+
+async function loadRatingHistory(showError = true) {
+  if (!auth.isAuthenticated) {
+    ratingHistory.value = null
+    ratingHistoryErrorMsg.value = ''
+    return
+  }
+
+  ratingHistoryLoading.value = true
+  if (showError) {
+    ratingHistoryErrorMsg.value = ''
+  }
+
+  try {
+    ratingHistory.value = await UserApi.getCurrentUserRatingHistory(
+      buildRatingHistoryRequest(selectedRatingPeriod.value),
+    )
+    ratingHistoryErrorMsg.value = ''
+  } catch (error: any) {
+    if (showError) {
+      ratingHistoryErrorMsg.value = error?.message || t('profile.game.ratingHistory.error')
+    }
+  } finally {
+    ratingHistoryLoading.value = false
   }
 }
 
@@ -218,6 +384,7 @@ async function applyBalanceDelta() {
     await cabinet.applyBalanceDelta(delta)
     gameForm.delta = ''
     gameSuccessMsg.value = t('profile.game.msg.balanceUpdated')
+    void loadRatingHistory(false)
   } catch (error: any) {
     gameErrorMsg.value = error?.message || t('profile.game.msg.failedBalance')
   } finally {
@@ -228,6 +395,7 @@ async function applyBalanceDelta() {
 async function logout() {
   await auth.logout()
   cabinet.reset()
+  ratingHistory.value = null
   router.replace('/auth')
 }
 </script>
@@ -365,7 +533,7 @@ async function logout() {
               <h2>{{ t('profile.game.title') }}</h2>
               <p class="section-copy">{{ t('profile.game.description') }}</p>
             </div>
-            <button class="btn" :disabled="cabinet.loading" @click="refreshGameProfile">
+            <button class="btn" :disabled="cabinet.loading || ratingHistoryLoading" @click="refreshGameProfile">
               {{ t('common.refresh') }}
             </button>
           </div>
@@ -376,10 +544,6 @@ async function logout() {
 
           <template v-else-if="cabinet.profile">
             <div class="meta">
-              <!-- <div class="row">
-                <span class="label">{{ t('profile.game.userId') }}</span>
-                <span class="value">#{{ cabinet.profile.user_id }}</span>
-              </div> -->
               <div class="row">
                 <span class="label">{{ t('profile.game.nickname') }}</span>
                 <span class="value">{{ cabinet.profile.nickname }}</span>
@@ -389,6 +553,93 @@ async function logout() {
                 <span class="value balance">{{ formattedBalance }}</span>
               </div>
             </div>
+
+            <div class="rating-summary">
+              <article class="summary-card">
+                <span class="summary-label">{{ t('profile.game.rating') }}</span>
+                <strong>{{ formattedRating }}</strong>
+              </article>
+              <article class="summary-card">
+                <span class="summary-label">{{ t('profile.game.rank') }}</span>
+                <strong>{{ ratingRankLabel }}</strong>
+              </article>
+              <article class="summary-card">
+                <span class="summary-label">{{ t('profile.game.periodGain') }}</span>
+                <strong :class="{ positive: (ratingHistory?.period_change ?? 0) > 0 }">
+                  {{ periodGainLabel }}
+                </strong>
+              </article>
+            </div>
+
+            <section class="rating-history">
+              <div class="rating-head">
+                <div>
+                  <h3>{{ t('profile.game.ratingHistoryTitle') }}</h3>
+                  <p class="helper">{{ t('profile.game.ratingHistoryDescription') }}</p>
+                </div>
+                <div class="period-switch">
+                  <button
+                    v-for="option in periodOptions"
+                    :key="option.value"
+                    class="period-chip"
+                    :class="{ active: selectedRatingPeriod === option.value }"
+                    :disabled="ratingHistoryLoading"
+                    @click="selectedRatingPeriod = option.value"
+                  >
+                    {{ t(option.labelKey) }}
+                  </button>
+                </div>
+              </div>
+
+              <div v-if="ratingHistoryLoading" class="chart-empty">
+                {{ t('profile.game.ratingHistory.loading') }}
+              </div>
+              <div v-else-if="ratingHistoryErrorMsg" class="chart-empty error">
+                {{ ratingHistoryErrorMsg }}
+              </div>
+              <div v-else-if="chartPoints.length === 0" class="chart-empty">
+                {{ t('profile.game.ratingHistory.empty') }}
+              </div>
+              <div v-else class="chart-shell">
+                <svg
+                  class="rating-chart"
+                  viewBox="0 0 100 100"
+                  preserveAspectRatio="none"
+                  role="img"
+                  :aria-label="t('profile.game.ratingHistoryTitle')"
+                >
+                  <defs>
+                    <linearGradient id="ratingArea" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="0%" stop-color="rgba(8, 145, 178, 0.38)" />
+                      <stop offset="100%" stop-color="rgba(8, 145, 178, 0.02)" />
+                    </linearGradient>
+                  </defs>
+                  <polygon :points="chartArea" fill="url(#ratingArea)" />
+                  <polyline class="chart-line" :points="chartPolyline" />
+                  <circle
+                    v-for="point in chartPoints"
+                    :key="point.item.history_id"
+                    class="chart-dot"
+                    :cx="point.x"
+                    :cy="point.y"
+                    r="1.8"
+                  />
+                </svg>
+
+                <div class="chart-axis">
+                  <span>{{ chartStartLabel }}</span>
+                  <span>{{ chartEndLabel }}</span>
+                </div>
+
+                <div v-if="latestRatingUpdate" class="chart-footnote">
+                  <span>
+                    {{ t('profile.game.ratingHistory.lastChange') }}
+                    <strong>{{ formatSignedNumber(latestRatingUpdate.delta) }}</strong>
+                  </span>
+                  <span>{{ formatRatingDateTime(latestRatingUpdate.created_at) }}</span>
+                </div>
+              </div>
+            </section>
 
             <div class="feedback">
               <span v-if="gameSuccessMsg" class="ok">{{ gameSuccessMsg }}</span>
@@ -406,11 +657,7 @@ async function logout() {
               </label>
               <div class="inline-actions">
                 <button class="btn btn--primary" type="submit" :disabled="nicknameSaving">
-                  {{
-                    nicknameSaving
-                      ? t('common.saving')
-                      : t('profile.game.saveNickname')
-                  }}
+                  {{ nicknameSaving ? t('common.saving') : t('profile.game.saveNickname') }}
                 </button>
               </div>
             </form>
@@ -428,11 +675,7 @@ async function logout() {
               <p class="helper">{{ t('profile.game.deltaHelp') }}</p>
               <div class="inline-actions">
                 <button class="btn btn--primary" type="submit" :disabled="balanceSaving">
-                  {{
-                    balanceSaving
-                      ? t('common.saving')
-                      : t('profile.game.applyDelta')
-                  }}
+                  {{ balanceSaving ? t('common.saving') : t('profile.game.applyDelta') }}
                 </button>
               </div>
             </form>
@@ -490,7 +733,8 @@ async function logout() {
 .card-head,
 .profile-header,
 .actions,
-.inline-actions {
+.inline-actions,
+.rating-head {
   display: flex;
   justify-content: space-between;
   gap: 1rem;
@@ -500,7 +744,8 @@ async function logout() {
 
 .card-head h2,
 .editor h3,
-.identity .name {
+.identity .name,
+.rating-history h3 {
   margin: 0;
 }
 
@@ -526,7 +771,8 @@ async function logout() {
 
 .section-copy,
 .helper,
-.state-copy {
+.state-copy,
+.chart-footnote {
   margin: 0;
 }
 
@@ -566,7 +812,9 @@ async function logout() {
   margin: 0;
 }
 
-.meta {
+.meta,
+.rating-history,
+.chart-shell {
   display: grid;
   gap: 0.7rem;
 }
@@ -591,12 +839,14 @@ async function logout() {
 
 .value.warn,
 .state-copy.error,
-.feedback .err {
+.feedback .err,
+.chart-empty.error {
   color: var(--color-danger);
 }
 
 .value.balance,
-.feedback .ok {
+.feedback .ok,
+.summary-card strong.positive {
   color: var(--color-success);
 }
 
@@ -606,7 +856,8 @@ async function logout() {
   flex-wrap: wrap;
 }
 
-.chip {
+.chip,
+.period-chip {
   display: inline-flex;
   align-items: center;
   border-radius: 999px;
@@ -621,10 +872,36 @@ async function logout() {
   gap: 0.85rem;
 }
 
-.grid {
+.grid,
+.rating-summary {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 0.85rem;
+}
+
+.grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.rating-summary {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.summary-card {
+  display: grid;
+  gap: 0.35rem;
+  padding: 0.95rem 1rem;
+  border-radius: 1rem;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.18), rgba(255, 255, 255, 0.04));
+  border: 1px solid color-mix(in oklab, var(--color-border), transparent 14%);
+}
+
+.summary-card strong {
+  font-size: 1.15rem;
+}
+
+.summary-label {
+  color: var(--color-muted);
+  font-size: 0.85rem;
 }
 
 .wide {
@@ -657,14 +934,9 @@ input[type='number'] {
   min-height: 1.2rem;
 }
 
-.btn {
+.btn,
+.period-chip {
   appearance: none;
-  border: 1px solid color-mix(in oklab, var(--color-border), transparent 10%);
-  background: color-mix(in oklab, var(--color-surface), white 8%);
-  color: var(--color-text);
-  border-radius: 999px;
-  padding: 0.8rem 1rem;
-  font-weight: 600;
   cursor: pointer;
   transition:
     transform var(--transition-fast) ease,
@@ -672,11 +944,22 @@ input[type='number'] {
     background var(--transition-fast) ease;
 }
 
-.btn:hover {
+.btn {
+  border: 1px solid color-mix(in oklab, var(--color-border), transparent 10%);
+  background: color-mix(in oklab, var(--color-surface), white 8%);
+  color: var(--color-text);
+  border-radius: 999px;
+  padding: 0.8rem 1rem;
+  font-weight: 600;
+}
+
+.btn:hover,
+.period-chip:hover {
   transform: translateY(-1px);
 }
 
-.btn:disabled {
+.btn:disabled,
+.period-chip:disabled {
   cursor: not-allowed;
   opacity: 0.6;
   transform: none;
@@ -686,6 +969,60 @@ input[type='number'] {
   border-color: transparent;
   background: linear-gradient(135deg, #0f766e, #0284c7);
   color: #f0fdfa;
+}
+
+.period-switch {
+  display: flex;
+  gap: 0.45rem;
+  flex-wrap: wrap;
+}
+
+.period-chip.active {
+  background: linear-gradient(135deg, rgba(15, 118, 110, 0.14), rgba(2, 132, 199, 0.18));
+  border-color: rgba(2, 132, 199, 0.35);
+}
+
+.chart-shell {
+  padding: 0.95rem;
+  border-radius: 1.15rem;
+  border: 1px solid color-mix(in oklab, var(--color-border), transparent 12%);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.16), rgba(255, 255, 255, 0.04));
+}
+
+.rating-chart {
+  width: 100%;
+  height: 220px;
+  overflow: visible;
+}
+
+.chart-line {
+  fill: none;
+  stroke: #0891b2;
+  stroke-width: 2.25;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.chart-dot {
+  fill: #0284c7;
+  stroke: white;
+  stroke-width: 0.8;
+}
+
+.chart-axis,
+.chart-footnote {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  color: var(--color-muted);
+  font-size: 0.84rem;
+}
+
+.chart-empty {
+  padding: 1rem;
+  border-radius: 1rem;
+  border: 1px dashed color-mix(in oklab, var(--color-border), transparent 10%);
+  color: var(--color-muted);
 }
 
 .state-block {
@@ -713,7 +1050,8 @@ input[type='number'] {
     padding: 1rem;
   }
 
-  .grid {
+  .grid,
+  .rating-summary {
     grid-template-columns: 1fr;
   }
 
@@ -734,6 +1072,11 @@ input[type='number'] {
   .actions .btn,
   .inline-actions .btn {
     width: 100%;
+  }
+
+  .chart-axis,
+  .chart-footnote {
+    flex-direction: column;
   }
 }
 </style>

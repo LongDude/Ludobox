@@ -26,6 +26,8 @@ export interface CurrentUserProfileResponse {
   user_id: number
   nickname: string
   balance: number
+  rating: number
+  rank: UserRank
 }
 
 export interface CurrentUserProfileUpdateRequest {
@@ -42,6 +44,33 @@ export interface UserBalanceEvent {
   user_id: number
   balance: number
   timestamp: string
+}
+
+export type UserRank = 'bronze' | 'silver' | 'gold' | 'platinum' | 'diamond' | string
+
+export interface UserRatingHistoryRequest {
+  date_from?: string
+  date_to?: string
+}
+
+export interface UserRatingHistoryItem {
+  history_id: number
+  round_id?: number | null
+  room_id?: number | null
+  game_id?: number | null
+  game_name?: string | null
+  source: string
+  delta: number
+  rating_after: number
+  rank: UserRank
+  created_at: string
+}
+
+export interface UserRatingHistoryResponse {
+  current_rating: number
+  current_rank: UserRank
+  period_change: number
+  items: UserRatingHistoryItem[]
 }
 
 export type UserGameHistoryResult =

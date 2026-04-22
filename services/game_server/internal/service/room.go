@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"math"
 	"net/http"
 	"net/url"
 	"sort"
@@ -21,6 +22,7 @@ import (
 )
 
 const defaultRNGDistributeURL = "http://rng-stub:7001/winnings/distribute"
+const ratingRewardSourceRoundWin = "round_win"
 
 const botParticipantIDOffset int64 = 1_000_000_000
 
@@ -639,6 +641,14 @@ func (s *RoomService) finalizeRoundAndCreateNext(ctx context.Context, roundID in
 		if err != nil {
 			return fmt.Errorf("get participants by round: %w", err)
 		}
+		roomInfo, err := ts.GetRoomForUpdate(ctx, roomID)
+		if err != nil {
+			return fmt.Errorf("get room info: %w", err)
+		}
+		if roomInfo == nil || roomInfo.Config == nil {
+			return repository.ErrRoomNotFound
+		}
+		ratingRewardDelta := calculateRatingReward(roomInfo.Config)
 
 		activeParticipants := make(map[int64]domain.RoundParticipant, len(participants))
 		for _, participant := range participants {
@@ -672,6 +682,17 @@ func (s *RoomService) finalizeRoundAndCreateNext(ctx context.Context, roundID in
 				}
 				if err := ts.UpdateWinningMoney(ctx, participant.RoundParticipantID, winAmount); err != nil {
 					return fmt.Errorf("update winning money for participant %d: %w", participant.RoundParticipantID, err)
+				}
+				if err := ts.ApplyUserRatingReward(ctx, domain.UserRatingReward{
+					UserID:        participant.UserID,
+					ParticipantID: participant.RoundParticipantID,
+					RoundID:       roundID,
+					RoomID:        roomID,
+					GameID:        roomInfo.Config.GameID,
+					Source:        ratingRewardSourceRoundWin,
+					Delta:         ratingRewardDelta,
+				}); err != nil {
+					return fmt.Errorf("apply rating reward for participant %d: %w", participant.RoundParticipantID, err)
 				}
 			}
 		}
@@ -1028,6 +1049,40 @@ func buildPayouts(config *domain.RoomConfig, winnersCount int, participantCount 
 	}
 
 	return payouts
+}
+
+func calculateRatingReward(config *domain.RoomConfig) int64 {
+	if config == nil {
+		return 10
+	}
+
+	competitionComponent := 0.0
+	if config.Capacity > 0 && config.NumberWinners > 0 {
+		competitionComponent = (float64(config.Capacity) / float64(config.NumberWinners)) - 1
+	}
+
+	stakeComponent := 0.0
+	if config.RegistrationPrice > 0 {
+		stakeComponent = math.Log10(float64(config.RegistrationPrice)+1) * 12
+	}
+
+	riskScore := 10 +
+		int(math.Round(competitionComponent*8)) +
+		int(math.Round(stakeComponent)) +
+		(config.Commission / 5)
+
+	if config.IsBoost {
+		riskScore += 6 + (config.BoostPower / 20)
+	}
+
+	if riskScore < 10 {
+		riskScore = 10
+	}
+	if riskScore > 100 {
+		riskScore = 100
+	}
+
+	return int64(riskScore)
 }
 
 func maxSeatsPerUser(capacity int) int {

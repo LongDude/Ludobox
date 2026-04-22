@@ -21,6 +21,8 @@ import type {
   UserBalanceEvent,
   UserGameHistoryListResponse,
   UserGameHistoryRequest,
+  UserRatingHistoryRequest,
+  UserRatingHistoryResponse,
 } from './types'
 
 type AdminEventHandlers = SseHandlers<AdminEvent>
@@ -57,6 +59,15 @@ function buildUserGameHistoryParams(request?: UserGameHistoryRequest) {
     game_id: request.game_id,
     room_id: request.room_id,
     status: request.status || undefined,
+    date_from: request.date_from || undefined,
+    date_to: request.date_to || undefined,
+  }
+}
+
+function buildUserRatingHistoryParams(request?: UserRatingHistoryRequest) {
+  if (!request) return undefined
+
+  return {
     date_from: request.date_from || undefined,
     date_to: request.date_to || undefined,
   }
@@ -131,6 +142,13 @@ export const UserApi = {
     return api
       .get<UserGameHistoryListResponse>('/users/user/history/games', {
         params: buildUserGameHistoryParams(request),
+      })
+      .then((response) => response.data)
+  },
+  getCurrentUserRatingHistory(request?: UserRatingHistoryRequest) {
+    return api
+      .get<UserRatingHistoryResponse>('/users/user/history/rating', {
+        params: buildUserRatingHistoryParams(request),
       })
       .then((response) => response.data)
   },
