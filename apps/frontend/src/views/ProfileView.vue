@@ -18,7 +18,57 @@ type ChartPoint = {
   item: UserRatingHistoryResponse['items'][number]
   x: number
   y: number
+  rating: string
+  date: string
 }
+
+type RatingBand = {
+  rank: UserRank
+  min: number
+  max: number | null
+  color: string
+  fill: string
+}
+
+type VisibleRatingBand = {
+  key: string
+  label: string
+  min: number
+  max: number
+  y: number
+  height: number
+  color: string
+  fill: string
+}
+
+type RatingThresholdLine = {
+  key: string
+  label: string
+  value: number
+  y: number
+  color: string
+}
+
+type RatingChartDomain = {
+  min: number
+  max: number
+}
+
+const RATING_CHART_WIDTH = 1000
+const RATING_CHART_HEIGHT = 360
+const RATING_CHART_LEFT = 74
+const RATING_CHART_RIGHT = 942
+const RATING_CHART_TOP = 30
+const RATING_CHART_BOTTOM = 286
+const RATING_CHART_PLOT_WIDTH = RATING_CHART_RIGHT - RATING_CHART_LEFT
+const RATING_CHART_PLOT_HEIGHT = RATING_CHART_BOTTOM - RATING_CHART_TOP
+const RATING_BANDS: RatingBand[] = [
+  { rank: 'bronze', min: 0, max: 500, color: '#b45309', fill: 'rgba(180, 83, 9, 0.08)' },
+  { rank: 'silver', min: 500, max: 1500, color: '#64748b', fill: 'rgba(100, 116, 139, 0.08)' },
+  { rank: 'gold', min: 1500, max: 3000, color: '#d97706', fill: 'rgba(217, 119, 6, 0.1)' },
+  { rank: 'platinum', min: 3000, max: 5000, color: '#0891b2', fill: 'rgba(8, 145, 178, 0.09)' },
+  { rank: 'diamond', min: 5000, max: null, color: '#7c3aed', fill: 'rgba(124, 58, 237, 0.09)' },
+]
 
 const auth = useAuthStore()
 const cabinet = useUserCabinetStore()
@@ -132,32 +182,124 @@ const latestRatingUpdate = computed(() => {
   return items.length > 0 ? items[items.length - 1] : null
 })
 
+const ratingChartDomain = computed<RatingChartDomain>(() => {
+  const items = ratingHistory.value?.items ?? []
+  const ratings = items.map((item) => item.rating_after)
+  if (cabinet.profile?.rating !== undefined) {
+    ratings.push(cabinet.profile.rating)
+  }
+
+  return getRatingChartDomain(Math.min(...ratings, 0), Math.max(...ratings, 0))
+})
+
 const chartPoints = computed<ChartPoint[]>(() => {
   const items = ratingHistory.value?.items ?? []
   if (items.length === 0) return []
 
-  const width = 100
-  const height = 100
-  const minRating = Math.min(...items.map((item) => item.rating_after))
-  const maxRating = Math.max(...items.map((item) => item.rating_after))
-  const range = Math.max(maxRating - minRating, 1)
+  const { min: domainMin, max: domainMax } = ratingChartDomain.value
+  const range = Math.max(domainMax - domainMin, 1)
 
   return items.map((item, index) => {
-    const x = items.length === 1 ? width / 2 : (index / (items.length - 1)) * width
-    const y = height - ((item.rating_after - minRating) / range) * height
-    return { item, x, y }
+    const progress = (item.rating_after - domainMin) / range
+    const x =
+      items.length === 1
+        ? RATING_CHART_LEFT + RATING_CHART_PLOT_WIDTH / 2
+        : RATING_CHART_LEFT + (index / (items.length - 1)) * RATING_CHART_PLOT_WIDTH
+    const y =
+      RATING_CHART_BOTTOM -
+      Math.min(Math.max(progress, 0), 1) * RATING_CHART_PLOT_HEIGHT
+
+    return {
+      item,
+      x,
+      y,
+      rating: formatRatingValue(item.rating_after),
+      date: formatRatingDate(item.created_at),
+    }
   })
 })
 
-const chartPolyline = computed(() => chartPoints.value.map((point) => `${point.x},${point.y}`).join(' '))
-
-const chartArea = computed(() => {
+const ratingChartPath = computed(() => {
   const points = chartPoints.value
   if (points.length === 0) return ''
+  if (points.length === 1) {
+    const point = points[0]
+    return `M ${point.x - 16} ${point.y} L ${point.x + 16} ${point.y}`
+  }
 
-  const first = points[0]
-  const last = points[points.length - 1]
-  return `0,100 ${first.x},${first.y} ${points.map((point) => `${point.x},${point.y}`).join(' ')} ${last.x},100`
+  return points.map((point, index) => `${index === 0 ? 'M' : 'L'} ${point.x} ${point.y}`).join(' ')
+})
+
+const chartHelperText = computed(() => {
+  const count = chartPoints.value.length
+  if (count === 1) return t('profile.game.ratingHistory.helper.single')
+  if (count <= 3) return t('profile.game.ratingHistory.helper.sparse')
+  return ''
+})
+
+const visibleRatingBands = computed<VisibleRatingBand[]>(() => {
+  const { min: domainMin, max: domainMax } = ratingChartDomain.value
+
+  return RATING_BANDS.map((band) => {
+    const bandMax = band.max ?? domainMax
+    const min = Math.max(band.min, domainMin)
+    const max = Math.min(bandMax, domainMax)
+    if (max <= min) return null
+
+    const yTop = ratingToChartY(max)
+    const yBottom = ratingToChartY(min)
+    return {
+      key: String(band.rank),
+      label: translateRank(band.rank),
+      min,
+      max,
+      y: yTop,
+      height: Math.max(yBottom - yTop, 1),
+      color: band.color,
+      fill: band.fill,
+    }
+  }).filter((band): band is VisibleRatingBand => Boolean(band))
+})
+
+const ratingThresholdLines = computed<RatingThresholdLine[]>(() => {
+  const { min, max } = ratingChartDomain.value
+
+  return RATING_BANDS.filter((band) => band.min > min && band.min < max).map((band) => ({
+    key: String(band.rank),
+    label: `${translateRank(band.rank)} ${formatRatingValue(band.min)}`,
+    value: band.min,
+    y: ratingToChartY(band.min),
+    color: band.color,
+  }))
+})
+
+const ratingGridLines = computed(() => {
+  const { min, max } = ratingChartDomain.value
+  const step = getRatingGridStep(max - min)
+  const first = Math.ceil(min / step) * step
+  const lines: Array<{ value: number; y: number; label: string }> = []
+
+  for (let value = first; value <= max; value += step) {
+    if (value === min || value === max) continue
+    lines.push({
+      value,
+      y: ratingToChartY(value),
+      label: formatRatingValue(value),
+    })
+  }
+
+  return lines
+})
+
+const nextRankTarget = computed(() => {
+  const currentRating = cabinet.profile?.rating ?? latestRatingUpdate.value?.rating_after ?? 0
+  const nextBand = RATING_BANDS.find((band) => band.min > currentRating)
+  if (!nextBand) return t('profile.game.ratingHistory.maxRank')
+
+  return t('profile.game.ratingHistory.nextTarget', {
+    rank: translateRank(nextBand.rank),
+    rating: formatRatingValue(nextBand.min),
+  })
 })
 
 const chartStartLabel = computed(() => {
@@ -230,26 +372,93 @@ function translateRankTooltip(rank?: UserRank) {
   return t(`profile.game.rankTooltip.${normalizeRank(rank)}`)
 }
 
+function getRatingChartDomain(minRating: number, maxRating: number): RatingChartDomain {
+  const safeMin = Math.max(0, Number.isFinite(minRating) ? minRating : 0)
+  const safeMax = Math.max(safeMin, Number.isFinite(maxRating) ? maxRating : safeMin)
+  const lowerBand = [...RATING_BANDS].reverse().find((band) => band.min <= safeMin)
+  const nextBand = RATING_BANDS.find((band) => band.min > safeMax)
+  const min = lowerBand?.min ?? 0
+  const max = nextBand?.min ?? Math.ceil((safeMax + 500) / 500) * 500
+
+  return {
+    min,
+    max: Math.max(max, min + 500),
+  }
+}
+
+function ratingToChartY(value: number) {
+  const { min, max } = ratingChartDomain.value
+  const progress = (value - min) / Math.max(max - min, 1)
+  return RATING_CHART_BOTTOM - Math.min(Math.max(progress, 0), 1) * RATING_CHART_PLOT_HEIGHT
+}
+
+function getRatingGridStep(range: number) {
+  if (range <= 750) return 100
+  if (range <= 2000) return 250
+  if (range <= 5000) return 500
+  return 1000
+}
+
 function formatSignedNumber(value: number) {
   const formatter = new Intl.NumberFormat(locale.value === 'ru' ? 'ru-RU' : 'en-US')
   if (value > 0) return `+${formatter.format(value)}`
   return formatter.format(value)
 }
 
+function formatRatingValue(value: number) {
+  return new Intl.NumberFormat(locale.value === 'ru' ? 'ru-RU' : 'en-US').format(value)
+}
+
 function formatRatingDate(value: string) {
   const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return value
+
   return new Intl.DateTimeFormat(locale.value === 'ru' ? 'ru-RU' : 'en-US', {
     day: '2-digit',
     month: 'short',
   }).format(date)
 }
 
+function formatRatingDateLong(value: string) {
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return value
+
+  return new Intl.DateTimeFormat(locale.value === 'ru' ? 'ru-RU' : 'en-US', {
+    day: '2-digit',
+    month: 'long',
+    year: 'numeric',
+  }).format(date)
+}
+
+function formatRatingTime(value: string) {
+  const date = new Date(value)
+  return Number.isNaN(date.getTime())
+    ? formatRatingDate(value)
+    : new Intl.DateTimeFormat(locale.value === 'ru' ? 'ru-RU' : 'en-US', {
+        timeStyle: 'short',
+      }).format(date)
+}
+
 function formatRatingDateTime(value: string) {
   const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return value
+
   return new Intl.DateTimeFormat(locale.value === 'ru' ? 'ru-RU' : 'en-US', {
     dateStyle: 'medium',
     timeStyle: 'short',
   }).format(date)
+}
+
+function isSameCalendarDay(left: string, right: string) {
+  const leftDate = new Date(left)
+  const rightDate = new Date(right)
+  if (Number.isNaN(leftDate.getTime()) || Number.isNaN(rightDate.getTime())) return false
+
+  return (
+    leftDate.getFullYear() === rightDate.getFullYear() &&
+    leftDate.getMonth() === rightDate.getMonth() &&
+    leftDate.getDate() === rightDate.getDate()
+  )
 }
 
 function buildRatingHistoryRequest(period: RatingPeriod): UserRatingHistoryRequest {
@@ -731,28 +940,122 @@ async function logout() {
                 {{ t('profile.game.ratingHistory.empty') }}
               </div>
               <div v-else class="chart-shell">
+
+                <p v-if="chartHelperText" class="chart-helper">
+                  {{ chartHelperText }}
+                </p>
+
                 <svg
                   class="rating-chart"
-                  viewBox="0 0 100 100"
-                  preserveAspectRatio="none"
+                  :viewBox="`0 0 ${RATING_CHART_WIDTH} ${RATING_CHART_HEIGHT}`"
+                  preserveAspectRatio="xMidYMid meet"
                   role="img"
                   :aria-label="t('profile.game.ratingHistoryTitle')"
                 >
-                  <defs>
-                    <linearGradient id="ratingArea" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="0%" stop-color="rgba(8, 145, 178, 0.38)" />
-                      <stop offset="100%" stop-color="rgba(8, 145, 178, 0.02)" />
-                    </linearGradient>
-                  </defs>
-                  <polygon :points="chartArea" fill="url(#ratingArea)" />
-                  <polyline class="chart-line" :points="chartPolyline" />
-                  <circle
-                    v-for="point in chartPoints"
-                    :key="point.item.history_id"
-                    class="chart-dot"
-                    :cx="point.x"
-                    :cy="point.y"
-                    r="1.8"
+                  <rect
+                    class="rating-plot-bg"
+                    :x="RATING_CHART_LEFT"
+                    :y="RATING_CHART_TOP"
+                    :width="RATING_CHART_PLOT_WIDTH"
+                    :height="RATING_CHART_PLOT_HEIGHT"
+                    rx="18"
+                  />
+
+                  <g v-for="band in visibleRatingBands" :key="band.key">
+                    <rect
+                      :x="RATING_CHART_LEFT"
+                      :y="band.y"
+                      :width="RATING_CHART_PLOT_WIDTH"
+                      :height="band.height"
+                      :fill="band.fill"
+                    />
+                    <text
+                      class="rank-band-label"
+                      :x="RATING_CHART_RIGHT - 12"
+                      :y="band.y + Math.max(band.height / 2, 12)"
+                      text-anchor="end"
+                      :fill="band.color"
+                    >
+                      {{ band.label }}
+                    </text>
+                  </g>
+
+                  <g v-for="line in ratingGridLines" :key="line.value">
+                    <line
+                      class="rating-grid-line"
+                      :x1="RATING_CHART_LEFT"
+                      :x2="RATING_CHART_RIGHT"
+                      :y1="line.y"
+                      :y2="line.y"
+                    />
+                    <text class="rating-axis-label" :x="RATING_CHART_LEFT - 12" :y="line.y + 4" text-anchor="end">
+                      {{ line.label }}
+                    </text>
+                  </g>
+
+                  <g v-for="line in ratingThresholdLines" :key="line.key">
+                    <line
+                      class="rating-threshold-line"
+                      :x1="RATING_CHART_LEFT"
+                      :x2="RATING_CHART_RIGHT"
+                      :y1="line.y"
+                      :y2="line.y"
+                      :stroke="line.color"
+                    />
+                    <text
+                      class="rating-threshold-label"
+                      :x="RATING_CHART_LEFT + 12"
+                      :y="Math.max(line.y - 7, RATING_CHART_TOP + 14)"
+                      :fill="line.color"
+                    >
+                      {{ line.label }}
+                    </text>
+                  </g>
+
+                  <path class="chart-line chart-line--rating" :d="ratingChartPath" />
+
+                  <g v-for="(point, index) in chartPoints" :key="point.item.history_id">
+                    <circle
+                      class="chart-dot"
+                      :class="{ 'chart-dot--latest': index === chartPoints.length - 1 }"
+                      :cx="point.x"
+                      :cy="point.y"
+                      :r="index === chartPoints.length - 1 ? 6 : 4.5"
+                    />
+                    <text
+                      v-if="chartPoints.length <= 8 || index === chartPoints.length - 1"
+                      class="chart-point-label"
+                      :class="{ 'chart-point-label--latest': index === chartPoints.length - 1 }"
+                      :x="point.x"
+                      :y="Math.max(point.y - 12, RATING_CHART_TOP + 14)"
+                      text-anchor="middle"
+                    >
+                      {{ point.rating }}
+                    </text>
+                    <text
+                      v-if="chartPoints.length <= 4"
+                      class="chart-point-date"
+                      :x="point.x"
+                      :y="RATING_CHART_BOTTOM + 24"
+                      text-anchor="middle"
+                    >
+                      {{ point.date }}
+                    </text>
+                  </g>
+
+                  <line
+                    class="rating-axis-line"
+                    :x1="RATING_CHART_LEFT"
+                    :x2="RATING_CHART_RIGHT"
+                    :y1="RATING_CHART_BOTTOM"
+                    :y2="RATING_CHART_BOTTOM"
+                  />
+                  <line
+                    class="rating-axis-line"
+                    :x1="RATING_CHART_LEFT"
+                    :x2="RATING_CHART_LEFT"
+                    :y1="RATING_CHART_TOP"
+                    :y2="RATING_CHART_BOTTOM"
                   />
                 </svg>
 
@@ -1217,17 +1520,27 @@ input[type='number'] {
 
 .chart-shell {
   justify-items: center;
-  padding: 0.95rem;
+  padding: 1rem;
   border-radius: 1.15rem;
   border: 1px solid color-mix(in oklab, var(--color-border), transparent 12%);
   background: linear-gradient(180deg, rgba(255, 255, 255, 0.16), rgba(255, 255, 255, 0.04));
+  overflow: hidden;
+}
+
+.chart-helper {
+  width: 100%;
+  max-width: 100%;
+  margin: 0;
+  color: var(--color-muted);
+  font-size: 0.82rem;
+  line-height: 1.45;
 }
 
 .rating-chart {
   width: 100%;
-  max-width: 720px;
-  height: clamp(150px, 20vw, 220px);
-  overflow: visible;
+  max-width: 100%;
+  height: clamp(270px, 33vw, 390px);
+  display: block;
 }
 
 .chart-axis,
@@ -1235,22 +1548,109 @@ input[type='number'] {
   width: 100%;
 }
 
+.rating-plot-bg {
+  fill: color-mix(in oklab, var(--color-surface), transparent 8%);
+  stroke: color-mix(in oklab, var(--color-border), transparent 20%);
+  stroke-width: 1.2;
+}
+
+.rank-band-label {
+  font-size: 13px;
+  font-weight: 900;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.rating-grid-line {
+  stroke: color-mix(in oklab, var(--color-border), transparent 48%);
+  stroke-width: 1;
+}
+
+.rating-axis-label,
+.chart-point-date {
+  fill: var(--color-muted);
+  font-size: 12px;
+}
+
+.rating-threshold-line {
+  stroke-width: 1.4;
+  stroke-dasharray: 7 8;
+  opacity: 0.62;
+}
+
+.rating-threshold-label {
+  font-size: 12px;
+  font-weight: 900;
+  paint-order: stroke;
+  stroke: color-mix(in oklab, var(--color-surface), white 24%);
+  stroke-width: 4px;
+  stroke-linejoin: round;
+}
+
+.rating-axis-line {
+  stroke: color-mix(in oklab, var(--color-border), transparent 18%);
+  stroke-width: 1.4;
+}
+
 .chart-line {
   fill: none;
-  stroke: #0891b2;
-  stroke-width: 2.25;
   stroke-linecap: round;
   stroke-linejoin: round;
 }
 
+.chart-line--rating {
+  stroke: #0f766e;
+  stroke-width: 4;
+  filter: drop-shadow(0 6px 12px rgba(15, 118, 110, 0.18));
+}
+
 .chart-dot {
-  fill: #0284c7;
+  fill: color-mix(in oklab, var(--color-surface), white 18%);
+  stroke: #0f766e;
+  stroke-width: 3;
+}
+
+.chart-dot--latest {
+  fill: #0f766e;
   stroke: white;
-  stroke-width: 0.8;
+  stroke-width: 3.5;
+  filter: drop-shadow(0 8px 14px rgba(15, 118, 110, 0.28));
+}
+
+.chart-point-label {
+  fill: var(--color-text);
+  font-size: 13px;
+  font-weight: 900;
+  paint-order: stroke;
+  stroke: color-mix(in oklab, var(--color-surface), white 24%);
+  stroke-width: 4px;
+  stroke-linejoin: round;
+}
+
+.chart-point-label--latest {
+  fill: #0f766e;
+  font-size: 15px;
+}
+
+.chart-target {
+  width: 100%;
+  display: flex;
+  justify-content: flex-end;
+  color: var(--color-text);
+  font-size: 0.86rem;
+  font-weight: 800;
+}
+
+.chart-target span {
+  padding: 0.45rem 0.7rem;
+  border-radius: 999px;
+  border: 1px solid color-mix(in oklab, #0f766e, transparent 65%);
+  background: color-mix(in oklab, #0f766e, transparent 88%);
 }
 
 .chart-axis,
 .chart-footnote {
+  max-width: 100%;
   display: flex;
   justify-content: space-between;
   gap: 1rem;

@@ -535,6 +535,16 @@ const messages: Record<Locale, Record<string, string>> = {
     'profile.game.ratingHistory.empty': 'No rating changes for the selected period yet.',
     'profile.game.ratingHistory.error': 'Failed to load rating history.',
     'profile.game.ratingHistory.lastChange': 'Last gain',
+    'profile.game.ratingHistory.startPoint': 'Start',
+    'profile.game.ratingHistory.latestPoint': 'Current rating',
+    'profile.game.ratingHistory.nextTarget': 'Next target: {rank} from {rating}',
+    'profile.game.ratingHistory.maxRank': 'You are already in the highest visible rank range.',
+    'profile.game.ratingHistory.helper.single':
+      'Only one rating event is available. The rank levels show the next rating target.',
+    'profile.game.ratingHistory.helper.comparison':
+      'Two rating events are shown as a compact comparison instead of a full trend chart.',
+    'profile.game.ratingHistory.helper.sparse':
+      'There are only a few rating events, so the chart shows a simple line against stable rank levels.',
     'profile.game.msg.nicknameRequired': 'Enter a nickname before saving.',
     'profile.game.msg.deltaRequired': 'Enter a non-zero integer delta.',
     'profile.game.msg.nicknameUpdated': 'Nickname updated.',
@@ -1571,6 +1581,16 @@ const messages: Record<Locale, Record<string, string>> = {
     'profile.game.ratingHistory.empty': 'За выбранный период изменений рейтинга пока нет.',
     'profile.game.ratingHistory.error': 'Не удалось загрузить историю рейтинга.',
     'profile.game.ratingHistory.lastChange': 'Последний прирост',
+    'profile.game.ratingHistory.startPoint': 'Начало',
+    'profile.game.ratingHistory.latestPoint': 'Текущий рейтинг',
+    'profile.game.ratingHistory.nextTarget': 'Следующая цель: {rank} от {rating}',
+    'profile.game.ratingHistory.maxRank': 'Вы уже в максимальной отображаемой зоне ранга.',
+    'profile.game.ratingHistory.helper.single':
+      'Доступно только одно изменение рейтинга. Уровни рангов показывают следующую цель.',
+    'profile.game.ratingHistory.helper.comparison':
+      'Два изменения рейтинга показаны компактным сравнением, а не полноценным графиком тренда.',
+    'profile.game.ratingHistory.helper.sparse':
+      'Изменений рейтинга пока мало, поэтому график показывает простую линию на стабильной шкале рангов.',
     'profile.game.msg.nicknameRequired': 'Введите никнейм перед сохранением.',
     'profile.game.msg.deltaRequired': 'Введите ненулевую целочисленную дельту.',
     'profile.game.msg.nicknameUpdated': 'Никнейм обновлён.',
