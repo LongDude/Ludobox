@@ -22,6 +22,8 @@ import (
 
 const defaultRNGDistributeURL = "http://rng-stub:7001/winnings/distribute"
 
+const botParticipantIDOffset int64 = 1_000_000_000
+
 type rngDistributeRequest struct {
 	Probabilities []float64 `json:"probabilities"`
 	WinnersCount  int       `json:"winners_count"`
@@ -773,7 +775,8 @@ func (s *RoomService) FinalizeGameRound(ctx context.Context, roundID int64) ([]d
 		return nil, errors.New("round has no active participants")
 	}
 
-	winningPositions, err := s.requestWinningPositions(ctx, roomInfo.Config, participants)
+	participantsWithBots := appendBotParticipants(roundID, roomInfo.Config.Capacity, participants)
+	winningPositions, err := s.requestWinningPositions(ctx, roomInfo.Config, participantsWithBots)
 	if err != nil {
 		return nil, err
 	}
@@ -781,8 +784,8 @@ func (s *RoomService) FinalizeGameRound(ctx context.Context, roundID int64) ([]d
 	payouts := buildPayouts(roomInfo.Config, len(winningPositions), len(participants))
 	payoutsByParticipant := make(map[int64]int64, len(winningPositions))
 	winners := make([]domain.RoundParticipant, 0, len(winningPositions))
-	participantsBySeat := make(map[int]domain.RoundParticipant, len(participants))
-	for _, participant := range participants {
+	participantsBySeat := make(map[int]domain.RoundParticipant, len(participantsWithBots))
+	for _, participant := range participantsWithBots {
 		participantsBySeat[participant.NumberInRoom] = participant
 	}
 
@@ -792,7 +795,9 @@ func (s *RoomService) FinalizeGameRound(ctx context.Context, roundID int64) ([]d
 			return nil, fmt.Errorf("winning position %d does not have an active participant", winningPosition)
 		}
 		participant.WinningMoney = payouts[idx]
-		payoutsByParticipant[participant.RoundParticipantID] = payouts[idx]
+		if !participant.IsBot {
+			payoutsByParticipant[participant.RoundParticipantID] = payouts[idx]
+		}
 		winners = append(winners, participant)
 	}
 
@@ -804,6 +809,41 @@ func (s *RoomService) FinalizeGameRound(ctx context.Context, roundID int64) ([]d
 	}
 
 	return winners, nil
+}
+
+func appendBotParticipants(roundID int64, capacity int, participants []domain.RoundParticipant) []domain.RoundParticipant {
+	if capacity < len(participants) {
+		capacity = len(participants)
+	}
+
+	participantsWithBots := append([]domain.RoundParticipant(nil), participants...)
+	occupiedSeats := make(map[int]struct{}, len(participants))
+	maxSeat := capacity
+	for _, participant := range participants {
+		occupiedSeats[participant.NumberInRoom] = struct{}{}
+		if participant.NumberInRoom > maxSeat {
+			maxSeat = participant.NumberInRoom
+		}
+	}
+
+	for seat := 1; seat <= maxSeat; seat++ {
+		if _, occupied := occupiedSeats[seat]; occupied {
+			continue
+		}
+		participantsWithBots = append(participantsWithBots, domain.RoundParticipant{
+			RoundParticipantID: botParticipantID(roundID, seat),
+			UserID:             -int64(seat),
+			RoundsID:           roundID,
+			NumberInRoom:       seat,
+			IsBot:              true,
+		})
+	}
+
+	return participantsWithBots
+}
+
+func botParticipantID(roundID int64, seat int) int64 {
+	return -((roundID * botParticipantIDOffset) + int64(seat))
 }
 
 func (s *RoomService) resolveRoom(ctx context.Context, roomID int64) (*domain.RoomInfo, error) {
@@ -908,8 +948,9 @@ func (s *RoomService) requestWinningPositions(ctx context.Context, config *domai
 
 	seatNumbers := make([]int, 0, len(orderedParticipants))
 	probabilities := make([]float64, 0, len(orderedParticipants))
+	countPlayers := len(orderedParticipants)
 	for _, participant := range orderedParticipants {
-		weight := 1.0
+		weight := 1.0 / float64(countPlayers)
 		if participant.Boost > 0 {
 			weight *= coefBoost
 		}

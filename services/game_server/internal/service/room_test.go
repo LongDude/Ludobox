@@ -733,12 +733,18 @@ func TestRequestWinningPositionsMapsWinnersToActualSeatNumbers(t *testing.T) {
 		if err := json.NewDecoder(request.Body).Decode(&payload); err != nil {
 			t.Fatalf("decode request: %v", err)
 		}
-		if len(payload.Probabilities) != 2 {
-			t.Fatalf("unexpected probabilities length: got %d want 2", len(payload.Probabilities))
+		if len(payload.Probabilities) != 4 {
+			t.Fatalf("unexpected probabilities length: got %d want 4", len(payload.Probabilities))
+		}
+		expectedProbabilities := []float64{0.25, 0.25, 0.25, 0.3125}
+		for idx, probability := range payload.Probabilities {
+			if probability != expectedProbabilities[idx] {
+				t.Fatalf("unexpected probability at %d: got %v want %v", idx, probability, expectedProbabilities[idx])
+			}
 		}
 
 		writer.Header().Set("Content-Type", "application/json")
-		if err := json.NewEncoder(writer).Encode(rngDistributeResponse{WinningPositions: []int{1, 2}}); err != nil {
+		if err := json.NewEncoder(writer).Encode(rngDistributeResponse{WinningPositions: []int{2, 4}}); err != nil {
 			t.Fatalf("encode response: %v", err)
 		}
 	}))
@@ -750,12 +756,13 @@ func TestRequestWinningPositionsMapsWinnersToActualSeatNumbers(t *testing.T) {
 	}
 
 	positions, err := service.requestWinningPositions(context.Background(), &domain.RoomConfig{
+		Capacity:      4,
 		NumberWinners: 2,
 		BoostPower:    25,
-	}, []domain.RoundParticipant{
+	}, appendBotParticipants(1, 4, []domain.RoundParticipant{
 		{RoundParticipantID: 10, NumberInRoom: 4, Boost: 25},
 		{RoundParticipantID: 11, NumberInRoom: 2},
-	})
+	}))
 	if err != nil {
 		t.Fatalf("request winning positions: %v", err)
 	}
@@ -765,5 +772,64 @@ func TestRequestWinningPositionsMapsWinnersToActualSeatNumbers(t *testing.T) {
 	}
 	if positions[0] != 2 || positions[1] != 4 {
 		t.Fatalf("unexpected mapped positions: got %v want [2 4]", positions)
+	}
+}
+
+func TestFinalizeGameRoundIncludesBotWinnersWithoutCreditingBots(t *testing.T) {
+	ctx := context.Background()
+	scope := newMockTransactionScope()
+	repo := &mockRoomRepository{scope: scope}
+
+	server := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+		var payload rngDistributeRequest
+		if err := json.NewDecoder(request.Body).Decode(&payload); err != nil {
+			t.Fatalf("decode request: %v", err)
+		}
+		if err := json.NewEncoder(writer).Encode(rngDistributeResponse{WinningPositions: []int{1, 2}}); err != nil {
+			t.Fatalf("encode response: %v", err)
+		}
+	}))
+	defer server.Close()
+
+	service := NewRoomService(repo, nil, 1, nil, server.URL)
+	service.httpClient = server.Client()
+
+	firstParticipantID, err := service.JoinRoomWithSeat(ctx, 100, 1, 2)
+	if err != nil {
+		t.Fatalf("first join failed: %v", err)
+	}
+	secondParticipantID, err := service.JoinRoomWithSeat(ctx, 200, 1, 4)
+	if err != nil {
+		t.Fatalf("second join failed: %v", err)
+	}
+	if err := scope.UpdateRoundStatus(ctx, 1, "active"); err != nil {
+		t.Fatalf("UpdateRoundStatus failed: %v", err)
+	}
+
+	winners, err := service.FinalizeGameRound(ctx, 1)
+	if err != nil {
+		t.Fatalf("FinalizeGameRound failed: %v", err)
+	}
+
+	if len(winners) != 2 {
+		t.Fatalf("unexpected winners count: got %d want 2", len(winners))
+	}
+	if !winners[0].IsBot || winners[0].NumberInRoom != 1 {
+		t.Fatalf("expected first winner to be bot in seat 1, got %+v", winners[0])
+	}
+	if winners[1].IsBot || winners[1].RoundParticipantID != firstParticipantID || winners[1].WinningMoney != 80 {
+		t.Fatalf("expected second winner to be participant %d with 80, got %+v", firstParticipantID, winners[1])
+	}
+	if scope.participants[firstParticipantID].WinningMoney != 80 {
+		t.Fatalf("unexpected winning money for first participant: got %d want 80", scope.participants[firstParticipantID].WinningMoney)
+	}
+	if scope.participants[secondParticipantID].WinningMoney != 0 {
+		t.Fatalf("unexpected winning money for second participant: got %d want 0", scope.participants[secondParticipantID].WinningMoney)
+	}
+	if scope.balances[100] != 980 {
+		t.Fatalf("unexpected balance for user 100: got %d want 980", scope.balances[100])
+	}
+	if scope.balances[200] != 900 {
+		t.Fatalf("unexpected balance for user 200: got %d want 900", scope.balances[200])
 	}
 }
