@@ -72,6 +72,7 @@ type RoundStatusResponse struct {
 type ParticipantInfo struct {
 	ParticipantID int64      `json:"participant_id"`
 	UserID        *int64     `json:"user_id,omitempty"`
+	Nickname      *string    `json:"nickname,omitempty"`
 	NumberInRoom  int        `json:"number_in_room"`
 	Boost         int        `json:"boost"`
 	WinningMoney  int64      `json:"winning_money,omitempty"`

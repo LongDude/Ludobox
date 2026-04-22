@@ -135,6 +135,7 @@ func roomStateResponse(
 		response.CurrentUserParticipants = append(response.CurrentUserParticipants, dto.ParticipantInfo{
 			ParticipantID: participant.RoundParticipantID,
 			UserID:        &userID,
+			Nickname:      participant.NickName,
 			NumberInRoom:  participant.NumberInRoom,
 			Boost:         participant.Boost,
 			WinningMoney:  participant.WinningMoney,
@@ -710,6 +711,7 @@ func GetRoundStatus(ctx *gin.Context, a *app.App) {
 		info := dto.ParticipantInfo{
 			ParticipantID: participant.RoundParticipantID,
 			UserID:        &userID,
+			Nickname:      participant.NickName,
 			NumberInRoom:  participant.NumberInRoom,
 			Boost:         participant.Boost,
 			WinningMoney:  participant.WinningMoney,

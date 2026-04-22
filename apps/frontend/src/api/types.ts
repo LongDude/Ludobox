@@ -95,15 +95,18 @@ export interface UserGameHistoryRequest {
 
 export interface UserGameHistoryItem {
   round_id: number
-  participant_id: number
   room_id: number
   game_id: number
   game_name: string
-  seat_number: number
   round_status: string
   result: UserGameHistoryResult
+  reserved_seats: number[]
+  winning_seats: number[]
+  reserved_seats_count: number
+  winning_seats_count: number
   entry_fee: number
   boost_fee: number
+  total_spent: number
   winning_money: number
   net_result: number
   joined_at: string
@@ -202,6 +205,7 @@ export interface GameRoomStateResponse {
 export interface GameParticipantInfo {
   participant_id: number
   user_id?: number | null
+  nickname?: string | null
   number_in_room: number
   boost: number
   winning_money: number

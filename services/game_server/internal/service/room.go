@@ -102,6 +102,46 @@ func (s *RoomService) InitializeRoomsCache(ctx context.Context) error {
 	return nil
 }
 
+// RecoverServerState cancels interrupted active rounds after a crash and
+// synchronizes persisted room occupancy with the live round participants.
+func (s *RoomService) RecoverServerState(ctx context.Context) error {
+	rooms, err := s.repo.GetRoomsByServerID(ctx, s.serverID)
+	if err != nil {
+		return fmt.Errorf("get rooms by server id: %w", err)
+	}
+
+	cancelledRounds := 0
+	for _, room := range rooms {
+		roomInfo, err := s.repo.GetRoom(ctx, room.RoomID)
+		if err != nil {
+			return fmt.Errorf("load room %d: %w", room.RoomID, err)
+		}
+		if roomInfo == nil {
+			continue
+		}
+
+		if roomInfo.CurrentRoundID != nil && roomInfo.CurrentRoundStatus != nil && *roomInfo.CurrentRoundStatus == "active" {
+			if err := s.cancelInterruptedRound(ctx, *roomInfo.CurrentRoundID); err != nil {
+				return fmt.Errorf("cancel interrupted round %d: %w", *roomInfo.CurrentRoundID, err)
+			}
+			cancelledRounds++
+		}
+
+		if err := s.syncRoomCurrentPlayers(ctx, room.RoomID); err != nil {
+			return fmt.Errorf("sync room %d current players: %w", room.RoomID, err)
+		}
+		s.refreshRoomCache(ctx, room.RoomID)
+	}
+
+	s.logger.WithFields(map[string]interface{}{
+		"server_id":        s.serverID,
+		"rooms_checked":    len(rooms),
+		"cancelled_rounds": cancelledRounds,
+	}).Info("Recovered game server state")
+
+	return nil
+}
+
 func (s *RoomService) JoinRoom(ctx context.Context, userID, roomID int64) (int64, error) {
 	return s.joinRoom(ctx, userID, roomID, nil)
 }
@@ -178,13 +218,6 @@ func (s *RoomService) joinRoom(ctx context.Context, userID, roomID int64, reques
 			}
 		}
 
-		if requestedSeat == nil && len(existingUserParticipants) > 0 {
-			participantID = existingUserParticipants[0].RoundParticipantID
-			waitingTimeSeconds = roomConfig.Time
-			activeTimeSeconds = roomConfig.RoundTime
-			minUsers = roomConfig.MinUsers
-			return nil
-		}
 		if requestedSeat != nil {
 			for _, participant := range existingUserParticipants {
 				if participant.NumberInRoom == *requestedSeat {
@@ -260,6 +293,9 @@ func (s *RoomService) joinRoom(ctx context.Context, userID, roomID int64, reques
 		waitingTimeSeconds = roomConfig.Time
 		activeTimeSeconds = roomConfig.RoundTime
 		minUsers = roomConfig.MinUsers
+		if err := s.updateRoomCurrentPlayersInTx(ctx, ts, roomID, roundID); err != nil {
+			return err
+		}
 		return nil
 	})
 	if err != nil {
@@ -441,6 +477,9 @@ func (s *RoomService) LeaveRoom(ctx context.Context, participantID, userID int64
 			}
 			roundCancelled = true
 		}
+		if err := ts.SetRoomCurrentPlayers(ctx, roomID, activeCount); err != nil {
+			return err
+		}
 
 		return nil
 	})
@@ -535,6 +574,9 @@ func (s *RoomService) LeaveRoomByUser(ctx context.Context, userID, roomID int64)
 			}
 			roundCancelled = true
 		}
+		if err := ts.SetRoomCurrentPlayers(ctx, roomID, activeCount); err != nil {
+			return err
+		}
 
 		return nil
 	})
@@ -592,6 +634,9 @@ func (s *RoomService) CancelWaitingRound(ctx context.Context, roundID int64) err
 		}
 		if err := ts.ArchiveRound(ctx, roundID); err != nil {
 			return fmt.Errorf("archive round: %w", err)
+		}
+		if err := ts.SetRoomCurrentPlayers(ctx, roomID, 0); err != nil {
+			return err
 		}
 
 		return nil
@@ -710,6 +755,9 @@ func (s *RoomService) finalizeRoundAndCreateNext(ctx context.Context, roundID in
 		}
 		if err := ts.UpdateRoundStatus(ctx, nextRoundID, "waiting"); err != nil {
 			return fmt.Errorf("set next round status waiting: %w", err)
+		}
+		if err := ts.SetRoomCurrentPlayers(ctx, roomID, 0); err != nil {
+			return err
 		}
 
 		return nil
@@ -903,6 +951,100 @@ func (s *RoomService) refreshRoomCache(ctx context.Context, roomID int64) {
 	if err := s.cacheRoomInfo(ctx, roomInfo); err != nil {
 		s.logger.WithError(err).Warnf("failed to cache room %d", roomID)
 	}
+}
+
+func (s *RoomService) syncRoomCurrentPlayers(ctx context.Context, roomID int64) error {
+	return s.repo.InTransaction(ctx, func(ts repository.TransactionScope) error {
+		roomInfo, err := ts.GetRoomForUpdate(ctx, roomID)
+		if err != nil {
+			return err
+		}
+
+		currentPlayers := 0
+		if roomInfo.CurrentRoundID != nil {
+			currentPlayers, err = ts.GetActiveParticipantsCount(ctx, *roomInfo.CurrentRoundID)
+			if err != nil {
+				return fmt.Errorf("get active participants count: %w", err)
+			}
+		}
+
+		return ts.SetRoomCurrentPlayers(ctx, roomID, currentPlayers)
+	})
+}
+
+func (s *RoomService) updateRoomCurrentPlayersInTx(
+	ctx context.Context,
+	ts repository.TransactionScope,
+	roomID int64,
+	roundID int64,
+) error {
+	activeCount, err := ts.GetActiveParticipantsCount(ctx, roundID)
+	if err != nil {
+		return fmt.Errorf("get active participants count: %w", err)
+	}
+	if err := ts.SetRoomCurrentPlayers(ctx, roomID, activeCount); err != nil {
+		return err
+	}
+	return nil
+}
+
+func (s *RoomService) cancelInterruptedRound(ctx context.Context, roundID int64) error {
+	return s.repo.InTransaction(ctx, func(ts repository.TransactionScope) error {
+		roundInfo, err := ts.GetRoundInfo(ctx, roundID)
+		if err != nil {
+			return err
+		}
+		if roundInfo.Status != "active" {
+			currentPlayers := 0
+			if roundInfo.ArchivedAt == nil {
+				currentPlayers, err = ts.GetActiveParticipantsCount(ctx, roundID)
+				if err != nil {
+					return fmt.Errorf("get active participants count: %w", err)
+				}
+			}
+			return ts.SetRoomCurrentPlayers(ctx, roundInfo.RoomID, currentPlayers)
+		}
+
+		participants, err := ts.GetParticipantsByRoundID(ctx, roundID)
+		if err != nil {
+			return fmt.Errorf("get participants by round: %w", err)
+		}
+
+		refundsByUser := make(map[int64]int64, len(participants))
+		for _, participant := range participants {
+			refund, err := ts.ReleaseAllReservations(ctx, participant.RoundParticipantID)
+			if err != nil {
+				return fmt.Errorf("release reservations for participant %d: %w", participant.RoundParticipantID, err)
+			}
+			if refund > 0 {
+				refundsByUser[participant.UserID] += refund
+			}
+			if err := ts.MarkParticipantExited(ctx, participant.RoundParticipantID); err != nil {
+				return fmt.Errorf("mark participant %d exited: %w", participant.RoundParticipantID, err)
+			}
+		}
+
+		for userID, refund := range refundsByUser {
+			if refund <= 0 {
+				continue
+			}
+			if err := ts.UpdateBalance(ctx, userID, refund); err != nil {
+				return fmt.Errorf("refund user %d: %w", userID, err)
+			}
+		}
+
+		if err := ts.UpdateRoundStatus(ctx, roundID, "cancelled"); err != nil {
+			return fmt.Errorf("set round status cancelled: %w", err)
+		}
+		if err := ts.ArchiveRound(ctx, roundID); err != nil {
+			return fmt.Errorf("archive round: %w", err)
+		}
+		if err := ts.SetRoomCurrentPlayers(ctx, roundInfo.RoomID, 0); err != nil {
+			return err
+		}
+
+		return nil
+	})
 }
 
 func (s *RoomService) cacheRoomInfo(ctx context.Context, roomInfo *domain.RoomInfo) error {

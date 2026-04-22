@@ -43,6 +43,7 @@ const actionLoading = ref('')
 const errorMsg = ref('')
 const successMsg = ref('')
 const selectedSeats = ref<number[]>([])
+const randomReserveCount = ref(1)
 const selectedBoostParticipantId = ref('')
 const autoRefresh = ref(true)
 const autoAdvanceNextRound = ref(true)
@@ -229,6 +230,7 @@ const ownedParticipants = computed(() => {
         addParticipant({
           participant_id: participantId,
           user_id: currentUserId.value,
+          nickname: cabinet.profile?.nickname ?? null,
           number_in_room: seat,
           boost: 0,
           winning_money: 0,
@@ -300,6 +302,13 @@ const canBoost = computed(
 )
 const canCancelBoost = computed(() => canManageCurrentRound.value && hasOwnedBoost.value)
 const canLeaveSeats = computed(() => canManageOwnedSeats.value)
+const canLeaveRoom = computed(() => canManageOwnedSeats.value)
+const randomReserveMax = computed(() => Math.max(1, remainingSeatCapacity.value))
+const safeRandomReserveCount = computed(() => {
+  const count = Number(randomReserveCount.value)
+  if (!Number.isFinite(count) || count <= 0) return 1
+  return Math.floor(count)
+})
 const joinBlockedHint = computed(() => {
   if (canJoinMoreSeats.value) {
     if (selectedSeats.value.length && seatSelectionLimitReached.value) {
@@ -329,7 +338,7 @@ const reserveSeatsLabel = computed(() => {
   if (selectedSeats.value.length) {
     return t('gameRoom.entry.reserveSelected', { count: selectedSeats.value.length })
   }
-  return t('gameRoom.entry.reserveRandom')
+  return t('gameRoom.entry.reserveRandomCount', { count: safeRandomReserveCount.value })
 })
 const boostHint = computed(() => {
   if (!isJoined.value) return t('gameRoom.errors.joinFirst')
@@ -482,12 +491,17 @@ watch(
   () => {
     if (!canJoinMoreSeats.value) {
       selectedSeats.value = []
+      randomReserveCount.value = 1
       return
     }
 
     selectedSeats.value = selectedSeats.value
       .filter((seat) => !occupiedSeats.value.has(seat))
       .slice(0, remainingSeatCapacity.value)
+    randomReserveCount.value = Math.min(
+      Math.max(1, randomReserveCount.value),
+      Math.max(1, remainingSeatCapacity.value),
+    )
   },
   { immediate: true },
 )
@@ -530,6 +544,15 @@ function normalizeError(error: any, fallback: string) {
   return error?.message || error?.details?.message || error?.details?.error || fallback
 }
 
+function errorCode(error: any) {
+  return String(error?.details?.code || '')
+}
+
+function isRecoverableRandomJoinError(error: any) {
+  const code = errorCode(error)
+  return code === 'ROOM_FULL' || code === 'MAX_SEATS_EXCEEDED' || code === 'ROUND_NOT_JOINABLE'
+}
+
 function normalizeRoundPhase(status: string) {
   const normalized = String(status || '').toLowerCase()
   if (['completed', 'complete', 'finished', 'finalized', 'archived'].includes(normalized)) {
@@ -544,6 +567,13 @@ function normalizeRoundPhase(status: string) {
 function clearFeedback() {
   errorMsg.value = ''
   successMsg.value = ''
+}
+
+function clearInitialJoinContext() {
+  joinResult.value = null
+  if (session.source === 'quick-match') {
+    session.clearQuickMatchMeta()
+  }
 }
 
 function rememberOwnedParticipantIds(participantIds: number[]) {
@@ -851,12 +881,29 @@ async function reserveSeats() {
   joining.value = true
   const requestedSeats = [...selectedSeats.value]
   const reservedSeats: number[] = []
+  const requestedRandomCount = requestedSeats.length
+    ? 0
+    : Math.min(safeRandomReserveCount.value, randomReserveMax.value)
+  const targetRandomCount = Math.min(requestedRandomCount || 1, remainingSeatCapacity.value, freeSeatsCount.value)
 
   try {
     if (!requestedSeats.length) {
-      joinResult.value = await GameApi.joinRoom(roomId.value)
-      rememberOwnedParticipantIds([joinResult.value.participant_id])
-      reservedSeats.push(joinResult.value.number_in_room)
+      if (targetRandomCount <= 0) {
+        throw new Error(t('gameRoom.entry.roomFull'))
+      }
+
+      for (let attempt = 0; attempt < targetRandomCount; attempt += 1) {
+        try {
+          joinResult.value = await GameApi.joinRoom(roomId.value)
+          rememberOwnedParticipantIds([joinResult.value.participant_id])
+          reservedSeats.push(joinResult.value.number_in_room)
+        } catch (error: any) {
+          if (reservedSeats.length > 0 && isRecoverableRandomJoinError(error)) {
+            break
+          }
+          throw error
+        }
+      }
     } else {
       for (const seat of requestedSeats) {
         if (occupiedSeats.value.has(seat)) {
@@ -871,10 +918,16 @@ async function reserveSeats() {
     }
 
     selectedSeats.value = []
+    randomReserveCount.value = 1
     displayedRoundId.value = null
     clearPendingNextRound()
-    successMsg.value =
-      reservedSeats.length > 1
+    successMsg.value = !requestedSeats.length && reservedSeats.length < requestedRandomCount
+      ? t('gameRoom.messages.joinedPartialAvailable', {
+          count: reservedSeats.length,
+          requested: requestedRandomCount,
+          seats: reservedSeats.join(', '),
+        })
+      : reservedSeats.length > 1
         ? t('gameRoom.messages.joinedMultiple', {
             count: reservedSeats.length,
             seats: reservedSeats.join(', '),
@@ -971,7 +1024,7 @@ async function leaveParticipant(participant: GameParticipantInfo) {
     await GameApi.leaveParticipant(roomId.value, participant.participant_id)
     successMsg.value = t('gameRoom.messages.leftSeat', { seat: participant.number_in_room })
     if (joinResult.value?.participant_id === participant.participant_id) {
-      joinResult.value = null
+      clearInitialJoinContext()
     }
     displayedRoundId.value = null
     clearPendingNextRound()
@@ -981,6 +1034,36 @@ async function leaveParticipant(participant: GameParticipantInfo) {
       stopStatusPolling()
       stopRoundEvents()
     }
+    refreshCabinetBalance()
+  } catch (error: any) {
+    errorMsg.value = normalizeError(error, t('gameRoom.errors.leave'))
+  } finally {
+    actionLoading.value = ''
+  }
+}
+
+async function leaveRoomFully() {
+  clearFeedback()
+
+  if (!canLeaveRoom.value) {
+    errorMsg.value = isJoined.value ? t('gameRoom.controls.actionsLocked') : t('gameRoom.errors.joinFirst')
+    return
+  }
+
+  const confirmed = window.confirm(t('gameRoom.confirmLeaveRoom'))
+  if (!confirmed) return
+
+  actionLoading.value = 'leave-room'
+
+  try {
+    const response = await GameApi.leaveRoom(roomId.value)
+    clearInitialJoinContext()
+    selectedSeats.value = []
+    randomReserveCount.value = 1
+    displayedRoundId.value = null
+    clearPendingNextRound()
+    await refreshRoundView(true)
+    successMsg.value = t('gameRoom.messages.leftRoom', { refund: response.refund ?? 0 })
     refreshCabinetBalance()
   } catch (error: any) {
     errorMsg.value = normalizeError(error, t('gameRoom.errors.leave'))
@@ -1192,6 +1275,17 @@ function scheduleNextRoundTransition(nextRoundId: number | null, nextRoundDelay:
             <p class="description">{{ joinBlockedHint }}</p>
 
             <template v-if="canJoinMoreSeats">
+              <label class="seat-input">
+                <span>{{ t('gameRoom.entry.randomSeatsCount') }}</span>
+                <input
+                  v-model.number="randomReserveCount"
+                  type="number"
+                  min="1"
+                  :max="randomReserveMax"
+                  :disabled="Boolean(selectedSeats.length)"
+                />
+              </label>
+
               <div v-if="seatOptions.length" class="seat-grid" :aria-label="t('gameRoom.entry.seats')">
                 <button
                   v-for="seat in seatOptions"
@@ -1213,6 +1307,9 @@ function scheduleNextRoundTransition(nextRoundId: number | null, nextRoundDelay:
 
               <p v-if="selectedSeats.length" class="description">
                 {{ t('gameRoom.entry.selectedSeats', { seats: selectedSeats.join(', ') }) }}
+              </p>
+              <p v-else class="description">
+                {{ t('gameRoom.entry.randomSeatsHint', { count: safeRandomReserveCount }) }}
               </p>
 
               <div class="actions stretch">
@@ -1307,7 +1404,10 @@ function scheduleNextRoundTransition(nextRoundId: number | null, nextRoundDelay:
               </span>
               <strong>{{ t('gameRoom.participant.seat', { seat: participant.number_in_room }) }}</strong>
               <span>{{ t('gameRoom.participant.id', { id: participant.participant_id }) }}</span>
-              <span v-if="participant.user_id">
+              <span v-if="participant.nickname">
+                {{ participant.nickname }}
+              </span>
+              <span v-else-if="participant.user_id">
                 {{ t('gameRoom.participant.user', { id: participant.user_id }) }}
               </span>
               <span>{{ participantState(participant) }}</span>
@@ -1420,6 +1520,14 @@ function scheduleNextRoundTransition(nextRoundId: number | null, nextRoundDelay:
           <h3>{{ t('gameRoom.controls.roomTitle') }}</h3>
           <p class="description">{{ t('gameRoom.controls.roomHint') }}</p>
           <div class="actions stretch">
+            <button
+              class="btn btn--danger"
+              type="button"
+              :disabled="!canLeaveRoom || actionLoading === 'leave-room'"
+              @click="leaveRoomFully"
+            >
+              {{ actionLoading === 'leave-room' ? t('common.loading') : t('gameRoom.controls.leaveRoom') }}
+            </button>
             <button class="btn" type="button" @click="backToHome">
               {{ t('matchmaking.play.backHome') }}
             </button>
@@ -1711,7 +1819,8 @@ label,
   margin: 0;
 }
 
-select {
+select,
+input[type='number'] {
   width: 100%;
   padding: 0.8rem 0.95rem;
   border: 1px solid color-mix(in oklab, var(--color-border), transparent 8%);

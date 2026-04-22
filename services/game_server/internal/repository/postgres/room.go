@@ -2,6 +2,7 @@ package postgres
 
 import (
 	"context"
+	"database/sql"
 	"fmt"
 
 	"game_server/internal/domain"
@@ -189,16 +190,22 @@ func (r *roomRepo) GetRoundInfo(ctx context.Context, roundID int64) (*domain.Rou
 // GetParticipantByID returns a single participant by ID
 func (r *roomRepo) GetParticipantByID(ctx context.Context, participantID int64) (*domain.RoundParticipant, error) {
 	var p domain.RoundParticipant
+	var nickname sql.NullString
 	err := r.db.QueryRow(ctx, `
-		SELECT round_participants_id, user_id, rounds_id, boost, winning_money, number_in_room, exit_room_at 
-		FROM round_participants WHERE round_participants_id = $1`,
+		SELECT rp.round_participants_id, rp.user_id, u.nickname, rp.rounds_id, rp.boost, rp.winning_money, rp.number_in_room, rp.exit_room_at
+		FROM round_participants rp
+		INNER JOIN users u ON u.user_id = rp.user_id
+		WHERE rp.round_participants_id = $1`,
 		participantID,
-	).Scan(&p.RoundParticipantID, &p.UserID, &p.RoundsID, &p.Boost, &p.WinningMoney, &p.NumberInRoom, &p.ExitRoomAt)
+	).Scan(&p.RoundParticipantID, &p.UserID, &nickname, &p.RoundsID, &p.Boost, &p.WinningMoney, &p.NumberInRoom, &p.ExitRoomAt)
 	if err != nil {
 		if err == pgx.ErrNoRows {
 			return nil, repository.ErrParticipantNotFound
 		}
 		return nil, fmt.Errorf("get participant: %w", err)
+	}
+	if nickname.Valid && nickname.String != "" {
+		p.NickName = &nickname.String
 	}
 	return &p, nil
 }
@@ -206,8 +213,11 @@ func (r *roomRepo) GetParticipantByID(ctx context.Context, participantID int64) 
 // GetParticipantsByRoundID returns all active (non-exited) participants for a round
 func (r *roomRepo) GetParticipantsByRoundID(ctx context.Context, roundID int64) ([]domain.RoundParticipant, error) {
 	rows, err := r.db.Query(ctx, `
-		SELECT round_participants_id, user_id, rounds_id, boost, winning_money, number_in_room, exit_room_at 
-		FROM round_participants WHERE rounds_id = $1 AND exit_room_at IS NULL`,
+		SELECT rp.round_participants_id, rp.user_id, u.nickname, rp.rounds_id, rp.boost, rp.winning_money, rp.number_in_room, rp.exit_room_at
+		FROM round_participants rp
+		INNER JOIN users u ON u.user_id = rp.user_id
+		WHERE rp.rounds_id = $1 AND rp.exit_room_at IS NULL
+		ORDER BY rp.number_in_room`,
 		roundID,
 	)
 	if err != nil {
@@ -218,8 +228,12 @@ func (r *roomRepo) GetParticipantsByRoundID(ctx context.Context, roundID int64) 
 	var participants []domain.RoundParticipant
 	for rows.Next() {
 		var p domain.RoundParticipant
-		if err := rows.Scan(&p.RoundParticipantID, &p.UserID, &p.RoundsID, &p.Boost, &p.WinningMoney, &p.NumberInRoom, &p.ExitRoomAt); err != nil {
+		var nickname sql.NullString
+		if err := rows.Scan(&p.RoundParticipantID, &p.UserID, &nickname, &p.RoundsID, &p.Boost, &p.WinningMoney, &p.NumberInRoom, &p.ExitRoomAt); err != nil {
 			return nil, err
+		}
+		if nickname.Valid && nickname.String != "" {
+			p.NickName = &nickname.String
 		}
 		participants = append(participants, p)
 	}
@@ -228,9 +242,10 @@ func (r *roomRepo) GetParticipantsByRoundID(ctx context.Context, roundID int64) 
 
 func (r *roomRepo) GetActiveParticipantsByRoomAndUser(ctx context.Context, roomID, userID int64) ([]domain.RoundParticipant, error) {
 	rows, err := r.db.Query(ctx, `
-		SELECT rp.round_participants_id, rp.user_id, rp.rounds_id, rp.boost, rp.winning_money, rp.number_in_room, rp.exit_room_at
+		SELECT rp.round_participants_id, rp.user_id, u.nickname, rp.rounds_id, rp.boost, rp.winning_money, rp.number_in_room, rp.exit_room_at
 		FROM round_participants rp
 		INNER JOIN rounds r ON r.rounds_id = rp.rounds_id
+		INNER JOIN users u ON u.user_id = rp.user_id
 		WHERE r.room_id = $1
 		  AND r.archived_at IS NULL
 		  AND rp.user_id = $2
@@ -245,8 +260,12 @@ func (r *roomRepo) GetActiveParticipantsByRoomAndUser(ctx context.Context, roomI
 	var participants []domain.RoundParticipant
 	for rows.Next() {
 		var p domain.RoundParticipant
-		if err := rows.Scan(&p.RoundParticipantID, &p.UserID, &p.RoundsID, &p.Boost, &p.WinningMoney, &p.NumberInRoom, &p.ExitRoomAt); err != nil {
+		var nickname sql.NullString
+		if err := rows.Scan(&p.RoundParticipantID, &p.UserID, &nickname, &p.RoundsID, &p.Boost, &p.WinningMoney, &p.NumberInRoom, &p.ExitRoomAt); err != nil {
 			return nil, fmt.Errorf("scan participant: %w", err)
+		}
+		if nickname.Valid && nickname.String != "" {
+			p.NickName = &nickname.String
 		}
 		participants = append(participants, p)
 	}

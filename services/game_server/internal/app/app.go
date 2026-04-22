@@ -83,3 +83,7 @@ func NewApp(
 func (a *App) InitializeCache(ctx context.Context) error {
 	return a.RoomService.InitializeRoomsCache(ctx)
 }
+
+func (a *App) RecoverServerState(ctx context.Context) error {
+	return a.RoomService.RecoverServerState(ctx)
+}

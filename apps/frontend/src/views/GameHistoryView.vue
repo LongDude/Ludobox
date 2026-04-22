@@ -110,6 +110,11 @@ function resultTone(result: UserGameHistoryResult) {
   if (result === 'active' || result === 'waiting') return 'live'
   return 'neutral'
 }
+
+function formatSeats(value: number[]) {
+  if (!value.length) return t('profile.history.seatsNone')
+  return value.join(', ')
+}
 </script>
 
 <template>
@@ -140,18 +145,12 @@ function resultTone(result: UserGameHistoryResult) {
         <p v-if="historyErrorMsg" class="state-copy error">{{ historyErrorMsg }}</p>
 
         <div v-if="!historyLoading || gameHistory.length > 0" class="history-list">
-          <article v-for="item in gameHistory" :key="item.participant_id" class="history-card">
+          <article v-for="item in gameHistory" :key="item.round_id" class="history-card">
             <div class="history-topline">
               <div>
                 <strong>{{ item.game_name || t('profile.history.gameFallback', { id: item.game_id }) }}</strong>
                 <p class="muted">
-                  {{
-                    t('profile.history.roundSummary', {
-                      round: item.round_id,
-                      room: item.room_id,
-                      seat: item.seat_number,
-                    })
-                  }}
+                  {{ t('profile.history.roundSummary', { round: item.round_id, room: item.room_id }) }}
                 </p>
               </div>
               <span class="result-pill" :class="resultTone(item.result)">
@@ -159,7 +158,20 @@ function resultTone(result: UserGameHistoryResult) {
               </span>
             </div>
 
+            <div class="seat-summary">
+              <span>{{ t('profile.history.seatsSummary', { count: item.reserved_seats_count, seats: formatSeats(item.reserved_seats) }) }}</span>
+              <span>{{ t('profile.history.seatsWinningSummary', { count: item.winning_seats_count, seats: formatSeats(item.winning_seats) }) }}</span>
+            </div>
+
             <dl class="history-meta">
+              <div>
+                <dt>{{ t('profile.history.meta.seats') }}</dt>
+                <dd>{{ item.reserved_seats_count }}</dd>
+              </div>
+              <div>
+                <dt>{{ t('profile.history.meta.winningSeats') }}</dt>
+                <dd>{{ item.winning_seats_count }}</dd>
+              </div>
               <div>
                 <dt>{{ t('profile.history.meta.joined') }}</dt>
                 <dd>{{ formatDateTime(item.joined_at) }}</dd>
@@ -175,6 +187,10 @@ function resultTone(result: UserGameHistoryResult) {
               <div>
                 <dt>{{ t('profile.history.meta.boost') }}</dt>
                 <dd>{{ formatMoney(item.boost_fee) }}</dd>
+              </div>
+              <div>
+                <dt>{{ t('profile.history.meta.totalSpent') }}</dt>
+                <dd>{{ formatMoney(item.total_spent) }}</dd>
               </div>
               <div>
                 <dt>{{ t('profile.history.meta.winning') }}</dt>
@@ -309,6 +325,13 @@ function resultTone(result: UserGameHistoryResult) {
 
 .history-topline strong {
   display: block;
+}
+
+.seat-summary {
+  display: grid;
+  gap: 0.3rem;
+  color: var(--color-muted);
+  font-size: 0.88rem;
 }
 
 .result-pill {

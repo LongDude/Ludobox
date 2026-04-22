@@ -75,6 +75,10 @@ export const useMatchSessionStore = defineStore('matchSession', () => {
     error.value = ''
   }
 
+  function clearQuickMatchMeta() {
+    quickMatchMeta.value = null
+  }
+
   watch(
     () => auth.isAuthenticated,
     (isAuthenticated) => {
@@ -98,6 +102,7 @@ export const useMatchSessionStore = defineStore('matchSession', () => {
     setFilters,
     setQuickMatchSession,
     setRecommendedRoomSession,
+    clearQuickMatchMeta,
     reset,
   }
 })

@@ -2,6 +2,7 @@ package postgres
 
 import (
 	"context"
+	"database/sql"
 	"errors"
 	"fmt"
 
@@ -84,27 +85,33 @@ func (s *txScope) CreateParticipant(ctx context.Context, userID, roundID int64, 
 
 func (s *txScope) GetParticipantByID(ctx context.Context, participantID int64) (*domain.RoundParticipant, error) {
 	var p domain.RoundParticipant
+	var nickname sql.NullString
 	err := s.tx.QueryRow(ctx, `
-		SELECT round_participants_id, user_id, rounds_id, boost, winning_money, number_in_room, exit_room_at
-		FROM round_participants
-		WHERE round_participants_id = $1
-		FOR UPDATE
-	`, participantID).Scan(&p.RoundParticipantID, &p.UserID, &p.RoundsID, &p.Boost, &p.WinningMoney, &p.NumberInRoom, &p.ExitRoomAt)
+		SELECT rp.round_participants_id, rp.user_id, u.nickname, rp.rounds_id, rp.boost, rp.winning_money, rp.number_in_room, rp.exit_room_at
+		FROM round_participants rp
+		INNER JOIN users u ON u.user_id = rp.user_id
+		WHERE rp.round_participants_id = $1
+		FOR UPDATE OF rp
+	`, participantID).Scan(&p.RoundParticipantID, &p.UserID, &nickname, &p.RoundsID, &p.Boost, &p.WinningMoney, &p.NumberInRoom, &p.ExitRoomAt)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return nil, repository.ErrParticipantNotFound
 		}
 		return nil, fmt.Errorf("get participant by id: %w", err)
 	}
+	if nickname.Valid && nickname.String != "" {
+		p.NickName = &nickname.String
+	}
 	return &p, nil
 }
 
 func (s *txScope) GetParticipantsByRoundID(ctx context.Context, roundID int64) ([]domain.RoundParticipant, error) {
 	rows, err := s.tx.Query(ctx, `
-		SELECT round_participants_id, user_id, rounds_id, boost, winning_money, number_in_room, exit_room_at
-		FROM round_participants
-		WHERE rounds_id = $1 AND exit_room_at IS NULL
-		ORDER BY number_in_room
+		SELECT rp.round_participants_id, rp.user_id, u.nickname, rp.rounds_id, rp.boost, rp.winning_money, rp.number_in_room, rp.exit_room_at
+		FROM round_participants rp
+		INNER JOIN users u ON u.user_id = rp.user_id
+		WHERE rp.rounds_id = $1 AND rp.exit_room_at IS NULL
+		ORDER BY rp.number_in_room
 	`, roundID)
 	if err != nil {
 		return nil, fmt.Errorf("get participants by round: %w", err)
@@ -114,8 +121,12 @@ func (s *txScope) GetParticipantsByRoundID(ctx context.Context, roundID int64) (
 	var participants []domain.RoundParticipant
 	for rows.Next() {
 		var p domain.RoundParticipant
-		if err := rows.Scan(&p.RoundParticipantID, &p.UserID, &p.RoundsID, &p.Boost, &p.WinningMoney, &p.NumberInRoom, &p.ExitRoomAt); err != nil {
+		var nickname sql.NullString
+		if err := rows.Scan(&p.RoundParticipantID, &p.UserID, &nickname, &p.RoundsID, &p.Boost, &p.WinningMoney, &p.NumberInRoom, &p.ExitRoomAt); err != nil {
 			return nil, fmt.Errorf("scan participant: %w", err)
+		}
+		if nickname.Valid && nickname.String != "" {
+			p.NickName = &nickname.String
 		}
 		participants = append(participants, p)
 	}
@@ -256,4 +267,16 @@ func (s *txScope) GetRoundStatus(ctx context.Context, roundID int64) (string, er
 		return "", err
 	}
 	return status, nil
+}
+
+func (s *txScope) SetRoomCurrentPlayers(ctx context.Context, roomID int64, currentPlayers int) error {
+	_, err := s.tx.Exec(ctx, `
+		UPDATE rooms
+		SET current_players = $2
+		WHERE room_id = $1
+	`, roomID, currentPlayers)
+	if err != nil {
+		return fmt.Errorf("set room current players: %w", err)
+	}
+	return nil
 }

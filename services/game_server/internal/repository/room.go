@@ -17,6 +17,7 @@ type TransactionScope interface {
 	GetParticipantsByRoundID(ctx context.Context, roundID int64) ([]domain.RoundParticipant, error)
 	CountUserActiveParticipants(ctx context.Context, roundID, userID int64) (int, error)
 	IsSeatOccupied(ctx context.Context, roundID int64, numberInRoom int) (bool, error)
+	SetRoomCurrentPlayers(ctx context.Context, roomID int64, currentPlayers int) error
 
 	// Balance
 	GetBalanceLocked(ctx context.Context, userID int64) (int64, error)

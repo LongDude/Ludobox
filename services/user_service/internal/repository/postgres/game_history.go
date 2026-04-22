@@ -11,11 +11,11 @@ import (
 
 const gameHistoryResultExpression = `
 	CASE
-		WHEN rp.winning_money > 0 THEN 'won'
-		WHEN rp.exit_room_at IS NOT NULL AND (rd.archived_at IS NULL OR rp.exit_room_at <= rd.archived_at) THEN 'left'
-		WHEN rd.status = 'cancelled' THEN 'cancelled'
-		WHEN rd.status = 'finished' THEN 'lost'
-		ELSE rd.status::TEXT
+		WHEN item.winning_money > 0 THEN 'won'
+		WHEN item.has_left THEN 'left'
+		WHEN item.round_status = 'cancelled' THEN 'cancelled'
+		WHEN item.round_status = 'finished' THEN 'lost'
+		ELSE item.round_status
 	END`
 
 func (r *gameHistoryRepository) GetUserGameHistory(ctx context.Context, userID int, params domain.GameHistoryParams) (domain.ListResponse[domain.GameHistoryItem], error) {
@@ -57,59 +57,97 @@ func (r *gameHistoryRepository) GetUserGameHistory(ctx context.Context, userID i
 		args = append(args, params.DateTo.UTC())
 		whereParts = append(whereParts, fmt.Sprintf("rd.created_at <= $%d", len(args)))
 	}
-	if status := strings.ToLower(strings.TrimSpace(params.Status)); status != "" {
-		args = append(args, status)
-		if status == "finished" {
-			whereParts = append(whereParts, fmt.Sprintf("rd.status::TEXT = $%d", len(args)))
-		} else {
-			whereParts = append(whereParts, fmt.Sprintf("(%s) = $%d", gameHistoryResultExpression, len(args)))
-		}
-	}
 
 	whereSQL := strings.Join(whereParts, " AND ")
-	fromSQL := `
-		FROM round_participants rp
-		INNER JOIN rounds rd ON rd.rounds_id = rp.rounds_id
-		INNER JOIN rooms r ON r.room_id = rd.room_id
-		INNER JOIN config c ON c.config_id = r.config_id
-		INNER JOIN games g ON g.game_id = c.game_id
-		LEFT JOIN (
+	baseCTE := `
+		WITH participant_fees AS (
 			SELECT
 				round_participants_id,
 				COALESCE(SUM(amount) FILTER (WHERE reservation_type = 'entry_fee' AND status <> 'released'), 0) AS entry_fee,
 				COALESCE(SUM(amount) FILTER (WHERE reservation_type = 'boost' AND status <> 'released'), 0) AS boost_fee
 			FROM user_balance_reservations
 			GROUP BY round_participants_id
-		) fees ON fees.round_participants_id = rp.round_participants_id
-		WHERE ` + whereSQL
+		),
+		user_round_history AS (
+			SELECT
+				rd.rounds_id,
+				rd.room_id,
+				g.game_id,
+				g.name_game,
+				rd.status::TEXT AS round_status,
+				COALESCE(array_agg(rp.number_in_room ORDER BY rp.number_in_room), '{}'::INT[]) AS reserved_seats,
+				COALESCE(
+					array_agg(rp.number_in_room ORDER BY rp.number_in_room) FILTER (WHERE rp.winning_money > 0),
+					'{}'::INT[]
+				) AS winning_seats,
+				COUNT(*)::INT AS reserved_seats_count,
+				COUNT(*) FILTER (WHERE rp.winning_money > 0)::INT AS winning_seats_count,
+				COALESCE(SUM(fees.entry_fee), 0) AS entry_fee,
+				COALESCE(SUM(fees.boost_fee), 0) AS boost_fee,
+				COALESCE(SUM(rp.winning_money), 0) AS winning_money,
+				MIN(rd.created_at) AS joined_at,
+				MAX(rd.archived_at) AS finished_at,
+				BOOL_OR(rp.exit_room_at IS NOT NULL AND (rd.archived_at IS NULL OR rp.exit_room_at <= rd.archived_at)) AS has_left
+			FROM round_participants rp
+			INNER JOIN rounds rd ON rd.rounds_id = rp.rounds_id
+			INNER JOIN rooms r ON r.room_id = rd.room_id
+			INNER JOIN config c ON c.config_id = r.config_id
+			INNER JOIN games g ON g.game_id = c.game_id
+			LEFT JOIN participant_fees fees ON fees.round_participants_id = rp.round_participants_id
+			WHERE ` + whereSQL + `
+			GROUP BY rd.rounds_id, rd.room_id, g.game_id, g.name_game, rd.status
+		)
+	`
+	filteredWhereParts := make([]string, 0, 1)
+	filteredArgs := append([]any(nil), args...)
+	if status := strings.ToLower(strings.TrimSpace(params.Status)); status != "" {
+		filteredArgs = append(filteredArgs, status)
+		if status == "finished" {
+			filteredWhereParts = append(filteredWhereParts, fmt.Sprintf("item.round_status = $%d", len(filteredArgs)))
+		} else {
+			filteredWhereParts = append(filteredWhereParts, fmt.Sprintf("(%s) = $%d", gameHistoryResultExpression, len(filteredArgs)))
+		}
+	}
+	filteredWhereSQL := ""
+	if len(filteredWhereParts) > 0 {
+		filteredWhereSQL = "WHERE " + strings.Join(filteredWhereParts, " AND ")
+	}
 
-	countQuery := `SELECT COUNT(*) ` + fromSQL
-	if err := r.db.QueryRow(ctx, countQuery, args...).Scan(&response.Total); err != nil {
+	countQuery := baseCTE + `
+		SELECT COUNT(*)
+		FROM user_round_history item
+		` + filteredWhereSQL
+	if err := r.db.QueryRow(ctx, countQuery, filteredArgs...).Scan(&response.Total); err != nil {
 		return response, fmt.Errorf("count user game history: %w", err)
 	}
 
 	offset := (page - 1) * pageSize
-	listArgs := append(args, pageSize, offset)
+	listArgs := append(filteredArgs, pageSize, offset)
 	listQuery := fmt.Sprintf(`
-		SELECT
-			rd.rounds_id,
-			rp.round_participants_id,
-			rd.room_id,
-			g.game_id,
-			g.name_game,
-			rp.number_in_room,
-			rd.status::TEXT,
-			%s AS result,
-			COALESCE(fees.entry_fee, 0) AS entry_fee,
-			COALESCE(fees.boost_fee, 0) AS boost_fee,
-			rp.winning_money,
-			(rp.winning_money - COALESCE(fees.entry_fee, 0) - COALESCE(fees.boost_fee, 0)) AS net_result,
-			rd.created_at,
-			rd.archived_at
 		%s
-		ORDER BY rd.created_at DESC, rp.round_participants_id DESC
+		SELECT
+			item.rounds_id,
+			item.room_id,
+			item.game_id,
+			item.name_game,
+			item.round_status,
+			%s AS result,
+			item.reserved_seats,
+			item.winning_seats,
+			item.reserved_seats_count,
+			item.winning_seats_count,
+			item.entry_fee,
+			item.boost_fee,
+			(item.entry_fee + item.boost_fee) AS total_spent,
+			item.winning_money,
+			(item.winning_money - item.entry_fee - item.boost_fee) AS net_result,
+			item.joined_at,
+			item.finished_at
+		FROM user_round_history item
+		%s
+		ORDER BY item.joined_at DESC, item.rounds_id DESC
 		LIMIT $%d OFFSET $%d
-	`, gameHistoryResultExpression, fromSQL, len(args)+1, len(args)+2)
+	`, baseCTE, gameHistoryResultExpression, filteredWhereSQL, len(filteredArgs)+1, len(filteredArgs)+2)
 
 	rows, err := r.db.Query(ctx, listQuery, listArgs...)
 	if err != nil {
@@ -134,18 +172,23 @@ func (r *gameHistoryRepository) GetUserGameHistory(ctx context.Context, userID i
 func scanGameHistoryItem(row rowScanner) (domain.GameHistoryItem, error) {
 	var item domain.GameHistoryItem
 	var archivedAt sql.NullTime
+	var reservedSeats []int32
+	var winningSeats []int32
 
 	err := row.Scan(
 		&item.RoundID,
-		&item.ParticipantID,
 		&item.RoomID,
 		&item.GameID,
 		&item.GameName,
-		&item.SeatNumber,
 		&item.RoundStatus,
 		&item.Result,
+		&reservedSeats,
+		&winningSeats,
+		&item.ReservedSeatsCount,
+		&item.WinningSeatsCount,
 		&item.EntryFee,
 		&item.BoostFee,
+		&item.TotalSpent,
 		&item.WinningMoney,
 		&item.NetResult,
 		&item.JoinedAt,
@@ -155,6 +198,8 @@ func scanGameHistoryItem(row rowScanner) (domain.GameHistoryItem, error) {
 		return item, err
 	}
 
+	item.ReservedSeats = convertSeatList(reservedSeats)
+	item.WinningSeats = convertSeatList(winningSeats)
 	item.JoinedAt = item.JoinedAt.UTC()
 	if archivedAt.Valid {
 		finishedAt := archivedAt.Time.UTC()
@@ -162,6 +207,18 @@ func scanGameHistoryItem(row rowScanner) (domain.GameHistoryItem, error) {
 	}
 
 	return item, nil
+}
+
+func convertSeatList(values []int32) []int {
+	if len(values) == 0 {
+		return []int{}
+	}
+
+	result := make([]int, 0, len(values))
+	for _, value := range values {
+		result = append(result, int(value))
+	}
+	return result
 }
 
 func validateGameHistoryStatus(status string) error {

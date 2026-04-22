@@ -363,6 +363,14 @@ func (m *mockTransactionScope) GetRoundStatus(ctx context.Context, roundID int64
 	return round.Status, nil
 }
 
+func (m *mockTransactionScope) SetRoomCurrentPlayers(ctx context.Context, roomID int64, currentPlayers int) error {
+	if roomID != m.roomInfo.Room.RoomID {
+		return repository.ErrRoomNotFound
+	}
+	m.roomInfo.Room.CurrentPlayers = currentPlayers
+	return nil
+}
+
 type mockRoomRepository struct {
 	scope *mockTransactionScope
 }
@@ -479,6 +487,9 @@ func TestJoinRoomWithSeatSuccess(t *testing.T) {
 	if scope.balances[100] != 900 {
 		t.Fatalf("unexpected balance: got %d want 900", scope.balances[100])
 	}
+	if scope.roomInfo.Room.CurrentPlayers != 1 {
+		t.Fatalf("unexpected current players: got %d want 1", scope.roomInfo.Room.CurrentPlayers)
+	}
 }
 
 func TestJoinRoomRespectsHalfCapacityLimit(t *testing.T) {
@@ -498,7 +509,7 @@ func TestJoinRoomRespectsHalfCapacityLimit(t *testing.T) {
 	}
 }
 
-func TestJoinRoomReusesExistingParticipantForSameUser(t *testing.T) {
+func TestJoinRoomAllocatesAnotherRandomSeatForSameUser(t *testing.T) {
 	ctx := context.Background()
 	scope := newMockTransactionScope()
 	repo := &mockRoomRepository{scope: scope}
@@ -514,14 +525,14 @@ func TestJoinRoomReusesExistingParticipantForSameUser(t *testing.T) {
 		t.Fatalf("JoinRoom failed: %v", err)
 	}
 
-	if reusedParticipantID != participantID {
-		t.Fatalf("expected existing participant %d, got %d", participantID, reusedParticipantID)
+	if reusedParticipantID == participantID {
+		t.Fatalf("expected a new participant, got reused id %d", reusedParticipantID)
 	}
-	if len(scope.participants) != 1 {
-		t.Fatalf("unexpected participants count: got %d want 1", len(scope.participants))
+	if len(scope.participants) != 2 {
+		t.Fatalf("unexpected participants count: got %d want 2", len(scope.participants))
 	}
-	if scope.balances[100] != 900 {
-		t.Fatalf("unexpected balance after reused join: got %d want 900", scope.balances[100])
+	if scope.balances[100] != 800 {
+		t.Fatalf("unexpected balance after second random join: got %d want 800", scope.balances[100])
 	}
 }
 
@@ -652,6 +663,9 @@ func TestLeaveRoomByUserReleasesAllUserSeats(t *testing.T) {
 	if activeCount != 1 {
 		t.Fatalf("unexpected active count: got %d want 1", activeCount)
 	}
+	if scope.roomInfo.Room.CurrentPlayers != 1 {
+		t.Fatalf("unexpected current players: got %d want 1", scope.roomInfo.Room.CurrentPlayers)
+	}
 }
 
 func TestLeaveRoomByUserIgnoresFinishedRound(t *testing.T) {
@@ -716,6 +730,48 @@ func TestFinalizeRoundCommitsReservationsAndCreatesNextRound(t *testing.T) {
 	}
 	if scope.roomInfo.CurrentRoundID == nil || *scope.roomInfo.CurrentRoundID == 1 {
 		t.Fatal("expected next round to be created")
+	}
+	if scope.roomInfo.Room.CurrentPlayers != 0 {
+		t.Fatalf("unexpected current players after finalize: got %d want 0", scope.roomInfo.Room.CurrentPlayers)
+	}
+}
+
+func TestRecoverServerStateCancelsInterruptedActiveRound(t *testing.T) {
+	ctx := context.Background()
+	scope := newMockTransactionScope()
+	repo := &mockRoomRepository{scope: scope}
+	service := NewRoomService(repo, nil, 1, nil, "")
+
+	firstParticipantID, err := service.JoinRoomWithSeat(ctx, 100, 1, 1)
+	if err != nil {
+		t.Fatalf("first join failed: %v", err)
+	}
+	secondParticipantID, err := service.JoinRoomWithSeat(ctx, 200, 1, 2)
+	if err != nil {
+		t.Fatalf("second join failed: %v", err)
+	}
+	if err := scope.UpdateRoundStatus(ctx, 1, "active"); err != nil {
+		t.Fatalf("UpdateRoundStatus failed: %v", err)
+	}
+
+	if err := service.RecoverServerState(ctx); err != nil {
+		t.Fatalf("RecoverServerState failed: %v", err)
+	}
+
+	if scope.rounds[1].Status != "cancelled" {
+		t.Fatalf("unexpected round status: got %s want cancelled", scope.rounds[1].Status)
+	}
+	if scope.rounds[1].ArchivedAt == nil {
+		t.Fatal("expected interrupted round to be archived")
+	}
+	if scope.participants[firstParticipantID].ExitRoomAt == nil || scope.participants[secondParticipantID].ExitRoomAt == nil {
+		t.Fatal("expected all participants to be marked exited")
+	}
+	if scope.balances[100] != 1000 || scope.balances[200] != 1000 {
+		t.Fatalf("unexpected balances after recovery: got %d and %d want 1000 and 1000", scope.balances[100], scope.balances[200])
+	}
+	if scope.roomInfo.Room.CurrentPlayers != 0 {
+		t.Fatalf("unexpected current players after recovery: got %d want 0", scope.roomInfo.Room.CurrentPlayers)
 	}
 }
 

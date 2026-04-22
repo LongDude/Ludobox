@@ -97,6 +97,14 @@ func main() {
 
 	usecase := app.NewApp(cfg, InternalRepo, RoomRepo, registration.ServerID, redisClient, logger)
 
+	recoveryCtx, recoveryCancel := context.WithTimeout(context.Background(), 30*time.Second)
+	if err := usecase.RecoverServerState(recoveryCtx); err != nil {
+		recoveryCancel()
+		logger.Fatalf("Failed to recover game server state: %v", err)
+		return
+	}
+	recoveryCancel()
+
 	// Initialize rooms cache
 	initCacheCtx, initCancel := context.WithTimeout(context.Background(), 10*time.Second)
 	if err := usecase.InitializeCache(initCacheCtx); err != nil {

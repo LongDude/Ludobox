@@ -58,20 +58,23 @@ func TestGetUserGameHistoryReturnsHistory(t *testing.T) {
 		result: domain.ListResponse[domain.GameHistoryItem]{
 			Items: []domain.GameHistoryItem{
 				{
-					RoundID:       77,
-					ParticipantID: 88,
-					RoomID:        9,
-					GameID:        3,
-					GameName:      "Dice",
-					SeatNumber:    2,
-					RoundStatus:   "finished",
-					Result:        "won",
-					EntryFee:      100,
-					BoostFee:      25,
-					WinningMoney:  400,
-					NetResult:     275,
-					JoinedAt:      joinedAt,
-					FinishedAt:    &finishedAt,
+					RoundID:            77,
+					RoomID:             9,
+					GameID:             3,
+					GameName:           "Dice",
+					RoundStatus:        "finished",
+					Result:             "won",
+					ReservedSeats:      []int{2, 4, 6},
+					WinningSeats:       []int{4},
+					ReservedSeatsCount: 3,
+					WinningSeatsCount:  1,
+					EntryFee:           300,
+					BoostFee:           25,
+					TotalSpent:         325,
+					WinningMoney:       400,
+					NetResult:          75,
+					JoinedAt:           joinedAt,
+					FinishedAt:         &finishedAt,
 				},
 			},
 			Total: 1,
@@ -121,8 +124,14 @@ func TestGetUserGameHistoryReturnsHistory(t *testing.T) {
 		t.Fatalf("items length = %d, want 1", len(response.Items))
 	}
 	item := response.Items[0]
-	if item.Result != "won" || item.NetResult != 275 || item.EntryFee != 100 || item.BoostFee != 25 {
+	if item.Result != "won" || item.NetResult != 75 || item.EntryFee != 300 || item.BoostFee != 25 || item.TotalSpent != 325 {
 		t.Fatalf("unexpected item: %+v", item)
+	}
+	if item.ReservedSeatsCount != 3 || item.WinningSeatsCount != 1 {
+		t.Fatalf("unexpected seat counts: %+v", item)
+	}
+	if len(item.ReservedSeats) != 3 || len(item.WinningSeats) != 1 {
+		t.Fatalf("unexpected seat lists: %+v", item)
 	}
 }
 
