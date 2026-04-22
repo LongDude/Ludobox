@@ -27,8 +27,10 @@ function firstQueryValue(value: string | string[] | null | undefined) {
   return value ?? ''
 }
 
-function parseInteger(input: string) {
-  const trimmed = input.trim()
+function parseInteger(input: string | number | null | undefined) {
+  if (input === null || input === undefined) return undefined
+
+  const trimmed = String(input).trim()
   if (!trimmed) return undefined
 
   const numeric = Number(trimmed)

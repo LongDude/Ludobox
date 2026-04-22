@@ -7,7 +7,7 @@ import FooterTab from '@/components/FooterTab.vue'
 import { useAuthStore } from '@/stores/authStore'
 import { useMatchSessionStore } from '@/stores/matchSessionStore'
 import { MatchmakingApi } from '@/api/useMatchmakingApi'
-import type { Pagination, RoomRecommendationResponse } from '@/api/types'
+import type { MatchmakingFilters, Pagination, RoomRecommendationResponse } from '@/api/types'
 import { useI18n } from '@/i18n'
 import { useLayoutInset } from '@/composables/useLayoutInset'
 import {
@@ -26,27 +26,48 @@ const route = useRoute()
 const router = useRouter()
 const { t } = useI18n()
 const { LeftTabHidden: leftHidden, layoutInset } = useLayoutInset()
+const ROOM_VIEW_MODE_KEY = 'matchmaking.rooms.view-mode'
 
-const draft = reactive<MatchmakingFilterDraft>(createMatchmakingDraft(queryToMatchmakingFilters(route.query)))
-const rooms = ref<RoomRecommendationResponse[]>([])
-const pagination = ref<Pagination | null>(null)
-const loading = ref(false)
-const cached = ref(false)
-const errorMsg = ref('')
+type RoomViewMode = 'grid' | 'list'
 
-let lastLoadId = 0
+function loadRoomViewMode(): RoomViewMode {
+  try {
+    return localStorage.getItem(ROOM_VIEW_MODE_KEY) === 'list' ? 'list' : 'grid'
+  } catch {
+    return 'grid'
+  }
+}
 
-const validationResult = computed(() => normalizeMatchmakingDraft(draft))
-
-const requestFilters = computed(() => {
-  const filters = queryToMatchmakingFilters(route.query)
-
+function normalizeRequestFilters(filters: MatchmakingFilters): MatchmakingFilters {
   return {
     ...filters,
     page: filters.page ?? DEFAULT_MATCHMAKING_PAGE,
     page_size: filters.page_size ?? DEFAULT_MATCHMAKING_PAGE_SIZE,
   }
-})
+}
+
+function mergeRouteFilters() {
+  const storedFilters = session.filters ?? {}
+  const routeFilters = queryToMatchmakingFilters(route.query)
+  return normalizeRequestFilters({
+    ...storedFilters,
+    ...routeFilters,
+  })
+}
+
+const draft = reactive<MatchmakingFilterDraft>(createMatchmakingDraft(mergeRouteFilters()))
+const rooms = ref<RoomRecommendationResponse[]>([])
+const pagination = ref<Pagination | null>(null)
+const loading = ref(false)
+const cached = ref(false)
+const errorMsg = ref('')
+const viewMode = ref<RoomViewMode>(loadRoomViewMode())
+
+let lastLoadId = 0
+
+const validationResult = computed(() => normalizeMatchmakingDraft(draft))
+
+const requestFilters = computed(() => mergeRouteFilters())
 
 const sortedRooms = computed(() =>
   [...rooms.value].sort((left, right) => right.score - left.score || left.room_id - right.room_id),
@@ -59,8 +80,10 @@ const totalPages = computed(() => {
 
 watch(
   () => route.query,
-  (query) => {
-    Object.assign(draft, createMatchmakingDraft(queryToMatchmakingFilters(query)))
+  () => {
+    const filters = requestFilters.value
+    Object.assign(draft, createMatchmakingDraft(filters))
+    session.setFilters(filters)
     void loadRooms()
   },
   { immediate: true, deep: true },
@@ -107,6 +130,13 @@ function formatBoost(room: RoomRecommendationResponse) {
 
 function formatScore(room: RoomRecommendationResponse) {
   return room.score.toFixed(2)
+}
+
+function setViewMode(next: RoomViewMode) {
+  viewMode.value = next
+  try {
+    localStorage.setItem(ROOM_VIEW_MODE_KEY, next)
+  } catch {}
 }
 
 function redirectToAuth() {
@@ -156,31 +186,36 @@ function applyFilters() {
   }
 
   errorMsg.value = ''
+  const nextFilters = normalizeRequestFilters({
+    ...validationResult.value.filters,
+    page: DEFAULT_MATCHMAKING_PAGE,
+    page_size: requestFilters.value.page_size ?? DEFAULT_MATCHMAKING_PAGE_SIZE,
+  })
+  session.setFilters(nextFilters)
 
   router.push({
     path: '/rooms',
-    query: filtersToQuery({
-      ...validationResult.value.filters,
-      page: DEFAULT_MATCHMAKING_PAGE,
-      page_size: requestFilters.value.page_size ?? DEFAULT_MATCHMAKING_PAGE_SIZE,
-    }),
+    query: filtersToQuery(nextFilters),
   })
 }
 
 function resetFilters() {
   errorMsg.value = ''
+  session.setFilters(null)
   router.push({ path: '/rooms' })
 }
 
 function changePage(nextPage: number) {
   if (nextPage < 1 || (pagination.value && nextPage > totalPages.value)) return
 
+  const nextFilters = {
+    ...requestFilters.value,
+    page: nextPage,
+  }
+  session.setFilters(nextFilters)
   router.push({
     path: '/rooms',
-    query: filtersToQuery({
-      ...requestFilters.value,
-      page: nextPage,
-    }),
+    query: filtersToQuery(nextFilters),
   })
 }
 
@@ -319,6 +354,24 @@ function enterRoom(room: RoomRecommendationResponse) {
             }}
           </p>
         </div>
+        <div class="view-toggle" :aria-label="t('matchmaking.results.viewAria')">
+          <button
+            class="view-toggle__button"
+            :class="{ active: viewMode === 'grid' }"
+            type="button"
+            @click="setViewMode('grid')"
+          >
+            {{ t('matchmaking.results.viewGrid') }}
+          </button>
+          <button
+            class="view-toggle__button"
+            :class="{ active: viewMode === 'list' }"
+            type="button"
+            @click="setViewMode('list')"
+          >
+            {{ t('matchmaking.results.viewList') }}
+          </button>
+        </div>
       </div>
 
       <div v-if="!auth.isAuthenticated" class="empty-state">
@@ -333,8 +386,13 @@ function enterRoom(room: RoomRecommendationResponse) {
         <p v-else-if="errorMsg" class="feedback feedback--error">{{ errorMsg }}</p>
         <p v-else-if="!sortedRooms.length" class="muted-copy">{{ t('matchmaking.results.empty') }}</p>
 
-        <div v-else class="room-grid">
-          <article v-for="room in sortedRooms" :key="room.room_id" class="room-card">
+        <div v-else :class="viewMode === 'grid' ? 'room-grid' : 'room-list'">
+          <article
+            v-for="room in sortedRooms"
+            :key="room.room_id"
+            class="room-card"
+            :class="{ 'room-card--list': viewMode === 'list' }"
+          >
             <div class="room-head">
               <div>
                 <p class="room-kicker">{{ t('matchmaking.results.roomLabel', { id: room.room_id }) }}</p>
@@ -427,6 +485,7 @@ function enterRoom(room: RoomRecommendationResponse) {
 .card-head,
 .filters-form,
 .room-grid,
+.room-list,
 .room-card,
 .room-head,
 .room-actions,
@@ -478,6 +537,32 @@ dt {
   font-weight: 600;
 }
 
+.view-toggle {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  padding: 0.35rem;
+  border-radius: 999px;
+  border: 1px solid color-mix(in oklab, var(--color-border), transparent 10%);
+  background: color-mix(in oklab, var(--color-surface), white 10%);
+}
+
+.view-toggle__button {
+  appearance: none;
+  border: 0;
+  background: transparent;
+  color: var(--color-muted);
+  border-radius: 999px;
+  padding: 0.55rem 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.view-toggle__button.active {
+  background: linear-gradient(135deg, #0f766e, #0284c7);
+  color: #f0fdfa;
+}
+
 .filters-form {
   margin-top: 1rem;
   grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -524,11 +609,20 @@ select {
   grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
 }
 
+.room-list {
+  grid-template-columns: 1fr;
+}
+
 .room-card {
   padding: 1rem;
   border-radius: 1.2rem;
   border: 1px solid color-mix(in oklab, var(--color-border), transparent 10%);
   background: color-mix(in oklab, var(--color-surface), white 10%);
+}
+
+.room-card--list {
+  grid-template-columns: minmax(0, 1.4fr) minmax(280px, 1fr) auto;
+  align-items: center;
 }
 
 .room-head {
@@ -628,12 +722,17 @@ dd {
     grid-template-columns: 1fr;
   }
 
+  .room-card--list {
+    grid-template-columns: 1fr;
+  }
+
   .form-actions,
   .pager {
     justify-content: stretch;
   }
 
   .form-actions .btn,
+  .room-actions .btn,
   .pager .btn {
     width: 100%;
   }
