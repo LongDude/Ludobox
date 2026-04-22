@@ -27,6 +27,7 @@ type UserRepository interface {
 	GetUserByID(ctx context.Context, id int) (*domain.User, error)
 	CreateUserByID(ctx context.Context, id int) (*domain.User, error)
 	UpdateUserByID(ctx context.Context, id int, user *domain.User) (*domain.User, error)
+	GetUserRatingHistory(ctx context.Context, userID int, params domain.UserRatingHistoryParams) (domain.UserRatingHistory, error)
 	DeleteUserByID(ctx context.Context, id int) error
 }
 type GameHistoryRepository interface {

@@ -9,4 +9,6 @@ type User struct {
 	LocaleType *string  `json:"locale_type"`
 	NickName   string   `json:"nickname"`
 	Balance    int      `json:"balance"`
+	Rating     int64    `json:"rating"`
+	Rank       string   `json:"rank"`
 }

@@ -99,6 +99,9 @@ export const useUserCabinetStore = defineStore('userCabinet', () => {
           }
           loaded.value = true
           error.value = ''
+          if (event.type === 'user_balance_changed') {
+            void refresh().catch(() => {})
+          }
           return
         }
 

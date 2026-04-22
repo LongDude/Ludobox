@@ -28,6 +28,7 @@ type TransactionScope interface {
 	UpdateParticipantBoost(ctx context.Context, participantID int64, boost int) error
 	MarkParticipantExited(ctx context.Context, participantID int64) error
 	UpdateWinningMoney(ctx context.Context, participantID int64, amount int64) error
+	ApplyUserRatingReward(ctx context.Context, reward domain.UserRatingReward) error
 
 	// Reservations
 	ReserveEntry(ctx context.Context, participantID int64, amount int64, expiresAt time.Time) (int64, error)

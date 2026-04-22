@@ -26,6 +26,8 @@ type mockTransactionScope struct {
 	roomEvents        []domain.RoomEvent
 	reservations      map[int64][]*reservationData
 	balances          map[int64]int64
+	ratings           map[int64]int64
+	ratingRewards     []domain.UserRatingReward
 	nextParticipantID int64
 	nextRoundID       int64
 }
@@ -71,6 +73,7 @@ func newMockTransactionScope() *mockTransactionScope {
 		participants:      make(map[int64]*domain.RoundParticipant),
 		reservations:      make(map[int64][]*reservationData),
 		balances:          map[int64]int64{100: 1000, 200: 1000},
+		ratings:           map[int64]int64{100: 0, 200: 0},
 		nextParticipantID: 1,
 		nextRoundID:       2,
 	}
@@ -219,6 +222,12 @@ func (m *mockTransactionScope) UpdateWinningMoney(ctx context.Context, participa
 		return repository.ErrParticipantNotFound
 	}
 	participant.WinningMoney = amount
+	return nil
+}
+
+func (m *mockTransactionScope) ApplyUserRatingReward(ctx context.Context, reward domain.UserRatingReward) error {
+	m.ratings[reward.UserID] += reward.Delta
+	m.ratingRewards = append(m.ratingRewards, reward)
 	return nil
 }
 
@@ -694,6 +703,13 @@ func TestFinalizeRoundCommitsReservationsAndCreatesNextRound(t *testing.T) {
 	if scope.balances[200] != 1060 {
 		t.Fatalf("unexpected winner balance for user 200: got %d want 1060", scope.balances[200])
 	}
+	expectedReward := calculateRatingReward(scope.roomInfo.Config)
+	if scope.ratings[100] != expectedReward {
+		t.Fatalf("unexpected winner rating for user 100: got %d want %d", scope.ratings[100], expectedReward)
+	}
+	if scope.ratings[200] != expectedReward {
+		t.Fatalf("unexpected winner rating for user 200: got %d want %d", scope.ratings[200], expectedReward)
+	}
 	if scope.rounds[1].ArchivedAt == nil {
 		t.Fatal("expected original round to be archived")
 	}
@@ -817,19 +833,47 @@ func TestFinalizeGameRoundIncludesBotWinnersWithoutCreditingBots(t *testing.T) {
 	if !winners[0].IsBot || winners[0].NumberInRoom != 1 {
 		t.Fatalf("expected first winner to be bot in seat 1, got %+v", winners[0])
 	}
-	if winners[1].IsBot || winners[1].RoundParticipantID != firstParticipantID || winners[1].WinningMoney != 80 {
-		t.Fatalf("expected second winner to be participant %d with 80, got %+v", firstParticipantID, winners[1])
+	if winners[1].IsBot || winners[1].RoundParticipantID != firstParticipantID || winners[1].WinningMoney != 160 {
+		t.Fatalf("expected second winner to be participant %d with 160, got %+v", firstParticipantID, winners[1])
 	}
-	if scope.participants[firstParticipantID].WinningMoney != 80 {
-		t.Fatalf("unexpected winning money for first participant: got %d want 80", scope.participants[firstParticipantID].WinningMoney)
+	if scope.participants[firstParticipantID].WinningMoney != 160 {
+		t.Fatalf("unexpected winning money for first participant: got %d want 160", scope.participants[firstParticipantID].WinningMoney)
 	}
 	if scope.participants[secondParticipantID].WinningMoney != 0 {
 		t.Fatalf("unexpected winning money for second participant: got %d want 0", scope.participants[secondParticipantID].WinningMoney)
 	}
-	if scope.balances[100] != 980 {
-		t.Fatalf("unexpected balance for user 100: got %d want 980", scope.balances[100])
+	if scope.balances[100] != 1060 {
+		t.Fatalf("unexpected balance for user 100: got %d want 1060", scope.balances[100])
 	}
 	if scope.balances[200] != 900 {
 		t.Fatalf("unexpected balance for user 200: got %d want 900", scope.balances[200])
+	}
+	expectedReward := calculateRatingReward(scope.roomInfo.Config)
+	if scope.ratings[100] != expectedReward {
+		t.Fatalf("unexpected rating for user 100: got %d want %d", scope.ratings[100], expectedReward)
+	}
+	if scope.ratings[200] != 0 {
+		t.Fatalf("unexpected rating for user 200: got %d want 0", scope.ratings[200])
+	}
+}
+
+func TestCalculateRatingRewardRewardsRiskierConfigsMore(t *testing.T) {
+	safer := calculateRatingReward(&domain.RoomConfig{
+		Capacity:          4,
+		RegistrationPrice: 50,
+		NumberWinners:     2,
+		Commission:        5,
+	})
+	riskier := calculateRatingReward(&domain.RoomConfig{
+		Capacity:          10,
+		RegistrationPrice: 5000,
+		NumberWinners:     1,
+		Commission:        20,
+		IsBoost:           true,
+		BoostPower:        60,
+	})
+
+	if riskier <= safer {
+		t.Fatalf("expected riskier config to reward more rating: safe=%d risky=%d", safer, riskier)
 	}
 }

@@ -13,6 +13,7 @@ type UserService interface {
 	CreateUserByID(ctx context.Context, id int) (*domain.User, error)
 	UpdateUserByID(ctx context.Context, id int, user *domain.User) (*domain.User, error)
 	UpdateUserBalance(ctx context.Context, balance_sum, id int) (*domain.User, error)
+	GetUserRatingHistory(ctx context.Context, userID int, params domain.UserRatingHistoryParams) (domain.UserRatingHistory, error)
 	DeleteUserByID(ctx context.Context, id int) error
 }
 
@@ -30,7 +31,11 @@ func NewUserService(userRepository repository.UserRepository, logger *logrus.Log
 
 // CreateUserByID implements [UserService].
 func (u *userService) CreateUserByID(ctx context.Context, id int) (*domain.User, error) {
-	return u.userRepository.CreateUserByID(ctx, id)
+	user, err := u.userRepository.CreateUserByID(ctx, id)
+	if err != nil {
+		return nil, err
+	}
+	return enrichUserRank(user), nil
 }
 
 // DeleteUserByID implements [UserService].
@@ -40,7 +45,11 @@ func (u *userService) DeleteUserByID(ctx context.Context, id int) error {
 
 // GetUserByID implements [UserService].
 func (u *userService) GetUserByID(ctx context.Context, id int) (*domain.User, error) {
-	return u.userRepository.GetUserByID(ctx, id)
+	user, err := u.userRepository.GetUserByID(ctx, id)
+	if err != nil {
+		return nil, err
+	}
+	return enrichUserRank(user), nil
 }
 
 // UpdateUserBalance implements [UserService].
@@ -55,7 +64,11 @@ func (u *userService) UpdateUserBalance(ctx context.Context, balance_sum int, id
 		return nil, repository.ErrorNegativeBalance
 	}
 
-	return u.userRepository.UpdateUserByID(ctx, id, user)
+	updated, err := u.userRepository.UpdateUserByID(ctx, id, user)
+	if err != nil {
+		return nil, err
+	}
+	return enrichUserRank(updated), nil
 }
 
 // UpdateUserByID implements [UserService].
@@ -72,5 +85,21 @@ func (u *userService) UpdateUserByID(ctx context.Context, id int, user *domain.U
 		current.Balance = user.Balance
 	}
 
-	return u.userRepository.UpdateUserByID(ctx, id, current)
+	updated, err := u.userRepository.UpdateUserByID(ctx, id, current)
+	if err != nil {
+		return nil, err
+	}
+	return enrichUserRank(updated), nil
+}
+
+func (u *userService) GetUserRatingHistory(ctx context.Context, userID int, params domain.UserRatingHistoryParams) (domain.UserRatingHistory, error) {
+	return u.userRepository.GetUserRatingHistory(ctx, userID, params)
+}
+
+func enrichUserRank(user *domain.User) *domain.User {
+	if user == nil {
+		return nil
+	}
+	user.Rank = domain.RankFromRating(user.Rating)
+	return user
 }

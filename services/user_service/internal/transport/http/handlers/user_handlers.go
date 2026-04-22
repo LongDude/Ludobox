@@ -33,6 +33,8 @@ func respondUser(ctx *gin.Context, user *domain.User) {
 		UserID:   user.ID,
 		Nickname: user.NickName,
 		Balance:  user.Balance,
+		Rating:   user.Rating,
+		Rank:     user.Rank,
 	})
 }
 
@@ -164,6 +166,8 @@ func CreateUserByID(ctx *gin.Context, a *app.App) {
 		UserID:   user.ID,
 		Nickname: user.NickName,
 		Balance:  user.Balance,
+		Rating:   user.Rating,
+		Rank:     user.Rank,
 	})
 }
 
