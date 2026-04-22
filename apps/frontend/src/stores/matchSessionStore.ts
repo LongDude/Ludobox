@@ -45,6 +45,10 @@ export const useMatchSessionStore = defineStore('matchSession', () => {
     loading.value = false
   }
 
+  function setFilters(next: MatchmakingFilters | null | undefined) {
+    filters.value = next ? { ...next } : null
+  }
+
   function setQuickMatchSession(response: QuickMatchResponse, requestFilters?: MatchmakingFilters) {
     source.value = 'quick-match'
     selectedRoom.value = response.room
@@ -54,7 +58,7 @@ export const useMatchSessionStore = defineStore('matchSession', () => {
       seat_number: response.seat_number,
       reused_existing_room: response.reused_existing_room,
     }
-    filters.value = requestFilters ? { ...requestFilters } : null
+    setFilters(requestFilters)
     loading.value = false
     error.value = ''
   }
@@ -66,7 +70,7 @@ export const useMatchSessionStore = defineStore('matchSession', () => {
     source.value = 'recommendation'
     selectedRoom.value = room
     quickMatchMeta.value = null
-    filters.value = requestFilters ? { ...requestFilters } : null
+    setFilters(requestFilters)
     loading.value = false
     error.value = ''
   }
@@ -91,6 +95,7 @@ export const useMatchSessionStore = defineStore('matchSession', () => {
     activeRoomId,
     setLoading,
     setError,
+    setFilters,
     setQuickMatchSession,
     setRecommendedRoomSession,
     reset,

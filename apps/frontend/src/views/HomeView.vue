@@ -15,6 +15,7 @@ import {
   createMatchmakingDraft,
   filtersToQuery,
   normalizeMatchmakingDraft,
+  queryToMatchmakingFilters,
   type MatchmakingFilterDraft,
 } from '@/utils/matchmaking'
 
@@ -25,7 +26,8 @@ const router = useRouter()
 const { t } = useI18n()
 const { LeftTabHidden: leftHidden, layoutInset } = useLayoutInset()
 
-const draft = reactive<MatchmakingFilterDraft>(createMatchmakingDraft())
+const initialFilters = session.filters ?? queryToMatchmakingFilters(route.query)
+const draft = reactive<MatchmakingFilterDraft>(createMatchmakingDraft(initialFilters))
 const submittingQuickMatch = ref(false)
 const formError = ref('')
 
@@ -91,6 +93,7 @@ function getFieldError(field: keyof MatchmakingFilterDraft) {
 
 function resetFilters() {
   formError.value = ''
+  session.setFilters(null)
   Object.assign(draft, createMatchmakingDraft())
 }
 
@@ -158,6 +161,11 @@ function handleBrowseRooms() {
     return
   }
 
+  session.setFilters({
+    ...validationResult.value.filters,
+    page: DEFAULT_MATCHMAKING_PAGE,
+    page_size: DEFAULT_MATCHMAKING_PAGE_SIZE,
+  })
   router.push(target)
 }
 </script>
