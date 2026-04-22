@@ -113,6 +113,12 @@ export const GameApi = {
       .then((response) => response.data)
   },
 
+  leaveParticipant(roomId: number, roundParticipantId: number) {
+    return api
+      .post<GameLeaveRoomResponse>(`/game/rooms/${roomId}/participants/${roundParticipantId}/leave`)
+      .then((response) => response.data)
+  },
+
   subscribeRoundEvents(roomId: number, roundId: number, handlers: RoundEventHandlers) {
     const controller = new AbortController()
     const auth = useAuthStore()

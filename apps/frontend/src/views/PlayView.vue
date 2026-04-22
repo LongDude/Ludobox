@@ -42,6 +42,7 @@ const actionLoading = ref('')
 const errorMsg = ref('')
 const successMsg = ref('')
 const selectedSeat = ref('')
+const selectedBoostParticipantId = ref('')
 const autoRefresh = ref(true)
 const autoAdvanceNextRound = ref(true)
 const sseConnected = ref(false)
@@ -125,7 +126,6 @@ const statusLabel = computed(() => {
 })
 const roundPhase = computed(() => normalizeRoundPhase(statusLabel.value))
 const currentRoundPhase = computed(() => normalizeRoundPhase(currentRoomStatusLabel.value))
-const currentRoomIsActive = computed(() => currentRoundPhase.value === 'playing')
 const roundPhases = computed(() =>
   [
     {
@@ -159,11 +159,14 @@ const seatOptions = computed(() => {
 })
 
 const occupiedSeats = computed(() => {
-  return new Set(
-    (roundStatus.value?.participants ?? [])
-      .filter((participant) => !participant.exited_at)
-      .map((participant) => participant.number_in_room),
-  )
+  const seats = new Set<number>()
+  for (const participant of roundStatus.value?.participants ?? []) {
+    if (!participant.exited_at) seats.add(participant.number_in_room)
+  }
+  for (const participant of roomState.value?.current_user_participants ?? []) {
+    if (!participant.exited_at) seats.add(participant.number_in_room)
+  }
+  return seats
 })
 
 const participants = computed(() =>
@@ -176,85 +179,131 @@ const winners = computed(() => roundStatus.value?.winners ?? [])
 const roomUserParticipants = computed(() =>
   (roomState.value?.current_user_participants ?? []).filter((participant) => !participant.exited_at),
 )
-const currentRoomParticipant = computed(() => {
-  const participant = roomUserParticipants.value[0] ?? null
-  if (!participant) return null
-
-  if (activeRoundId.value === roomRoundId.value) {
-    return (
-      participants.value.find((item) => item.participant_id === participant.participant_id) ??
-      participant
-    )
+const ownedParticipants = computed(() => {
+  const owned = new Map<number, GameParticipantInfo>()
+  const addParticipant = (participant: GameParticipantInfo | null | undefined) => {
+    if (!participant || participant.exited_at || participant.participant_id <= 0) return
+    owned.set(participant.participant_id, participant)
   }
 
-  return participant
-})
-const displayedOwnParticipants = computed(() => {
+  for (const participant of roomUserParticipants.value) {
+    addParticipant(participant)
+  }
+
   const userId = currentUserId.value
-  if (userId) {
-    const matched = participants.value.filter(
-      (participant) => participant.user_id === userId && !participant.exited_at,
-    )
-    if (matched.length > 0) return matched
-  }
+  for (const participant of participants.value) {
+    if (userId && participant.user_id === userId) {
+      addParticipant(participant)
+      continue
+    }
 
-  if (participants.value.length > 0 && roomUserParticipants.value.length > 0) {
-    const ownedParticipantIds = new Set(
-      roomUserParticipants.value.map((participant) => participant.participant_id),
-    )
-    const matched = participants.value.filter(
-      (participant) =>
-        !participant.exited_at && ownedParticipantIds.has(participant.participant_id),
-    )
-    if (matched.length > 0) return matched
+    if (owned.has(participant.participant_id)) {
+      addParticipant(participant)
+    }
   }
 
   const participantId = initialParticipantId.value
-  if (!participantId || initialParticipantRoundId.value !== activeRoundId.value) return []
-
-  const matched = participants.value.find((participant) => participant.participant_id === participantId)
-  return matched ? [matched] : []
-})
-const activeParticipant = computed(() => {
-  if (activeRoundId.value === roomRoundId.value && currentRoomParticipant.value) {
-    return currentRoomParticipant.value
+  if (
+    participantId &&
+    initialParticipantRoundId.value === activeRoundId.value &&
+    !owned.has(participantId)
+  ) {
+    const matched = participants.value.find((participant) => participant.participant_id === participantId)
+    if (matched) {
+      addParticipant(matched)
+    } else {
+      const seat = joinResult.value?.number_in_room || quickMatchMeta.value?.seat_number || 0
+      if (seat > 0) {
+        addParticipant({
+          participant_id: participantId,
+          user_id: currentUserId.value,
+          number_in_room: seat,
+          boost: 0,
+          winning_money: 0,
+          is_bot: false,
+          exited_at: null,
+        })
+      }
+    }
   }
 
-  if (displayedOwnParticipants.value.length > 0) {
-    return displayedOwnParticipants.value[0] ?? null
-  }
-
-  return null
+  return [...owned.values()].sort((left, right) => left.number_in_room - right.number_in_room)
 })
-const activeParticipantId = computed(() => activeParticipant.value?.participant_id ?? null)
-const currentParticipantId = computed(() => currentRoomParticipant.value?.participant_id ?? null)
-const mySeat = computed(
-  () => currentRoomParticipant.value?.number_in_room ?? activeParticipant.value?.number_in_room ?? null,
+const ownedParticipantIds = computed(
+  () => new Set(ownedParticipants.value.map((participant) => participant.participant_id)),
 )
-const isJoined = computed(() => {
-  if (roomUserParticipants.value.length > 0) return true
-  return Boolean(initialParticipantId.value && initialParticipantRoundId.value === roomRoundId.value)
+const ownedSeatNumbers = computed(
+  () => new Set(ownedParticipants.value.map((participant) => participant.number_in_room)),
+)
+const isJoined = computed(() => ownedParticipants.value.length > 0)
+const maxOwnSeats = computed(() => Math.max(1, Math.floor((roomCapacity.value || 1) / 2)))
+const freeSeatsCount = computed(
+  () => seatOptions.value.filter((seat) => !occupiedSeats.value.has(seat)).length,
+)
+const ownSeatsLimitReached = computed(
+  () => ownedParticipants.value.length >= maxOwnSeats.value,
+)
+const canJoinMoreSeats = computed(
+  () =>
+    currentRoundPhase.value === 'waiting' &&
+    roomCapacity.value > 0 &&
+    freeSeatsCount.value > 0 &&
+    !ownSeatsLimitReached.value,
+)
+const boostedParticipant = computed(
+  () => ownedParticipants.value.find((participant) => participant.boost > 0) ?? null,
+)
+const selectedBoostParticipant = computed(() => {
+  const selectedId = Number(selectedBoostParticipantId.value)
+  if (selectedId > 0) {
+    const selected = ownedParticipants.value.find(
+      (participant) => participant.participant_id === selectedId,
+    )
+    if (selected) return selected
+  }
+
+  return boostedParticipant.value ?? ownedParticipants.value[0] ?? null
 })
 const hasOwnedBoost = computed(() =>
-  roomUserParticipants.value.some((participant) => participant.boost > 0),
+  Boolean(boostedParticipant.value),
 )
-const hasActiveParticipantBoost = computed(
-  () => Boolean(currentRoomParticipant.value?.boost && currentRoomParticipant.value.boost > 0),
-)
-const canManageCurrentRound = computed(
-  () => Boolean(currentParticipantId.value) && currentRoundPhase.value === 'waiting',
-)
+const canManageCurrentRound = computed(() => currentRoundPhase.value === 'waiting')
+const canManageOwnedSeats = computed(() => isJoined.value && canManageCurrentRound.value)
 const canBoost = computed(
   () =>
     canManageCurrentRound.value &&
     isJoined.value &&
+    Boolean(selectedBoostParticipant.value) &&
     (roomState.value?.is_boost ?? room.value?.is_boost) === true &&
     !hasOwnedBoost.value,
 )
-const canLeave = computed(() => isJoined.value && !currentRoomIsActive.value)
+const canCancelBoost = computed(() => canManageCurrentRound.value && hasOwnedBoost.value)
+const canLeaveSeats = computed(() => canManageOwnedSeats.value)
+const joinBlockedHint = computed(() => {
+  if (canJoinMoreSeats.value) {
+    return isJoined.value
+      ? t('gameRoom.entry.addSeatHint', {
+          count: ownedParticipants.value.length,
+          limit: maxOwnSeats.value,
+        })
+      : t('gameRoom.entry.notJoinedHint')
+  }
+  if (currentRoundPhase.value !== 'waiting') return t('gameRoom.entry.actionsLocked')
+  if (!roomCapacity.value) return t('gameRoom.entry.roomUnavailable')
+  if (ownSeatsLimitReached.value) {
+    return t('gameRoom.entry.seatLimitReached', { limit: maxOwnSeats.value })
+  }
+  if (freeSeatsCount.value <= 0) return t('gameRoom.entry.roomFull')
+  return t('gameRoom.entry.notJoinedHint')
+})
 const boostHint = computed(() => {
-  if (hasOwnedBoost.value) return t('gameRoom.controls.boostAlreadyActive')
-  if (currentRoomIsActive.value) return t('gameRoom.controls.actionsLocked')
+  if (!isJoined.value) return t('gameRoom.errors.joinFirst')
+  if (hasOwnedBoost.value && boostedParticipant.value) {
+    return t('gameRoom.controls.boostActiveOnSeat', {
+      seat: boostedParticipant.value.number_in_room,
+    })
+  }
+  if (!canManageCurrentRound.value) return t('gameRoom.controls.actionsLocked')
   return canBoost.value ? t('gameRoom.controls.boostHint') : t('gameRoom.controls.boostDisabled')
 })
 const nextRoundAvailable = computed(
@@ -299,10 +348,28 @@ watch(
   () => roomId.value,
   () => {
     displayedRoundId.value = null
+    selectedBoostParticipantId.value = ''
     clearPendingNextRound()
     roundStatus.value = null
     liveEvents.value = []
     void loadRoomState(true)
+  },
+  { immediate: true },
+)
+
+watch(
+  ownedParticipants,
+  (owned) => {
+    const boosted = boostedParticipant.value
+    if (boosted) {
+      selectedBoostParticipantId.value = String(boosted.participant_id)
+      return
+    }
+
+    const selectedId = Number(selectedBoostParticipantId.value)
+    if (owned.some((participant) => participant.participant_id === selectedId)) return
+
+    selectedBoostParticipantId.value = owned[0] ? String(owned[0].participant_id) : ''
   },
   { immediate: true },
 )
@@ -372,6 +439,7 @@ function normalizeError(error: any, fallback: string) {
   if (code === 'BOOST_ALREADY_PURCHASED') return t('gameRoom.errors.boostAlreadyPurchased')
   if (code === 'BOOST_DISABLED') return t('gameRoom.errors.boostDisabled')
   if (code === 'GAME_STARTED') return t('gameRoom.errors.gameStarted')
+  if (code === 'MAX_SEATS_EXCEEDED') return t('gameRoom.errors.maxSeatsExceeded')
   return error?.message || error?.details?.message || error?.details?.error || fallback
 }
 
@@ -657,10 +725,17 @@ async function refreshRoundView(silent = false) {
 
 async function joinRoom() {
   clearFeedback()
+
+  if (!canJoinMoreSeats.value) {
+    errorMsg.value = joinBlockedHint.value
+    return
+  }
+
   joining.value = true
 
   try {
     joinResult.value = await GameApi.joinRoom(roomId.value)
+    selectedSeat.value = ''
     displayedRoundId.value = null
     clearPendingNextRound()
     successMsg.value = t('gameRoom.messages.joined', { seat: joinResult.value.number_in_room })
@@ -676,13 +751,18 @@ async function joinRoom() {
 async function joinRoomWithSeat() {
   clearFeedback()
 
+  if (!canJoinMoreSeats.value) {
+    errorMsg.value = joinBlockedHint.value
+    return
+  }
+
   const seat = Number(selectedSeat.value)
   if (!Number.isInteger(seat) || seat <= 0) {
     errorMsg.value = t('gameRoom.errors.seatRequired')
     return
   }
 
-  if (occupiedSeats.value.has(seat) && seat !== mySeat.value) {
+  if (occupiedSeats.value.has(seat)) {
     errorMsg.value = t('gameRoom.errors.seatTaken')
     return
   }
@@ -691,6 +771,7 @@ async function joinRoomWithSeat() {
 
   try {
     joinResult.value = await GameApi.joinRoomWithSeat(roomId.value, { number_in_room: seat })
+    selectedSeat.value = ''
     displayedRoundId.value = null
     clearPendingNextRound()
     successMsg.value = t('gameRoom.messages.joined', { seat: joinResult.value.number_in_room })
@@ -706,8 +787,8 @@ async function joinRoomWithSeat() {
 async function purchaseBoost() {
   clearFeedback()
 
-  const participantId = currentParticipantId.value
-  if (!participantId) {
+  const participant = selectedBoostParticipant.value
+  if (!participant) {
     errorMsg.value = t('gameRoom.errors.joinFirst')
     return
   }
@@ -719,7 +800,7 @@ async function purchaseBoost() {
   actionLoading.value = 'boost'
 
   try {
-    const response = await GameApi.purchaseBoost(roomId.value, participantId)
+    const response = await GameApi.purchaseBoost(roomId.value, participant.participant_id)
     successMsg.value = t('gameRoom.messages.boostPurchased', {
       power: response.boost_power,
       cost: response.boost_cost,
@@ -736,8 +817,8 @@ async function purchaseBoost() {
 async function cancelBoost() {
   clearFeedback()
 
-  const participantId = currentParticipantId.value
-  if (!participantId) {
+  const participant = boostedParticipant.value
+  if (!participant) {
     errorMsg.value = t('gameRoom.errors.joinFirst')
     return
   }
@@ -745,7 +826,7 @@ async function cancelBoost() {
   actionLoading.value = 'cancel-boost'
 
   try {
-    const response = await GameApi.cancelBoost(roomId.value, participantId)
+    const response = await GameApi.cancelBoost(roomId.value, participant.participant_id)
     successMsg.value = t('gameRoom.messages.boostCancelled', { refund: response.refund ?? 0 })
     refreshCabinetBalance()
     await refreshRoundView()
@@ -756,23 +837,27 @@ async function cancelBoost() {
   }
 }
 
-async function leaveRoom() {
+async function leaveParticipant(participant: GameParticipantInfo) {
   clearFeedback()
 
-  if (!canLeave.value) {
-    errorMsg.value = t('gameRoom.errors.joinFirst')
+  if (!canLeaveSeats.value) {
+    errorMsg.value = isJoined.value ? t('gameRoom.controls.actionsLocked') : t('gameRoom.errors.joinFirst')
     return
   }
 
-  const confirmed = window.confirm(t('gameRoom.confirmLeave'))
+  const confirmed = window.confirm(
+    t('gameRoom.confirmLeaveSeat', { seat: participant.number_in_room }),
+  )
   if (!confirmed) return
 
-  actionLoading.value = 'leave'
+  actionLoading.value = `leave-${participant.participant_id}`
 
   try {
-    const response = await GameApi.leaveRoom(roomId.value)
-    successMsg.value = t('gameRoom.messages.left', { refund: response.refund ?? 0 })
-    joinResult.value = null
+    await GameApi.leaveParticipant(roomId.value, participant.participant_id)
+    successMsg.value = t('gameRoom.messages.leftSeat', { seat: participant.number_in_room })
+    if (joinResult.value?.participant_id === participant.participant_id) {
+      joinResult.value = null
+    }
     displayedRoundId.value = null
     clearPendingNextRound()
     await refreshRoundView(true)
@@ -947,53 +1032,95 @@ function scheduleNextRoundTransition(nextRoundId: number | null, nextRoundDelay:
         </div>
 
         <div class="join-box" :class="{ joined: isJoined }">
-          <template v-if="isJoined">
+          <div v-if="isJoined" class="own-seats">
             <p class="join-title">
-              {{ t('gameRoom.entry.joinedAs', { participant: currentParticipantId ?? '-', seat: mySeat ?? '-' }) }}
+              {{ t('gameRoom.entry.ownedSeatsTitle', { count: ownedParticipants.length }) }}
             </p>
             <p class="description">
-              {{ t('gameRoom.entry.joinedHint') }}
+              {{ t('gameRoom.entry.ownedSeatsHint', { limit: maxOwnSeats }) }}
             </p>
-          </template>
 
-          <template v-else>
-            <p class="join-title">{{ t('gameRoom.entry.notJoinedTitle') }}</p>
-            <p class="description">{{ t('gameRoom.entry.notJoinedHint') }}</p>
-
-            <div v-if="seatOptions.length" class="seat-grid" :aria-label="t('gameRoom.entry.seats')">
-              <button
-                v-for="seat in seatOptions"
-                :key="seat"
-                class="seat-button"
-                :class="{ occupied: occupiedSeats.has(seat), selected: Number(selectedSeat) === seat }"
-                type="button"
-                :disabled="occupiedSeats.has(seat)"
-                @click="selectedSeat = String(seat)"
+            <div class="own-seat-list">
+              <article
+                v-for="participant in ownedParticipants"
+                :key="participant.participant_id"
+                class="own-seat-card"
               >
-                {{ seat }}
-              </button>
+                <div>
+                  <strong>{{ t('gameRoom.participant.seat', { seat: participant.number_in_room }) }}</strong>
+                  <span>{{ t('gameRoom.participant.id', { id: participant.participant_id }) }}</span>
+                  <span v-if="participant.boost > 0">
+                    {{ t('gameRoom.entry.boostActiveSeat', { seat: participant.number_in_room }) }}
+                  </span>
+                </div>
+                <button
+                  class="btn btn--danger"
+                  type="button"
+                  :disabled="!canLeaveSeats || actionLoading === `leave-${participant.participant_id}`"
+                  @click="leaveParticipant(participant)"
+                >
+                  {{
+                    actionLoading === `leave-${participant.participant_id}`
+                      ? t('common.loading')
+                      : t('gameRoom.entry.releaseSeat')
+                  }}
+                </button>
+              </article>
             </div>
+          </div>
 
-            <label class="seat-input">
-              <span>{{ t('gameRoom.entry.seatNumber') }}</span>
-              <input
-                v-model="selectedSeat"
-                type="number"
-                min="1"
-                step="1"
-                :placeholder="t('gameRoom.entry.seatPlaceholder')"
-              />
-            </label>
+          <div class="join-flow">
+            <p class="join-title">
+              {{ isJoined ? t('gameRoom.entry.addSeatTitle') : t('gameRoom.entry.notJoinedTitle') }}
+            </p>
+            <p class="description">{{ joinBlockedHint }}</p>
 
-            <div class="actions stretch">
-              <button class="btn btn--primary" type="button" :disabled="joining" @click="joinRoom">
-                {{ joining ? t('gameRoom.entry.joining') : t('gameRoom.entry.joinAuto') }}
-              </button>
-              <button class="btn" type="button" :disabled="joining" @click="joinRoomWithSeat">
-                {{ t('gameRoom.entry.joinSeat') }}
-              </button>
-            </div>
-          </template>
+            <template v-if="canJoinMoreSeats">
+              <div v-if="seatOptions.length" class="seat-grid" :aria-label="t('gameRoom.entry.seats')">
+                <button
+                  v-for="seat in seatOptions"
+                  :key="seat"
+                  class="seat-button"
+                  :class="{
+                    occupied: occupiedSeats.has(seat),
+                    selected: Number(selectedSeat) === seat,
+                    'own-seat': ownedSeatNumbers.has(seat),
+                  }"
+                  type="button"
+                  :disabled="occupiedSeats.has(seat)"
+                  @click="selectedSeat = String(seat)"
+                >
+                  {{ seat }}
+                </button>
+              </div>
+
+              <label class="seat-input">
+                <span>{{ t('gameRoom.entry.seatNumber') }}</span>
+                <input
+                  v-model="selectedSeat"
+                  type="number"
+                  min="1"
+                  step="1"
+                  :placeholder="t('gameRoom.entry.seatPlaceholder')"
+                />
+              </label>
+
+              <div class="actions stretch">
+                <button class="btn btn--primary" type="button" :disabled="joining" @click="joinRoom">
+                  {{
+                    joining
+                      ? t('gameRoom.entry.joining')
+                      : isJoined
+                        ? t('gameRoom.entry.joinAutoMore')
+                        : t('gameRoom.entry.joinAuto')
+                  }}
+                </button>
+                <button class="btn" type="button" :disabled="joining" @click="joinRoomWithSeat">
+                  {{ t('gameRoom.entry.joinSeat') }}
+                </button>
+              </div>
+            </template>
+          </div>
         </div>
       </article>
 
@@ -1072,9 +1199,9 @@ function scheduleNextRoundTransition(nextRoundId: number | null, nextRoundDelay:
               v-for="participant in participants"
               :key="participant.participant_id"
               class="participant-card"
-              :class="{ own: participant.participant_id === activeParticipantId }"
+              :class="{ own: ownedParticipantIds.has(participant.participant_id) }"
             >
-              <span v-if="participant.participant_id === activeParticipantId" class="own-badge">
+              <span v-if="ownedParticipantIds.has(participant.participant_id)" class="own-badge">
                 {{ t('gameRoom.participant.you') }}
               </span>
               <strong>{{ t('gameRoom.participant.seat', { seat: participant.number_in_room }) }}</strong>
@@ -1150,6 +1277,24 @@ function scheduleNextRoundTransition(nextRoundId: number | null, nextRoundDelay:
             <span>{{ t('gameRoom.controls.boostValue') }}</span>
             <strong>{{ formatBoost() }}</strong>
           </p>
+          <label class="seat-input">
+            <span>{{ t('gameRoom.controls.boostSeat') }}</span>
+            <select v-model="selectedBoostParticipantId" :disabled="!ownedParticipants.length || hasOwnedBoost">
+              <option value="">{{ t('gameRoom.controls.boostSeatPlaceholder') }}</option>
+              <option
+                v-for="participant in ownedParticipants"
+                :key="participant.participant_id"
+                :value="String(participant.participant_id)"
+              >
+                {{
+                  t('gameRoom.controls.boostSeatOption', {
+                    seat: participant.number_in_room,
+                    participant: participant.participant_id,
+                  })
+                }}
+              </option>
+            </select>
+          </label>
           <div class="actions stretch">
             <button
               class="btn btn--primary"
@@ -1162,7 +1307,7 @@ function scheduleNextRoundTransition(nextRoundId: number | null, nextRoundDelay:
             <button
               class="btn"
               type="button"
-              :disabled="!hasActiveParticipantBoost || !canManageCurrentRound || actionLoading === 'cancel-boost'"
+              :disabled="!canCancelBoost || actionLoading === 'cancel-boost'"
               @click="cancelBoost"
             >
               {{ actionLoading === 'cancel-boost' ? t('common.loading') : t('gameRoom.controls.cancelBoost') }}
@@ -1174,14 +1319,6 @@ function scheduleNextRoundTransition(nextRoundId: number | null, nextRoundDelay:
           <h3>{{ t('gameRoom.controls.roomTitle') }}</h3>
           <p class="description">{{ t('gameRoom.controls.roomHint') }}</p>
           <div class="actions stretch">
-            <button
-              class="btn btn--danger"
-              type="button"
-              :disabled="!canLeave || actionLoading === 'leave'"
-              @click="leaveRoom"
-            >
-              {{ actionLoading === 'leave' ? t('common.loading') : t('gameRoom.controls.leave') }}
-            </button>
             <button class="btn" type="button" @click="backToHome">
               {{ t('matchmaking.play.backHome') }}
             </button>
@@ -1426,8 +1563,15 @@ strong.live {
   opacity: 0.45;
 }
 
+.seat-button.own-seat {
+  border-color: color-mix(in oklab, var(--color-primary-secondary), transparent 20%);
+}
+
 label,
 .seat-input,
+.own-seats,
+.own-seat-list,
+.join-flow,
 .participants,
 .winners,
 .participant-list,
@@ -1435,6 +1579,22 @@ label,
 .event-list {
   display: grid;
   gap: 0.55rem;
+}
+
+.own-seat-card {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.85rem;
+  padding: 0.85rem;
+  border-radius: 1rem;
+  border: 1px solid color-mix(in oklab, var(--color-primary-secondary), transparent 35%);
+  background: color-mix(in oklab, var(--color-primary-secondary), transparent 91%);
+}
+
+.own-seat-card div {
+  display: grid;
+  gap: 0.25rem;
 }
 
 .boost-value {
@@ -1445,7 +1605,8 @@ label,
   margin: 0;
 }
 
-input[type='number'] {
+input[type='number'],
+select {
   width: 100%;
   padding: 0.8rem 0.95rem;
   border: 1px solid color-mix(in oklab, var(--color-border), transparent 8%);
