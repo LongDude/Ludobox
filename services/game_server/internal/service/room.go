@@ -1008,7 +1008,7 @@ func buildPayouts(config *domain.RoomConfig, winnersCount int, participantCount 
 		return nil
 	}
 
-	grossBank := config.RegistrationPrice * int64(participantCount)
+	grossBank := config.RegistrationPrice * int64(config.Capacity)
 	commission := grossBank * int64(config.Commission) / 100
 	prizePool := grossBank - commission
 	payouts := make([]int64, winnersCount)
