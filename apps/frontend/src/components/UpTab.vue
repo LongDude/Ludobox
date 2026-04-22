@@ -114,7 +114,7 @@ async function logout() {
   <header class="up-tab" :class="{ collapsed: settings.LeftTabHidden }">
     <button class="brand" type="button" @click="redirectTo('/')">
       <span class="brand-mark">
-        <img class="brand-logo" src="./../assets/logo_micro.svg" alt="LudaBox" />
+        <img class="brand-logo" src="./../assets/logo_micro.svg" alt="LudoBox" />
       </span>
     </button>
 

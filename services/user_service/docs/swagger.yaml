@@ -22,9 +22,13 @@ definitions:
         type: boolean
       min_users:
         type: integer
+      next_round_delay:
+        type: integer
       number_winners:
         type: integer
       registration_price:
+        type: integer
+      round_time:
         type: integer
       time:
         type: integer
@@ -49,9 +53,13 @@ definitions:
         type: boolean
       min_users:
         type: integer
+      next_round_delay:
+        type: integer
       number_winners:
         type: integer
       registration_price:
+        type: integer
+      round_time:
         type: integer
       time:
         type: integer
@@ -77,6 +85,50 @@ definitions:
     properties:
       error:
         type: string
+    type: object
+  presenters.GameHistoryItemResponse:
+    properties:
+      boost_fee:
+        type: integer
+      entry_fee:
+        type: integer
+      finished_at:
+        type: string
+      game_id:
+        type: integer
+      game_name:
+        type: string
+      joined_at:
+        type: string
+      net_result:
+        type: integer
+      participant_id:
+        type: integer
+      result:
+        type: string
+      room_id:
+        type: integer
+      round_id:
+        type: integer
+      round_status:
+        type: string
+      seat_number:
+        type: integer
+      winning_money:
+        type: integer
+    type: object
+  presenters.GameHistoryResponse:
+    properties:
+      items:
+        items:
+          $ref: '#/definitions/presenters.GameHistoryItemResponse'
+        type: array
+      page:
+        type: integer
+      page_size:
+        type: integer
+      total:
+        type: integer
     type: object
   presenters.GameResponse:
     properties:
@@ -212,11 +264,37 @@ definitions:
         example: ludobox_vip_2
         type: string
     type: object
+  service.AdminEvent:
+    properties:
+      action:
+        type: string
+      id:
+        type: integer
+      resource:
+        type: string
+      timestamp:
+        type: string
+      type:
+        type: string
+    type: object
+  service.UserBalanceEvent:
+    properties:
+      action:
+        type: string
+      balance:
+        type: integer
+      timestamp:
+        type: string
+      type:
+        type: string
+      user_id:
+        type: integer
+    type: object
 host: localhost:8080
 info:
   contact: {}
-  description: LudaBox UserService
-  title: LudaBox API
+  description: LudoBox UserService
+  title: LudoBox API
   version: "1.0"
 paths:
   /admin/config:
@@ -486,6 +564,40 @@ paths:
       summary: List active configs
       tags:
       - Config
+  /admin/events:
+    get:
+      consumes:
+      - application/json
+      description: Streams admin resource change events for games, configs, rooms
+        and servers.
+      parameters:
+      - description: Authorization Token
+        in: header
+        name: Authorization
+        required: true
+        type: string
+      produces:
+      - text/event-stream
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/service.AdminEvent'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/presenters.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/presenters.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/presenters.ErrorResponse'
+      summary: Subscribe admin events
+      tags:
+      - Admin Events
   /admin/game:
     post:
       consumes:
@@ -1286,6 +1398,107 @@ paths:
           schema:
             $ref: '#/definitions/presenters.ErrorResponse'
       summary: Update current user balance
+      tags:
+      - User
+  /user/balance/events:
+    get:
+      consumes:
+      - application/json
+      description: Streams balance changes for the authenticated user.
+      parameters:
+      - description: Authenticated user id
+        in: header
+        name: X-Authenticated-User
+        required: true
+        type: string
+      - description: Authorization Token
+        in: header
+        name: Authorization
+        required: true
+        type: string
+      produces:
+      - text/event-stream
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/service.UserBalanceEvent'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/presenters.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/presenters.ErrorResponse'
+      summary: Subscribe current user balance events
+      tags:
+      - User
+  /user/history/games:
+    get:
+      consumes:
+      - application/json
+      description: Returns current user's game participation history with results
+        and financial outcome.
+      parameters:
+      - description: Authenticated user id
+        in: header
+        name: X-Authenticated-User
+        required: true
+        type: string
+      - description: Authorization Token
+        in: header
+        name: Authorization
+        required: true
+        type: string
+      - description: Page number
+        in: query
+        name: page
+        type: integer
+      - description: Page size
+        in: query
+        name: page_size
+        type: integer
+      - description: Game id
+        in: query
+        name: game_id
+        type: integer
+      - description: Room id
+        in: query
+        name: room_id
+        type: integer
+      - description: 'Result/status: won, lost, left, cancelled, waiting, active'
+        in: query
+        name: status
+        type: string
+      - description: Start date/time, RFC3339 or YYYY-MM-DD
+        in: query
+        name: date_from
+        type: string
+      - description: End date/time, RFC3339 or YYYY-MM-DD
+        in: query
+        name: date_to
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/presenters.GameHistoryResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/presenters.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/presenters.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/presenters.ErrorResponse'
+      summary: List current user game history
       tags:
       - User
 swagger: "2.0"

@@ -110,10 +110,10 @@ function isActive(path: string) {
       <div class="header">
         <button class="brand-button" type="button" @click="redirectTo('/')">
           <span class="brand-mark">
-            <img alt="LudaBox" src="./../assets/logo_micro.svg" class="brand-logo" />
+            <img alt="LudoBox" src="./../assets/logo_micro.svg" class="brand-logo" />
           </span>
           <span v-if="!LeftTabHidden" class="brand-copy">
-            <strong>LudaBox</strong>
+            <strong>LudoBox</strong>
             <small>{{ t('layout.sidebarTagline') }}</small>
           </span>
         </button>

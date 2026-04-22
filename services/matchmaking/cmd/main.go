@@ -16,9 +16,9 @@ import (
 	"user_service/pkg/storage"
 )
 
-// @title LudaBox API
+// @title LudoBox API
 // @version 1.0
-// @description LudaBox Matchmaking
+// @description LudoBox Matchmaking
 // @host localhost:8080
 // @BasePath /api
 func main() {

@@ -1,4 +1,4 @@
-﻿# LudaBox Frontend
+﻿# LudoBox Frontend
 
 Фронтенд веб‑приложения для проведения лотерей построенный на микросервисной архитектуре на Vue 3 со входом через SSO, ролями (USER, ADMIN). Проект собран на Vite и TypeScript, использует Pinia, Vue Router и Axios. 
 
@@ -73,9 +73,9 @@ Nginx раздаёт статику на http://localhost (порт 80).
 - `src/stores/` — Pinia‑хранилища (auth/chat/paper/settings/toast).
 - `src/api/` — слой API на Axios:
   - `src/api/base/useBaseApi.ts` — клиент для SSO с перехватом 401 → refresh.
-  - `src/api/base/useLudaApi.ts` — клиент для LudaBox API.
+  - `src/api/base/useLudaApi.ts` — клиент для LudoBox API.
   - `src/api/useSSOApi.ts` — методы SSO.
-  - `src/api/useLudaApi.ts` — методы LudaBox API.
+  - `src/api/useLudaApi.ts` — методы LudoBox API.
 - `src/views/` — страницы приложения.
 - `src/components/` — UI‑компоненты (панели, тосты, диалоги).
 - `src/i18n.ts` — простая i18n (en/ru).
@@ -95,7 +95,6 @@ VITE_SSO_CLIENT_ID_URL=https://domain/api
 
 - `VITE_FRONTEND_BASE_URL` — базовый URL фронтенда (для redirect URL OAuth).
 - `VITE_SSO_CLIENT_ID_URL` — базовый URL SSO‑сервиса.
-- `VITE_ALIB_API_URL` — базовый URL ALib API.
 - `VITE_API_BASE_URL` — зарезервирован для общего базового URL.
 
 ## Сборка и деплой

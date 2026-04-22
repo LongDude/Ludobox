@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/url"
+	"sort"
 	"strings"
 	"time"
 
@@ -777,7 +778,7 @@ func (s *RoomService) FinalizeGameRound(ctx context.Context, roundID int64) ([]d
 		return nil, err
 	}
 
-	payouts := buildPayouts(roomInfo.Config, len(winningPositions))
+	payouts := buildPayouts(roomInfo.Config, len(winningPositions), len(participants))
 	payoutsByParticipant := make(map[int64]int64, len(winningPositions))
 	winners := make([]domain.RoundParticipant, 0, len(winningPositions))
 	participantsBySeat := make(map[int]domain.RoundParticipant, len(participants))
@@ -890,29 +891,30 @@ func (s *RoomService) cacheRoomInfo(ctx context.Context, roomInfo *domain.RoomIn
 
 func (s *RoomService) requestWinningPositions(ctx context.Context, config *domain.RoomConfig, participants []domain.RoundParticipant) ([]int, error) {
 	winnersCount := config.NumberWinners
-	countPlayers := config.Capacity
 	boostPower := config.BoostPower
 
-	if winnersCount > countPlayers {
-		winnersCount = countPlayers
+	if winnersCount > len(participants) {
+		winnersCount = len(participants)
+	}
+	if winnersCount == 0 {
+		return []int{}, nil
 	}
 
-	coefBoost := (100.0 + float64(boostPower)) / 100.0
-	sumProbabilities := 1.0
-	weight := 1.0 / float64(countPlayers)
-	probabilities := make([]float64, countPlayers)
-	for i := range countPlayers {
-		probabilities[i] = weight
-	}
-	for _, participant := range participants {
+	coefBoost := (100 + float64(boostPower)) / 100.0
+	orderedParticipants := append([]domain.RoundParticipant(nil), participants...)
+	sort.Slice(orderedParticipants, func(left, right int) bool {
+		return orderedParticipants[left].NumberInRoom < orderedParticipants[right].NumberInRoom
+	})
+
+	seatNumbers := make([]int, 0, len(orderedParticipants))
+	probabilities := make([]float64, 0, len(orderedParticipants))
+	for _, participant := range orderedParticipants {
+		weight := 1.0
 		if participant.Boost > 0 {
-			probabilities[participant.NumberInRoom-1] *= coefBoost
-			sumProbabilities += coefBoost
+			weight *= coefBoost
 		}
-	}
-
-	for i := range countPlayers {
-		probabilities[i] /= sumProbabilities
+		seatNumbers = append(seatNumbers, participant.NumberInRoom)
+		probabilities = append(probabilities, weight)
 	}
 
 	payload := rngDistributeRequest{
@@ -949,15 +951,23 @@ func (s *RoomService) requestWinningPositions(ctx context.Context, config *domai
 		return nil, fmt.Errorf("RNG service returned %d winners, expected %d", len(rngResponse.WinningPositions), winnersCount)
 	}
 
-	return rngResponse.WinningPositions, nil
+	winningPositions := make([]int, 0, len(rngResponse.WinningPositions))
+	for _, position := range rngResponse.WinningPositions {
+		if position < 1 || position > len(seatNumbers) {
+			return nil, fmt.Errorf("RNG service returned invalid winner index %d", position)
+		}
+		winningPositions = append(winningPositions, seatNumbers[position-1])
+	}
+
+	return winningPositions, nil
 }
 
-func buildPayouts(config *domain.RoomConfig, winnersCount int) []int64 {
-	if winnersCount == 0 {
+func buildPayouts(config *domain.RoomConfig, winnersCount int, participantCount int) []int64 {
+	if winnersCount == 0 || participantCount <= 0 {
 		return nil
 	}
 
-	grossBank := config.RegistrationPrice * int64(config.Capacity)
+	grossBank := config.RegistrationPrice * int64(participantCount)
 	commission := grossBank * int64(config.Commission) / 100
 	prizePool := grossBank - commission
 	payouts := make([]int64, winnersCount)

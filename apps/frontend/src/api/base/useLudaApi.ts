@@ -1,10 +1,10 @@
 import { useAuthStore } from '@/stores/authStore'
 import axios, { AxiosError } from 'axios'
-import { LUDABOX_API_URL } from '@/config'
+import { LUDOBOX_API_URL } from '@/config'
 import { attachAccessToken, retryRequestAfterRefresh } from '@/api/base/authRetry'
 
 export const api = axios.create({
-  baseURL: LUDABOX_API_URL,
+  baseURL: LUDOBOX_API_URL,
   timeout: 20000,
   withCredentials: true,
 })

@@ -17,9 +17,9 @@ import (
 	"time"
 )
 
-// @title LudaBox API
+// @title LudoBox API
 // @version 1.0
-// @description LudaBox GameServer
+// @description LudoBox GameServer
 // @host localhost:8080
 // @BasePath /api
 func main() {

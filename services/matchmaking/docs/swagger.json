@@ -1,8 +1,8 @@
 {
     "swagger": "2.0",
     "info": {
-        "description": "LudaBox Matchmaking",
-        "title": "LudaBox API",
+        "description": "LudoBox Matchmaking",
+        "title": "LudoBox API",
         "contact": {},
         "version": "1.0"
     },

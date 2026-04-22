@@ -12,15 +12,21 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-// EventsService управляет SSE подписчиками и отправкой событий
+const subscriberBufferSize = 256
+
+// EventsService manages SSE subscribers and event delivery.
 type EventsService struct {
-	subscribers map[int64][]chan *dto.SSEEvent // roundID -> []chan
+	subscribers map[int64][]chan *dto.SSEEvent
 	mu          sync.RWMutex
 	logger      *logrus.Logger
 	roomRepo    repository.RoomRepository
 }
 
 func NewEventsService(roomRepo repository.RoomRepository, logger *logrus.Logger) *EventsService {
+	if logger == nil {
+		logger = logrus.New()
+	}
+
 	return &EventsService{
 		subscribers: make(map[int64][]chan *dto.SSEEvent),
 		logger:      logger,
@@ -28,39 +34,40 @@ func NewEventsService(roomRepo repository.RoomRepository, logger *logrus.Logger)
 	}
 }
 
-// Subscribe подписывает канал на события раунда
+// Subscribe registers a buffered channel for round events.
 func (es *EventsService) Subscribe(roundID int64) chan *dto.SSEEvent {
 	es.mu.Lock()
 	defer es.mu.Unlock()
 
-	eventChan := make(chan *dto.SSEEvent, 100)
+	eventChan := make(chan *dto.SSEEvent, subscriberBufferSize)
 	es.subscribers[roundID] = append(es.subscribers[roundID], eventChan)
 
 	return eventChan
 }
 
-// Unsubscribe отписывает канал от событий
+// Unsubscribe removes the channel from the subscriber list.
 func (es *EventsService) Unsubscribe(roundID int64, eventChan chan *dto.SSEEvent) {
 	es.mu.Lock()
 	defer es.mu.Unlock()
 
-	if chans, exists := es.subscribers[roundID]; exists {
-		for i, ch := range chans {
-			if ch == eventChan {
-				// Удаляем канал из списка
-				es.subscribers[roundID] = append(chans[:i], chans[i+1:]...)
-				close(eventChan)
-				break
-			}
+	chans, exists := es.subscribers[roundID]
+	if !exists {
+		return
+	}
+
+	for i, ch := range chans {
+		if ch == eventChan {
+			es.subscribers[roundID] = append(chans[:i], chans[i+1:]...)
+			break
 		}
-		// Если подписчиков нет - удаляем раунд
-		if len(es.subscribers[roundID]) == 0 {
-			delete(es.subscribers, roundID)
-		}
+	}
+
+	if len(es.subscribers[roundID]) == 0 {
+		delete(es.subscribers, roundID)
 	}
 }
 
-// PublishEvent отправляет событие всем подписчикам раунда
+// PublishEvent broadcasts an event to all subscribers of the round.
 func (es *EventsService) PublishEvent(ctx context.Context, roundID int64, eventType string, data interface{}) {
 	event := &dto.SSEEvent{
 		Type:      eventType,
@@ -69,17 +76,12 @@ func (es *EventsService) PublishEvent(ctx context.Context, roundID int64, eventT
 	}
 
 	es.mu.RLock()
-	chans := es.subscribers[roundID]
+	chans := append([]chan *dto.SSEEvent(nil), es.subscribers[roundID]...)
 	es.mu.RUnlock()
 
 	for _, ch := range chans {
-		select {
-		case ch <- event:
-		case <-ctx.Done():
+		if !es.enqueueEvent(ctx, roundID, ch, event) {
 			return
-		default:
-			// Канал переполнен, пропускаем (можно залогировать)
-			es.logger.Warnf("Event channel full for round %d", roundID)
 		}
 	}
 
@@ -87,12 +89,11 @@ func (es *EventsService) PublishEvent(ctx context.Context, roundID int64, eventT
 		return
 	}
 
-	if err := es.persistEvent(ctx, roundID, eventType, data); err != nil && es.logger != nil {
+	if err := es.persistEvent(ctx, roundID, eventType, data); err != nil {
 		es.logger.WithError(err).Warnf("failed to persist room event %s for round %d", eventType, roundID)
 	}
 }
 
-// PublishPlayerJoined отправляет событие присоединения игрока
 func (es *EventsService) PublishPlayerJoined(ctx context.Context, roundID int64, participantID int64, numberInRoom int, currentPlayers int) {
 	es.PublishEvent(ctx, roundID, "player_joined", dto.EventPlayerJoined{
 		ParticipantID:  participantID,
@@ -101,7 +102,6 @@ func (es *EventsService) PublishPlayerJoined(ctx context.Context, roundID int64,
 	})
 }
 
-// PublishPlayerLeft отправляет событие выхода игрока
 func (es *EventsService) PublishPlayerLeft(ctx context.Context, roundID int64, participantID int64, numberInRoom int, currentPlayers int) {
 	es.PublishEvent(ctx, roundID, "player_left", dto.EventPlayerLeft{
 		ParticipantID:  participantID,
@@ -110,7 +110,6 @@ func (es *EventsService) PublishPlayerLeft(ctx context.Context, roundID int64, p
 	})
 }
 
-// PublishBoostPurchased отправляет событие покупки буста
 func (es *EventsService) PublishBoostPurchased(ctx context.Context, roundID int64, participantID int64, boostPower int) {
 	es.PublishEvent(ctx, roundID, "boost_purchased", dto.EventBoostPurchased{
 		ParticipantID: participantID,
@@ -118,7 +117,6 @@ func (es *EventsService) PublishBoostPurchased(ctx context.Context, roundID int6
 	})
 }
 
-// PublishBoostCancelled отправляет событие отмены буста
 func (es *EventsService) PublishBoostCancelled(ctx context.Context, roundID int64, participantID int64) {
 	es.PublishEvent(ctx, roundID, "boost_cancelled", dto.EventBoostCancelled{
 		ParticipantID: participantID,
@@ -133,7 +131,6 @@ func (es *EventsService) PublishRoundTimer(ctx context.Context, roundID int64, s
 	})
 }
 
-// PublishRoundStarted отправляет событие начала игры
 func (es *EventsService) PublishRoundStarted(ctx context.Context, roundID int64, finalPlayers int, gameDurationSec int) {
 	es.PublishEvent(ctx, roundID, "round_started", dto.EventRoundStarted{
 		RoundID:         roundID,
@@ -142,7 +139,6 @@ func (es *EventsService) PublishRoundStarted(ctx context.Context, roundID int64,
 	})
 }
 
-// PublishRoundFinalized отправляет событие завершения игры
 func (es *EventsService) PublishRoundFinalized(
 	ctx context.Context,
 	roundID int64,
@@ -160,7 +156,7 @@ func (es *EventsService) PublishRoundFinalized(
 	})
 }
 
-// EncodeSSEMessage кодирует событие в SSE формат
+// EncodeSSEMessage marshals the event into SSE wire format.
 func (es *EventsService) EncodeSSEMessage(event *dto.SSEEvent) (string, error) {
 	data, err := json.Marshal(event)
 	if err != nil {
@@ -169,7 +165,6 @@ func (es *EventsService) EncodeSSEMessage(event *dto.SSEEvent) (string, error) {
 	return "data: " + string(data) + "\n\n", nil
 }
 
-// GetSubscriberCount возвращает количество подписчиков для раунда (для отладки)
 func (es *EventsService) GetSubscriberCount(roundID int64) int {
 	es.mu.RLock()
 	defer es.mu.RUnlock()
@@ -188,4 +183,42 @@ func (es *EventsService) persistEvent(ctx context.Context, roundID int64, eventT
 	}
 
 	return es.roomRepo.CreateRoomEvent(ctx, roundInfo.RoomID, &roundID, eventType, payload)
+}
+
+func (es *EventsService) enqueueEvent(
+	ctx context.Context,
+	roundID int64,
+	ch chan *dto.SSEEvent,
+	event *dto.SSEEvent,
+) bool {
+	select {
+	case ch <- event:
+		return true
+	case <-ctx.Done():
+		return false
+	default:
+	}
+
+	if event.Type == "round_timer" {
+		es.logger.Debugf("dropping round_timer for round %d: subscriber channel is full", roundID)
+		return true
+	}
+
+	select {
+	case <-ch:
+		es.logger.Warnf("subscriber channel full for round %d, evicting oldest event to deliver %s", roundID, event.Type)
+	default:
+		es.logger.Warnf("subscriber channel full for round %d, failed to evict oldest event for %s", roundID, event.Type)
+		return true
+	}
+
+	select {
+	case ch <- event:
+		return true
+	case <-ctx.Done():
+		return false
+	default:
+		es.logger.Warnf("subscriber channel still full for round %d, dropping critical event %s", roundID, event.Type)
+		return true
+	}
 }

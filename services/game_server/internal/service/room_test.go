@@ -4,6 +4,8 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"net/http"
+	"net/http/httptest"
 	"testing"
 	"time"
 
@@ -709,7 +711,7 @@ func TestBuildPayoutsUsesActualParticipantsAndCommission(t *testing.T) {
 		RoundTime:           60,
 	}
 
-	payouts := buildPayouts(config, 2)
+	payouts := buildPayouts(config, 2, 2)
 	if len(payouts) != 2 {
 		t.Fatalf("unexpected payouts length: got %d want 2", len(payouts))
 	}
@@ -718,5 +720,50 @@ func TestBuildPayoutsUsesActualParticipantsAndCommission(t *testing.T) {
 	}
 	if payouts[1] != 72 {
 		t.Fatalf("unexpected second payout: got %d want 72", payouts[1])
+	}
+}
+
+func TestRequestWinningPositionsMapsWinnersToActualSeatNumbers(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+		if request.URL.Path != "/winnings/distribute" {
+			t.Fatalf("unexpected path: %s", request.URL.Path)
+		}
+
+		var payload rngDistributeRequest
+		if err := json.NewDecoder(request.Body).Decode(&payload); err != nil {
+			t.Fatalf("decode request: %v", err)
+		}
+		if len(payload.Probabilities) != 2 {
+			t.Fatalf("unexpected probabilities length: got %d want 2", len(payload.Probabilities))
+		}
+
+		writer.Header().Set("Content-Type", "application/json")
+		if err := json.NewEncoder(writer).Encode(rngDistributeResponse{WinningPositions: []int{1, 2}}); err != nil {
+			t.Fatalf("encode response: %v", err)
+		}
+	}))
+	defer server.Close()
+
+	service := &RoomService{
+		rngDistributeURL: server.URL + "/winnings/distribute",
+		httpClient:       server.Client(),
+	}
+
+	positions, err := service.requestWinningPositions(context.Background(), &domain.RoomConfig{
+		NumberWinners: 2,
+		BoostPower:    25,
+	}, []domain.RoundParticipant{
+		{RoundParticipantID: 10, NumberInRoom: 4, Boost: 25},
+		{RoundParticipantID: 11, NumberInRoom: 2},
+	})
+	if err != nil {
+		t.Fatalf("request winning positions: %v", err)
+	}
+
+	if len(positions) != 2 {
+		t.Fatalf("unexpected positions length: got %d want 2", len(positions))
+	}
+	if positions[0] != 2 || positions[1] != 4 {
+		t.Fatalf("unexpected mapped positions: got %v want [2 4]", positions)
 	}
 }
