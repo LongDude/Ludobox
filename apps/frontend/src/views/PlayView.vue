@@ -102,9 +102,10 @@ const currentUserId = computed(() => auth.User?.id ?? null)
 const roomCapacity = computed(
   () => roomState.value?.room_capacity || joinResult.value?.room_capacity || room.value?.capacity || 0,
 )
-const entryPrice = computed(
-  () => roomState.value?.entry_price ?? joinResult.value?.entry_price ?? room.value?.registration_price ?? '-',
-)
+const entryPrice = computed(() => {
+  const value = roomState.value?.entry_price ?? joinResult.value?.entry_price ?? room.value?.registration_price
+  return value === undefined || value === null ? '-' : formatMoney(value)
+})
 const minPlayers = computed(
   () => roomState.value?.min_players ?? joinResult.value?.min_players ?? room.value?.min_users ?? '-',
 )
@@ -564,6 +565,15 @@ function formatBoost() {
 function formatScore() {
   if (!room.value) return '-'
   return room.value.score.toFixed(2)
+}
+
+function formatMoney(value: number | string | null | undefined) {
+  const numeric = Number(value)
+  if (!Number.isFinite(numeric)) return '-'
+
+  return new Intl.NumberFormat(undefined, {
+    maximumFractionDigits: 2,
+  }).format(numeric)
 }
 
 function normalizeError(error: any, fallback: string) {
