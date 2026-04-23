@@ -1733,6 +1733,14 @@ onBeforeUnmount(() => {
 
   display: flex;
   flex-direction: column;
+
+  background:
+  radial-gradient(circle at top right, rgba(14, 165, 233, 0.16), transparent 26%),
+  linear-gradient(
+    310deg,
+    color-mix(in oklab, var(--color-bg-secondary), white 16%),
+    color-mix(in oklab, var(--color-surface), transparent 4%)
+  );
 }
 
 .circular-seat-container {
@@ -2078,11 +2086,12 @@ onBeforeUnmount(() => {
   grid-template-columns: minmax(0, 1fr) auto;
   gap: 1rem;
   background:
-    radial-gradient(circle at top right, rgba(245, 158, 11, 0.18), transparent 24%),
+    radial-gradient(circle at left, rgba(245, 158, 11, 0.18), transparent 18%),
+    radial-gradient(circle at right, rgba(14, 165, 233, 0.16), transparent 26%),
     linear-gradient(
       135deg,
-      color-mix(in oklab, var(--color-bg-secondary), white 18%),
-      color-mix(in oklab, var(--color-surface), transparent 6%)
+      color-mix(in oklab, var(--color-bg-secondary), white 16%),
+      color-mix(in oklab, var(--color-surface), transparent 4%)
     );
 }
 
@@ -2112,9 +2121,17 @@ onBeforeUnmount(() => {
 .join-box {
   min-width: 460px;
   flex-grow: 1;
+
+  background:
+    radial-gradient(circle at top left, rgba(245, 158, 11, 0.18), transparent 8%),
+    linear-gradient(
+      20deg,
+      color-mix(in oklab, var(--color-bg-secondary), white 14%),
+      color-mix(in oklab, var(--color-surface), transparent 4%)
+    );
 }
 
-.panel-card {
+.panel-card:not(.right-info) {
   background: color-mix(in oklab, var(--color-surface), white 10%);
     /*radial-gradient(circle at top left, color-mix(in oklab, #0ea5e9, white 88%), transparent 28%),
     linear-gradient(180deg, color-mix(in oklab, var(--color-surface), white 14%), var(--color-surface));*/
@@ -2244,7 +2261,7 @@ strong.live {
   padding: 0.85rem;
   border-radius: 1rem;
   border: 1px solid color-mix(in oklab, var(--color-border), transparent 10%);
-  background: color-mix(in oklab, var(--color-surface), white 10%);
+/*  background: color-mix(in oklab, var(--color-surface), white 10%);*/
 }
 
 .join-box.joined,
@@ -2448,7 +2465,7 @@ input[type='number'] {
   padding: 0.8rem 0.9rem;
   border-radius: 1rem;
   border: 1px solid color-mix(in oklab, var(--color-border), transparent 10%);
-  background: color-mix(in oklab, var(--color-surface), white 8%);
+  background: color-mix(in oklab, var(--color-surface), white 6%);
 }
 
 .event-card div {
