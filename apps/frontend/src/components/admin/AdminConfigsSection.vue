@@ -342,7 +342,6 @@ function distributionLabel(value: number, index: number) {
   <section class="section-card">
     <div class="section-header">
       <div>
-        <p class="eyebrow">{{ t('admin.configsSection.eyebrow') }}</p>
         <h2>{{ t('admin.configsSection.title') }}</h2>
         <p class="section-copy">{{ t('admin.configsSection.description') }}</p>
       </div>
@@ -649,8 +648,8 @@ function distributionLabel(value: number, index: number) {
   border-radius: 1.5rem;
   border: 1px solid color-mix(in oklab, var(--color-border), transparent 8%);
   background:
-    radial-gradient(circle at top right, color-mix(in oklab, #f59e0b, white 76%), transparent 28%),
-    linear-gradient(180deg, color-mix(in oklab, var(--color-surface), white 24%), var(--color-surface));
+    radial-gradient(circle at top right, color-mix(in oklab, #0ea5e9, var(--color-surface) 92%), transparent 60%),
+    linear-gradient(180deg, color-mix(in oklab, var(--color-surface), white 12%), var(--color-surface));
   box-shadow: var(--shadow-md);
 }
 

@@ -153,7 +153,6 @@ function changeLimit(nextLimit: number) {
   <section class="section-card">
     <div class="section-header">
       <div>
-        <p class="eyebrow">{{ t('admin.usersSection.eyebrow') }}</p>
         <h2>{{ t('admin.usersSection.title') }}</h2>
         <p class="section-copy">{{ t('admin.usersSection.description') }}</p>
       </div>
@@ -308,8 +307,9 @@ function changeLimit(nextLimit: number) {
   padding: 1.5rem;
   border: 1px solid color-mix(in oklab, var(--color-border), transparent 10%);
   border-radius: 1.5rem;
-  background:
-    linear-gradient(180deg, color-mix(in oklab, var(--color-surface), white 28%), var(--color-surface));
+  background: 
+    radial-gradient(circle at top right, color-mix(in oklab, #0ea5e9, var(--color-surface) 92%), transparent 60%),
+    linear-gradient(180deg, color-mix(in oklab, var(--color-surface), white 12%), var(--color-surface));
   box-shadow: var(--shadow-md);
 }
 

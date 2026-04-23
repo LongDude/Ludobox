@@ -295,7 +295,6 @@ function formatSeats(value?: number[] | null) {
       <section class="panel-card">
         <div class="card-head">
           <div>
-            <p class="eyebrow accent">{{ t('profile.history.eyebrow') }}</p>
             <h2>{{ t('profile.history.title') }}</h2>
             <p class="section-copy">{{ t('profile.history.description') }}</p>
           </div>
@@ -386,6 +385,7 @@ function formatSeats(value?: number[] | null) {
   display: grid;
   align-items: start;
   overflow: auto;
+  margin-top: 0.5rem;
   transition: all var(--transition-slow) ease;
 }
 
@@ -394,9 +394,10 @@ function formatSeats(value?: number[] | null) {
 }
 
 .container {
-  max-width: 1100px;
+  max-width: none;
   margin: auto;
   width: 100%;
+  padding: 0;
 }
 
 .panel-card {
@@ -405,9 +406,9 @@ function formatSeats(value?: number[] | null) {
   padding: 1.35rem;
   border-radius: 1.5rem;
   border: 1px solid color-mix(in oklab, var(--color-border), transparent 8%);
-  background:
-    radial-gradient(circle at top left, color-mix(in oklab, #0ea5e9, white 88%), transparent 26%),
-    linear-gradient(180deg, color-mix(in oklab, var(--color-surface), white 16%), var(--color-surface));
+  background: 
+    radial-gradient(circle at top right, color-mix(in oklab, #0ea5e9, var(--color-surface) 95%), transparent 60%),
+    linear-gradient(180deg, color-mix(in oklab, var(--color-surface), white 12%), var(--color-surface));
   box-shadow: var(--shadow-md);
 }
 
@@ -464,7 +465,7 @@ function formatSeats(value?: number[] | null) {
   padding: 1rem;
   border: 1px solid color-mix(in oklab, var(--color-border), transparent 10%);
   border-radius: 1.1rem;
-  background: color-mix(in oklab, var(--color-surface), white 10%);
+  background: color-mix(in oklab, var(--color-surface), white 2%);
 }
 
 .history-topline {

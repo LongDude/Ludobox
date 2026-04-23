@@ -271,7 +271,10 @@ function handleBrowseRooms() {
   font-size: 3.5rem;
   font-weight: 700;
   margin: 0 0 1rem 0;
-  background: linear-gradient(135deg, #fff 0%, #94a3b8 100%);
+background: color-mix(in oklab, rgba(245, 158, 11, 1), var(--color-surface) 5%);
+/*color: var(--color-text);*/
+text-shadow: 0 0.5px 1.5px rgba(0, 0, 0, 0.06);
+
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;
@@ -395,7 +398,7 @@ function handleBrowseRooms() {
   padding: 0.6rem 0.8rem;
   border-radius: 0.5rem;
   border: 1px solid rgba(255, 255, 255, 0.1);
-  background: rgba(0, 0, 0, 0.3);
+  background: rgba(0, 0, 0, 0.1);
   color: var(--color-text);
   font-size: 0.85rem;
   transition: all 0.2s ease;
