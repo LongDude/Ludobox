@@ -1201,7 +1201,7 @@ async function cancelBoost() {
 
   actionLoading.value = 'cancel-boost'
 
-  try {own-seat
+  try {
     const response = await GameApi.cancelBoost(roomId.value, participant.participant_id)
     successMsg.value = t('gameRoom.messages.boostCancelled', { refund: response.refund ?? 0 })
     refreshCabinetBalance()
