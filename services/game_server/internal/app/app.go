@@ -53,6 +53,7 @@ func NewApp(
 				ParticipantID: winner.RoundParticipantID,
 				UserID:        userID,
 				Nickname:      winner.NickName,
+				Rating:        winner.Rating,
 				NumberInRoom:  winner.NumberInRoom,
 				Winnings:      winner.WinningMoney,
 				GrossWinnings: winner.GrossWinningMoney,

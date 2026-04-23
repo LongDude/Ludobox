@@ -70,6 +70,8 @@ definitions:
         type: integer
       participant_id:
         type: integer
+      rating:
+        type: integer
       user_id:
         type: integer
       winning_money:
@@ -183,7 +185,6 @@ paths:
       description: Finish round, select winners, and finalize
       parameters:
       - description: Round ID
-        format: int64
         in: path
         name: roundID
         required: true
@@ -210,7 +211,6 @@ paths:
       description: Transition round to active state and finalize
       parameters:
       - description: Round ID
-        format: int64
         in: path
         name: roundID
         required: true
@@ -243,7 +243,6 @@ paths:
         required: true
         type: string
       - description: Room ID
-        format: int64
         in: path
         name: roomID
         required: true
@@ -282,7 +281,6 @@ paths:
         required: true
         type: string
       - description: Room ID
-        format: int64
         in: path
         name: roomID
         required: true
@@ -317,7 +315,6 @@ paths:
         required: true
         type: string
       - description: Room ID
-        format: int64
         in: path
         name: roomID
         required: true
@@ -359,7 +356,6 @@ paths:
         required: true
         type: string
       - description: Room ID
-        format: int64
         in: path
         name: roomID
         required: true
@@ -398,13 +394,11 @@ paths:
         required: true
         type: string
       - description: Room ID
-        format: int64
         in: path
         name: roomID
         required: true
         type: integer
       - description: Round participant ID
-        format: int64
         in: path
         name: roundParticipantID
         required: true
@@ -432,13 +426,11 @@ paths:
         required: true
         type: string
       - description: Room ID
-        format: int64
         in: path
         name: roomID
         required: true
         type: integer
       - description: Round participant ID
-        format: int64
         in: path
         name: roundParticipantID
         required: true
@@ -473,13 +465,11 @@ paths:
         required: true
         type: string
       - description: Room ID
-        format: int64
         in: path
         name: roomID
         required: true
         type: integer
       - description: Round participant ID
-        format: int64
         in: path
         name: roundParticipantID
         required: true
@@ -514,13 +504,11 @@ paths:
         required: true
         type: string
       - description: Room ID
-        format: int64
         in: path
         name: roomID
         required: true
         type: integer
       - description: Round ID
-        format: int64
         in: path
         name: roundID
         required: true
@@ -549,13 +537,11 @@ paths:
         required: true
         type: string
       - description: Room ID
-        format: int64
         in: path
         name: roomID
         required: true
         type: integer
       - description: Round ID
-        format: int64
         in: path
         name: roundID
         required: true

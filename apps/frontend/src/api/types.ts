@@ -174,6 +174,8 @@ export interface GameJoinRoomWithSeatRequest {
 export interface GameJoinRoomResponse {
   participant_id: number
   round_id: number
+  nickname?: string | null
+  rating?: number | null
   number_in_room: number
   room_capacity: number
   current_players: number
@@ -206,6 +208,7 @@ export interface GameParticipantInfo {
   participant_id: number
   user_id?: number | null
   nickname?: string | null
+  rating?: number | null
   number_in_room: number
   boost: number
   winning_money: number
@@ -251,6 +254,7 @@ export interface GameWinnerInfo {
   participant_id: number
   user_id?: number | null
   nickname?: string | null
+  rating?: number | null
   number_in_room: number
   winnings: number
   gross_winnings: number

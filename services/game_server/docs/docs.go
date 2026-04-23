@@ -54,7 +54,6 @@ const docTemplate = `{
                 "parameters": [
                     {
                         "type": "integer",
-                        "format": "int64",
                         "description": "Round ID",
                         "name": "roundID",
                         "in": "path",
@@ -94,7 +93,6 @@ const docTemplate = `{
                 "parameters": [
                     {
                         "type": "integer",
-                        "format": "int64",
                         "description": "Round ID",
                         "name": "roundID",
                         "in": "path",
@@ -141,7 +139,6 @@ const docTemplate = `{
                     },
                     {
                         "type": "integer",
-                        "format": "int64",
                         "description": "Room ID",
                         "name": "roomID",
                         "in": "path",
@@ -199,7 +196,6 @@ const docTemplate = `{
                     },
                     {
                         "type": "integer",
-                        "format": "int64",
                         "description": "Room ID",
                         "name": "roomID",
                         "in": "path",
@@ -251,7 +247,6 @@ const docTemplate = `{
                     },
                     {
                         "type": "integer",
-                        "format": "int64",
                         "description": "Room ID",
                         "name": "roomID",
                         "in": "path",
@@ -312,7 +307,6 @@ const docTemplate = `{
                     },
                     {
                         "type": "integer",
-                        "format": "int64",
                         "description": "Room ID",
                         "name": "roomID",
                         "in": "path",
@@ -367,7 +361,6 @@ const docTemplate = `{
                     },
                     {
                         "type": "integer",
-                        "format": "int64",
                         "description": "Room ID",
                         "name": "roomID",
                         "in": "path",
@@ -375,7 +368,6 @@ const docTemplate = `{
                     },
                     {
                         "type": "integer",
-                        "format": "int64",
                         "description": "Round participant ID",
                         "name": "roundParticipantID",
                         "in": "path",
@@ -425,7 +417,6 @@ const docTemplate = `{
                     },
                     {
                         "type": "integer",
-                        "format": "int64",
                         "description": "Room ID",
                         "name": "roomID",
                         "in": "path",
@@ -433,7 +424,6 @@ const docTemplate = `{
                     },
                     {
                         "type": "integer",
-                        "format": "int64",
                         "description": "Round participant ID",
                         "name": "roundParticipantID",
                         "in": "path",
@@ -479,7 +469,6 @@ const docTemplate = `{
                     },
                     {
                         "type": "integer",
-                        "format": "int64",
                         "description": "Room ID",
                         "name": "roomID",
                         "in": "path",
@@ -487,7 +476,6 @@ const docTemplate = `{
                     },
                     {
                         "type": "integer",
-                        "format": "int64",
                         "description": "Round participant ID",
                         "name": "roundParticipantID",
                         "in": "path",
@@ -539,7 +527,6 @@ const docTemplate = `{
                     },
                     {
                         "type": "integer",
-                        "format": "int64",
                         "description": "Room ID",
                         "name": "roomID",
                         "in": "path",
@@ -547,7 +534,6 @@ const docTemplate = `{
                     },
                     {
                         "type": "integer",
-                        "format": "int64",
                         "description": "Round ID",
                         "name": "roundID",
                         "in": "path",
@@ -587,7 +573,6 @@ const docTemplate = `{
                     },
                     {
                         "type": "integer",
-                        "format": "int64",
                         "description": "Room ID",
                         "name": "roomID",
                         "in": "path",
@@ -595,7 +580,6 @@ const docTemplate = `{
                     },
                     {
                         "type": "integer",
-                        "format": "int64",
                         "description": "Round ID",
                         "name": "roundID",
                         "in": "path",
@@ -725,6 +709,9 @@ const docTemplate = `{
                     "type": "integer"
                 },
                 "participant_id": {
+                    "type": "integer"
+                },
+                "rating": {
                     "type": "integer"
                 },
                 "user_id": {

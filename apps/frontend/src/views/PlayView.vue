@@ -286,6 +286,7 @@ const ownedParticipants = computed(() => {
           participant_id: participantId,
           user_id: currentUserId.value,
           nickname: cabinet.profile?.nickname ?? null,
+          rating: cabinet.profile?.rating ?? null,
           number_in_room: seat,
           boost: 0,
           winning_money: 0,

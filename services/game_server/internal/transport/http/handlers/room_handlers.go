@@ -132,17 +132,7 @@ func roomStateResponse(
 		}
 	}
 	for _, participant := range userParticipants {
-		userID := participant.UserID
-		response.CurrentUserParticipants = append(response.CurrentUserParticipants, dto.ParticipantInfo{
-			ParticipantID: participant.RoundParticipantID,
-			UserID:        &userID,
-			Nickname:      participant.NickName,
-			NumberInRoom:  participant.NumberInRoom,
-			Boost:         participant.Boost,
-			WinningMoney:  participant.WinningMoney,
-			IsBot:         false,
-			ExitedAt:      participant.ExitRoomAt,
-		})
+		response.CurrentUserParticipants = append(response.CurrentUserParticipants, participantInfoFromDomain(participant))
 	}
 	for _, event := range recentEvents {
 		response.RecentEvents = append(response.RecentEvents, roomEventToSSE(event))
@@ -264,8 +254,7 @@ func JoinRoom(ctx *gin.Context, a *app.App) {
 			a.EventsService.PublishPlayerJoined(
 				ctx.Request.Context(),
 				*roomInfo.CurrentRoundID,
-				participantID,
-				participant.NumberInRoom,
+				*participant,
 				roomInfo.ActiveParticipantsCount,
 			)
 		}
@@ -279,6 +268,8 @@ func JoinRoom(ctx *gin.Context, a *app.App) {
 	response := dto.JoinRoomResponse{
 		ParticipantID:  participantID,
 		NumberInRoom:   participant.NumberInRoom,
+		Nickname:       participant.NickName,
+		Rating:         participant.Rating,
 		RoomCapacity:   roomInfo.Config.Capacity,
 		CurrentPlayers: roomInfo.ActiveParticipantsCount,
 		MinPlayers:     roomInfo.Config.MinUsers,
@@ -361,8 +352,7 @@ func JoinRoomWithSeat(ctx *gin.Context, a *app.App) {
 			a.EventsService.PublishPlayerJoined(
 				ctx.Request.Context(),
 				*roomInfo.CurrentRoundID,
-				participantID,
-				participant.NumberInRoom,
+				*participant,
 				roomInfo.ActiveParticipantsCount,
 			)
 		}
@@ -376,6 +366,8 @@ func JoinRoomWithSeat(ctx *gin.Context, a *app.App) {
 	response := dto.JoinRoomResponse{
 		ParticipantID:  participantID,
 		RoundID:        derefInt64(roomInfo.CurrentRoundID),
+		Nickname:       participant.NickName,
+		Rating:         participant.Rating,
 		NumberInRoom:   participant.NumberInRoom,
 		RoomCapacity:   roomInfo.Config.Capacity,
 		CurrentPlayers: roomInfo.ActiveParticipantsCount,
@@ -598,7 +590,7 @@ func LeaveRoom(ctx *gin.Context, a *app.App) {
 	if err == nil && roomInfo != nil {
 		currentPlayers = roomInfo.ActiveParticipantsCount
 	}
-	a.EventsService.PublishPlayerLeft(ctx.Request.Context(), participant.RoundsID, participantID, participant.NumberInRoom, currentPlayers)
+	a.EventsService.PublishPlayerLeft(ctx.Request.Context(), participant.RoundsID, *participant, currentPlayers)
 
 	ctx.JSON(http.StatusOK, dto.LeaveRoomResponse{
 		Success: true,
@@ -661,8 +653,7 @@ func LeaveRoomByUser(ctx *gin.Context, a *app.App) {
 		a.EventsService.PublishPlayerLeft(
 			ctx.Request.Context(),
 			participant.RoundsID,
-			participant.RoundParticipantID,
-			participant.NumberInRoom,
+			participant,
 			currentPlayers,
 		)
 	}
@@ -721,17 +712,7 @@ func GetRoundStatus(ctx *gin.Context, a *app.App) {
 	participantInfos := make([]dto.ParticipantInfo, 0, len(participants))
 	winners := make([]dto.ParticipantInfo, 0)
 	for _, participant := range participants {
-		userID := participant.UserID
-		info := dto.ParticipantInfo{
-			ParticipantID: participant.RoundParticipantID,
-			UserID:        &userID,
-			Nickname:      participant.NickName,
-			NumberInRoom:  participant.NumberInRoom,
-			Boost:         participant.Boost,
-			WinningMoney:  participant.WinningMoney,
-			IsBot:         false,
-			ExitedAt:      participant.ExitRoomAt,
-		}
+		info := participantInfoFromDomain(participant)
 		participantInfos = append(participantInfos, info)
 		if participant.WinningMoney > 0 {
 			winners = append(winners, info)
@@ -906,20 +887,7 @@ func InternalFinalizeGame(ctx *gin.Context, a *app.App) {
 	winnerInfos := make([]dto.WinnerInfo, 0, len(winners))
 	payouts := make(map[int64]int64, len(winners))
 	for _, winner := range winners {
-		var userID *int64
-		if !winner.IsBot && winner.UserID > 0 {
-			value := winner.UserID
-			userID = &value
-		}
-		winnerInfos = append(winnerInfos, dto.WinnerInfo{
-			ParticipantID: winner.RoundParticipantID,
-			UserID:        userID,
-			Nickname:      winner.NickName,
-			NumberInRoom:  winner.NumberInRoom,
-			Winnings:      winner.WinningMoney,
-			GrossWinnings: winner.GrossWinningMoney,
-			IsBot:         winner.IsBot,
-		})
+		winnerInfos = append(winnerInfos, winnerInfoFromDomain(winner))
 		payouts[winner.RoundParticipantID] = winner.WinningMoney
 	}
 	nextRoundID := int64(0)
@@ -1000,5 +968,44 @@ func roomEventToSSE(event domain.RoomEvent) dto.SSEEvent {
 		Type:      event.EventType,
 		Timestamp: event.CreatedAt,
 		Data:      data,
+	}
+}
+
+func participantInfoFromDomain(participant domain.RoundParticipant) dto.ParticipantInfo {
+	var userID *int64
+	if !participant.IsBot && participant.UserID > 0 {
+		value := participant.UserID
+		userID = &value
+	}
+
+	return dto.ParticipantInfo{
+		ParticipantID: participant.RoundParticipantID,
+		UserID:        userID,
+		Nickname:      participant.NickName,
+		Rating:        participant.Rating,
+		NumberInRoom:  participant.NumberInRoom,
+		Boost:         participant.Boost,
+		WinningMoney:  participant.WinningMoney,
+		IsBot:         participant.IsBot,
+		ExitedAt:      participant.ExitRoomAt,
+	}
+}
+
+func winnerInfoFromDomain(participant domain.RoundParticipant) dto.WinnerInfo {
+	var userID *int64
+	if !participant.IsBot && participant.UserID > 0 {
+		value := participant.UserID
+		userID = &value
+	}
+
+	return dto.WinnerInfo{
+		ParticipantID: participant.RoundParticipantID,
+		UserID:        userID,
+		Nickname:      participant.NickName,
+		Rating:        participant.Rating,
+		NumberInRoom:  participant.NumberInRoom,
+		Winnings:      participant.WinningMoney,
+		GrossWinnings: participant.GrossWinningMoney,
+		IsBot:         participant.IsBot,
 	}
 }

@@ -193,13 +193,14 @@ func (r *roomRepo) GetRoundInfo(ctx context.Context, roundID int64) (*domain.Rou
 func (r *roomRepo) GetParticipantByID(ctx context.Context, participantID int64) (*domain.RoundParticipant, error) {
 	var p domain.RoundParticipant
 	var nickname sql.NullString
+	var rating sql.NullInt64
 	err := r.db.QueryRow(ctx, `
-		SELECT rp.round_participants_id, rp.user_id, u.nickname, rp.rounds_id, rp.boost, rp.winning_money, rp.number_in_room, rp.exit_room_at
+		SELECT rp.round_participants_id, rp.user_id, u.nickname, u.rating, rp.rounds_id, rp.boost, rp.winning_money, rp.number_in_room, rp.exit_room_at
 		FROM round_participants rp
 		INNER JOIN users u ON u.user_id = rp.user_id
 		WHERE rp.round_participants_id = $1`,
 		participantID,
-	).Scan(&p.RoundParticipantID, &p.UserID, &nickname, &p.RoundsID, &p.Boost, &p.WinningMoney, &p.NumberInRoom, &p.ExitRoomAt)
+	).Scan(&p.RoundParticipantID, &p.UserID, &nickname, &rating, &p.RoundsID, &p.Boost, &p.WinningMoney, &p.NumberInRoom, &p.ExitRoomAt)
 	if err != nil {
 		if err == pgx.ErrNoRows {
 			return nil, repository.ErrParticipantNotFound
@@ -209,13 +210,16 @@ func (r *roomRepo) GetParticipantByID(ctx context.Context, participantID int64) 
 	if nickname.Valid && nickname.String != "" {
 		p.NickName = &nickname.String
 	}
+	if rating.Valid {
+		p.Rating = &rating.Int64
+	}
 	return &p, nil
 }
 
 // GetParticipantsByRoundID returns all active (non-exited) participants for a round
 func (r *roomRepo) GetParticipantsByRoundID(ctx context.Context, roundID int64) ([]domain.RoundParticipant, error) {
 	rows, err := r.db.Query(ctx, `
-		SELECT rp.round_participants_id, rp.user_id, u.nickname, rp.rounds_id, rp.boost, rp.winning_money, rp.number_in_room, rp.exit_room_at
+		SELECT rp.round_participants_id, rp.user_id, u.nickname, u.rating, rp.rounds_id, rp.boost, rp.winning_money, rp.number_in_room, rp.exit_room_at
 		FROM round_participants rp
 		INNER JOIN users u ON u.user_id = rp.user_id
 		WHERE rp.rounds_id = $1 AND rp.exit_room_at IS NULL
@@ -231,11 +235,15 @@ func (r *roomRepo) GetParticipantsByRoundID(ctx context.Context, roundID int64) 
 	for rows.Next() {
 		var p domain.RoundParticipant
 		var nickname sql.NullString
-		if err := rows.Scan(&p.RoundParticipantID, &p.UserID, &nickname, &p.RoundsID, &p.Boost, &p.WinningMoney, &p.NumberInRoom, &p.ExitRoomAt); err != nil {
+		var rating sql.NullInt64
+		if err := rows.Scan(&p.RoundParticipantID, &p.UserID, &nickname, &rating, &p.RoundsID, &p.Boost, &p.WinningMoney, &p.NumberInRoom, &p.ExitRoomAt); err != nil {
 			return nil, err
 		}
 		if nickname.Valid && nickname.String != "" {
 			p.NickName = &nickname.String
+		}
+		if rating.Valid {
+			p.Rating = &rating.Int64
 		}
 		participants = append(participants, p)
 	}
@@ -244,7 +252,7 @@ func (r *roomRepo) GetParticipantsByRoundID(ctx context.Context, roundID int64) 
 
 func (r *roomRepo) GetActiveParticipantsByRoomAndUser(ctx context.Context, roomID, userID int64) ([]domain.RoundParticipant, error) {
 	rows, err := r.db.Query(ctx, `
-		SELECT rp.round_participants_id, rp.user_id, u.nickname, rp.rounds_id, rp.boost, rp.winning_money, rp.number_in_room, rp.exit_room_at
+		SELECT rp.round_participants_id, rp.user_id, u.nickname, u.rating, rp.rounds_id, rp.boost, rp.winning_money, rp.number_in_room, rp.exit_room_at
 		FROM round_participants rp
 		INNER JOIN rounds r ON r.rounds_id = rp.rounds_id
 		INNER JOIN users u ON u.user_id = rp.user_id
@@ -263,11 +271,15 @@ func (r *roomRepo) GetActiveParticipantsByRoomAndUser(ctx context.Context, roomI
 	for rows.Next() {
 		var p domain.RoundParticipant
 		var nickname sql.NullString
-		if err := rows.Scan(&p.RoundParticipantID, &p.UserID, &nickname, &p.RoundsID, &p.Boost, &p.WinningMoney, &p.NumberInRoom, &p.ExitRoomAt); err != nil {
+		var rating sql.NullInt64
+		if err := rows.Scan(&p.RoundParticipantID, &p.UserID, &nickname, &rating, &p.RoundsID, &p.Boost, &p.WinningMoney, &p.NumberInRoom, &p.ExitRoomAt); err != nil {
 			return nil, fmt.Errorf("scan participant: %w", err)
 		}
 		if nickname.Valid && nickname.String != "" {
 			p.NickName = &nickname.String
+		}
+		if rating.Valid {
+			p.Rating = &rating.Int64
 		}
 		participants = append(participants, p)
 	}

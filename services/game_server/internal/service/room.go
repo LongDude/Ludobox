@@ -849,6 +849,7 @@ func (s *RoomService) FinalizeGameRound(ctx context.Context, roundID int64) ([]d
 
 	payouts := buildPayouts(roomInfo.Config, len(winningPositions), len(participants))
 	grossPayouts := buildGrossPayouts(roomInfo.Config, len(winningPositions))
+	ratingRewardDelta := calculateRatingReward(roomInfo.Config)
 	payoutsByParticipant := make(map[int64]int64, len(winningPositions))
 	winners := make([]domain.RoundParticipant, 0, len(winningPositions))
 	participantsBySeat := make(map[int]domain.RoundParticipant, len(participantsWithBots))
@@ -867,6 +868,11 @@ func (s *RoomService) FinalizeGameRound(ctx context.Context, roundID int64) ([]d
 		}
 		if !participant.IsBot {
 			payoutsByParticipant[participant.RoundParticipantID] = payouts[idx]
+			nextRating := ratingRewardDelta
+			if participant.Rating != nil {
+				nextRating += *participant.Rating
+			}
+			participant.Rating = &nextRating
 		}
 		winners = append(winners, participant)
 	}

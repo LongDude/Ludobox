@@ -9,6 +9,8 @@ type JoinRoomWithSeatRequest struct {
 type JoinRoomResponse struct {
 	ParticipantID  int64      `json:"participant_id"`
 	RoundID        int64      `json:"round_id"`
+	Nickname       *string    `json:"nickname"`
+	Rating         *int64     `json:"rating"`
 	NumberInRoom   int        `json:"number_in_room"`
 	RoomCapacity   int        `json:"room_capacity"`
 	CurrentPlayers int        `json:"current_players"`
@@ -74,6 +76,7 @@ type ParticipantInfo struct {
 	ParticipantID int64      `json:"participant_id"`
 	UserID        *int64     `json:"user_id,omitempty"`
 	Nickname      *string    `json:"nickname,omitempty"`
+	Rating        *int64     `json:"rating,omitempty"`
 	NumberInRoom  int        `json:"number_in_room"`
 	Boost         int        `json:"boost"`
 	WinningMoney  int64      `json:"winning_money,omitempty"`
@@ -88,15 +91,21 @@ type SSEEvent struct {
 }
 
 type EventPlayerJoined struct {
-	ParticipantID  int64 `json:"participant_id"`
-	NumberInRoom   int   `json:"number_in_room"`
-	CurrentPlayers int   `json:"current_players"`
+	ParticipantID  int64   `json:"participant_id"`
+	UserID         *int64  `json:"user_id,omitempty"`
+	Nickname       *string `json:"nickname,omitempty"`
+	Rating         *int64  `json:"rating,omitempty"`
+	NumberInRoom   int     `json:"number_in_room"`
+	CurrentPlayers int     `json:"current_players"`
 }
 
 type EventPlayerLeft struct {
-	ParticipantID  int64 `json:"participant_id"`
-	NumberInRoom   int   `json:"number_in_room"`
-	CurrentPlayers int   `json:"current_players"`
+	ParticipantID  int64   `json:"participant_id"`
+	UserID         *int64  `json:"user_id,omitempty"`
+	Nickname       *string `json:"nickname,omitempty"`
+	Rating         *int64  `json:"rating,omitempty"`
+	NumberInRoom   int     `json:"number_in_room"`
+	CurrentPlayers int     `json:"current_players"`
 }
 
 type EventBoostPurchased struct {
@@ -132,6 +141,7 @@ type WinnerInfo struct {
 	ParticipantID int64   `json:"participant_id"`
 	UserID        *int64  `json:"user_id,omitempty"`
 	Nickname      *string `json:"nickname,omitempty"`
+	Rating        *int64  `json:"rating,omitempty"`
 	NumberInRoom  int     `json:"number_in_room"`
 	Winnings      int64   `json:"winnings"`
 	GrossWinnings int64   `json:"gross_winnings"`

@@ -28,6 +28,7 @@ type mockTransactionScope struct {
 	reservations      map[int64][]*reservationData
 	balances          map[int64]int64
 	ratings           map[int64]int64
+	nicknames         map[int64]string
 	ratingRewards     []domain.UserRatingReward
 	nextParticipantID int64
 	nextRoundID       int64
@@ -75,6 +76,7 @@ func newMockTransactionScope() *mockTransactionScope {
 		reservations:      make(map[int64][]*reservationData),
 		balances:          map[int64]int64{100: 1000, 200: 1000},
 		ratings:           map[int64]int64{100: 0, 200: 0},
+		nicknames:         map[int64]string{100: "user_100", 200: "user_200"},
 		nextParticipantID: 1,
 		nextRoundID:       2,
 	}
@@ -133,6 +135,12 @@ func (m *mockTransactionScope) GetParticipantByID(ctx context.Context, participa
 		return nil, repository.ErrParticipantNotFound
 	}
 	copyParticipant := *participant
+	if nickname, ok := m.nicknames[copyParticipant.UserID]; ok && nickname != "" {
+		copyParticipant.NickName = &nickname
+	}
+	if rating, ok := m.ratings[copyParticipant.UserID]; ok {
+		copyParticipant.Rating = int64Ptr(rating)
+	}
 	return &copyParticipant, nil
 }
 
@@ -140,7 +148,14 @@ func (m *mockTransactionScope) GetParticipantsByRoundID(ctx context.Context, rou
 	participants := make([]domain.RoundParticipant, 0)
 	for _, participant := range m.participants {
 		if participant.RoundsID == roundID && participant.ExitRoomAt == nil {
-			participants = append(participants, *participant)
+			copyParticipant := *participant
+			if nickname, ok := m.nicknames[copyParticipant.UserID]; ok && nickname != "" {
+				copyParticipant.NickName = &nickname
+			}
+			if rating, ok := m.ratings[copyParticipant.UserID]; ok {
+				copyParticipant.Rating = int64Ptr(rating)
+			}
+			participants = append(participants, copyParticipant)
 		}
 	}
 	return participants, nil
@@ -932,6 +947,9 @@ func TestFinalizeGameRoundIncludesBotWinnersWithoutCreditingBots(t *testing.T) {
 	if scope.ratings[200] != 0 {
 		t.Fatalf("unexpected rating for user 200: got %d want 0", scope.ratings[200])
 	}
+	if winners[1].Rating == nil || *winners[1].Rating != expectedReward {
+		t.Fatalf("unexpected winner rating in response: got %v want %d", winners[1].Rating, expectedReward)
+	}
 }
 
 func TestCalculateRatingRewardRewardsRiskierConfigsMore(t *testing.T) {
@@ -1011,4 +1029,8 @@ func TestFinalizeGameRoundDoesNotCancelTimerContext(t *testing.T) {
 	if scope.rounds[1].Status != "finished" {
 		t.Fatalf("expected finished status, got %s", scope.rounds[1].Status)
 	}
+}
+
+func int64Ptr(value int64) *int64 {
+	return &value
 }

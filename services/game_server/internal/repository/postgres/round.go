@@ -87,13 +87,14 @@ func (s *txScope) CreateParticipant(ctx context.Context, userID, roundID int64, 
 func (s *txScope) GetParticipantByID(ctx context.Context, participantID int64) (*domain.RoundParticipant, error) {
 	var p domain.RoundParticipant
 	var nickname sql.NullString
+	var rating sql.NullInt64
 	err := s.tx.QueryRow(ctx, `
-		SELECT rp.round_participants_id, rp.user_id, u.nickname, rp.rounds_id, rp.boost, rp.winning_money, rp.number_in_room, rp.exit_room_at
+		SELECT rp.round_participants_id, rp.user_id, u.nickname, u.rating, rp.rounds_id, rp.boost, rp.winning_money, rp.number_in_room, rp.exit_room_at
 		FROM round_participants rp
 		INNER JOIN users u ON u.user_id = rp.user_id
 		WHERE rp.round_participants_id = $1
 		FOR UPDATE OF rp
-	`, participantID).Scan(&p.RoundParticipantID, &p.UserID, &nickname, &p.RoundsID, &p.Boost, &p.WinningMoney, &p.NumberInRoom, &p.ExitRoomAt)
+	`, participantID).Scan(&p.RoundParticipantID, &p.UserID, &nickname, &rating, &p.RoundsID, &p.Boost, &p.WinningMoney, &p.NumberInRoom, &p.ExitRoomAt)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return nil, repository.ErrParticipantNotFound
@@ -103,12 +104,15 @@ func (s *txScope) GetParticipantByID(ctx context.Context, participantID int64) (
 	if nickname.Valid && nickname.String != "" {
 		p.NickName = &nickname.String
 	}
+	if rating.Valid {
+		p.Rating = &rating.Int64
+	}
 	return &p, nil
 }
 
 func (s *txScope) GetParticipantsByRoundID(ctx context.Context, roundID int64) ([]domain.RoundParticipant, error) {
 	rows, err := s.tx.Query(ctx, `
-		SELECT rp.round_participants_id, rp.user_id, u.nickname, rp.rounds_id, rp.boost, rp.winning_money, rp.number_in_room, rp.exit_room_at
+		SELECT rp.round_participants_id, rp.user_id, u.nickname, u.rating, rp.rounds_id, rp.boost, rp.winning_money, rp.number_in_room, rp.exit_room_at
 		FROM round_participants rp
 		INNER JOIN users u ON u.user_id = rp.user_id
 		WHERE rp.rounds_id = $1 AND rp.exit_room_at IS NULL
@@ -123,11 +127,15 @@ func (s *txScope) GetParticipantsByRoundID(ctx context.Context, roundID int64) (
 	for rows.Next() {
 		var p domain.RoundParticipant
 		var nickname sql.NullString
-		if err := rows.Scan(&p.RoundParticipantID, &p.UserID, &nickname, &p.RoundsID, &p.Boost, &p.WinningMoney, &p.NumberInRoom, &p.ExitRoomAt); err != nil {
+		var rating sql.NullInt64
+		if err := rows.Scan(&p.RoundParticipantID, &p.UserID, &nickname, &rating, &p.RoundsID, &p.Boost, &p.WinningMoney, &p.NumberInRoom, &p.ExitRoomAt); err != nil {
 			return nil, fmt.Errorf("scan participant: %w", err)
 		}
 		if nickname.Valid && nickname.String != "" {
 			p.NickName = &nickname.String
+		}
+		if rating.Valid {
+			p.Rating = &rating.Int64
 		}
 		participants = append(participants, p)
 	}

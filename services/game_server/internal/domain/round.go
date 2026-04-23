@@ -14,6 +14,7 @@ type RoundParticipant struct {
 	RoundParticipantID int64      `json:"round_participants_id"`
 	UserID             int64      `json:"user_id"`
 	NickName           *string    `json:"nickname,omitempty"`
+	Rating             *int64     `json:"rating,omitempty"`
 	RoundsID           int64      `json:"rounds_id"`
 	Boost              int        `json:"boost"`
 	WinningMoney       int64      `json:"winning_money"`

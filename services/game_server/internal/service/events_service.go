@@ -6,6 +6,7 @@ import (
 	"sync"
 	"time"
 
+	"game_server/internal/domain"
 	"game_server/internal/repository"
 	"game_server/internal/transport/dto"
 
@@ -94,18 +95,36 @@ func (es *EventsService) PublishEvent(ctx context.Context, roundID int64, eventT
 	}
 }
 
-func (es *EventsService) PublishPlayerJoined(ctx context.Context, roundID int64, participantID int64, numberInRoom int, currentPlayers int) {
+func (es *EventsService) PublishPlayerJoined(ctx context.Context, roundID int64, participant domain.RoundParticipant, currentPlayers int) {
+	var userID *int64
+	if !participant.IsBot && participant.UserID > 0 {
+		value := participant.UserID
+		userID = &value
+	}
+
 	es.PublishEvent(ctx, roundID, "player_joined", dto.EventPlayerJoined{
-		ParticipantID:  participantID,
-		NumberInRoom:   numberInRoom,
+		ParticipantID:  participant.RoundParticipantID,
+		UserID:         userID,
+		Nickname:       participant.NickName,
+		Rating:         participant.Rating,
+		NumberInRoom:   participant.NumberInRoom,
 		CurrentPlayers: currentPlayers,
 	})
 }
 
-func (es *EventsService) PublishPlayerLeft(ctx context.Context, roundID int64, participantID int64, numberInRoom int, currentPlayers int) {
+func (es *EventsService) PublishPlayerLeft(ctx context.Context, roundID int64, participant domain.RoundParticipant, currentPlayers int) {
+	var userID *int64
+	if !participant.IsBot && participant.UserID > 0 {
+		value := participant.UserID
+		userID = &value
+	}
+
 	es.PublishEvent(ctx, roundID, "player_left", dto.EventPlayerLeft{
-		ParticipantID:  participantID,
-		NumberInRoom:   numberInRoom,
+		ParticipantID:  participant.RoundParticipantID,
+		UserID:         userID,
+		Nickname:       participant.NickName,
+		Rating:         participant.Rating,
+		NumberInRoom:   participant.NumberInRoom,
 		CurrentPlayers: currentPlayers,
 	})
 }
