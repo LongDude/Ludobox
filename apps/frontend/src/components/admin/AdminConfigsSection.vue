@@ -424,7 +424,12 @@ function distributionLabel(value: number, index: number) {
           </label>
           <label class="boost-toggle">
             <span>{{ t('admin.configsSection.fields.boostEnabled') }}</span>
-            <input v-model="form.is_boost" type="checkbox" />
+            <span class="boost-toggle__control">
+              <input v-model="form.is_boost" class="boost-toggle__input" type="checkbox" />
+              <span class="boost-toggle__track" aria-hidden="true">
+                <span class="boost-toggle__thumb"></span>
+              </span>
+            </span>
           </label>
           <label>
             <span>{{ t('admin.configsSection.fields.boostPrice') }}</span>
@@ -750,14 +755,68 @@ function distributionLabel(value: number, index: number) {
   grid-column: 1 / -1;
 }
 
-.boost-toggle {
+.form-grid label.boost-toggle {
   display: flex;
+  flex-direction: row;
   align-items: center;
   justify-content: space-between;
   gap: 1rem;
   padding: 0.85rem 1rem;
   border: 1px dashed color-mix(in oklab, var(--color-border), transparent 8%);
   border-radius: 1rem;
+}
+
+.boost-toggle__control {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.boost-toggle__input {
+  position: absolute;
+  inset: 0;
+  margin: 0;
+  opacity: 0;
+  cursor: pointer;
+}
+
+.boost-toggle__track {
+  width: 46px;
+  height: 26px;
+  display: inline-flex;
+  align-items: center;
+  padding: 3px;
+  border-radius: 999px;
+  background: color-mix(in oklab, var(--color-border), white 12%);
+  transition:
+    background var(--transition-fast) ease,
+    box-shadow var(--transition-fast) ease;
+}
+
+.boost-toggle__thumb {
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: var(--color-surface);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.25);
+  transition: transform var(--transition-fast) ease;
+}
+
+.boost-toggle__input:checked + .boost-toggle__track {
+  background: linear-gradient(135deg, #d97706, #b45309);
+}
+
+.boost-toggle__input:checked + .boost-toggle__track .boost-toggle__thumb {
+  transform: translateX(20px);
+}
+
+.boost-toggle__input:focus-visible + .boost-toggle__track {
+  box-shadow: 0 0 0 3px color-mix(in oklab, #d97706, transparent 72%);
+}
+
+.boost-toggle__input:disabled + .boost-toggle__track {
+  opacity: 0.6;
 }
 
 .input {

@@ -9,25 +9,6 @@ const { t } = useI18n()
   </div>
 </template>
 <style lang="css" scoped>
-.footer {
-  position: fixed;
-  bottom: 0;
-  left: 304px;
-  right: 20px;
-  height: 20px;
-  font-size: x-small;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  transition: all var(--transition-slow) ease;
-}
-.footer.collapsed {
-  left: 120px;
-}
-p {
-  margin: 0;
-}
-
 @media (max-width: 960px) {
   .footer,
   .footer.collapsed {
