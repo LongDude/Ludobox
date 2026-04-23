@@ -4,6 +4,7 @@ USER_SERVICE_SCALE ?= 2
 BACKEND_SCALE = --scale matchmaking-core=$(MATCHMAKING_SCALE) --scale user-service-core=$(USER_SERVICE_SCALE)
 TOOLS_SERVICES = pgadmin redis-commander-game-1 redis-commander-game-2 redis-commander-matchmaking redis-commander-user
 FRONTEND_SERVICES = frontend-dev frontend-prod
+FRONTEND_PROD_STACK = haproxy frontend-prod
 K6 ?= k6
 K6_DIR ?= tests/k6
 K6_BASE_URL ?= http://localhost
@@ -28,7 +29,8 @@ K6_LEAVE_AFTER ?= 1
 K6_ARGS ?=
 
 .PHONY: help up build down build-sso build-user build-game build-matchmaking build-rng \
-	frontend-up frontend-dev-up frontend-prod-up frontend-down frontend-dev-down frontend-prod-down \
+	frontend-up frontend-dev-up frontend-prod-up frontend-prod-cert frontend-prod-renew frontend-vps-up \
+	frontend-down frontend-dev-down frontend-prod-down \
 	tools-up tools-down pgadmin-up pgadmin-down redis-up redis-down \
 	k6-matchmaking k6-game-server k6-all
 
@@ -46,7 +48,10 @@ help:
 	@echo "-- Frontend --"
 	@echo "frontend-up        - start frontend in dev profile"
 	@echo "frontend-dev-up    - start frontend-dev"
-	@echo "frontend-prod-up   - start frontend-prod"
+	@echo "frontend-prod-up   - start frontend-prod with the root haproxy ingress"
+	@echo "frontend-prod-cert - issue or reuse Let's Encrypt cert for DOMAIN and restart haproxy"
+	@echo "frontend-prod-renew - renew Let's Encrypt certs and restart haproxy"
+	@echo "frontend-vps-up    - build backend + frontend-prod and issue cert for VPS deployment"
 	@echo "frontend-down      - stop both frontend profiles"
 	@echo ""
 	@echo "-- Tools --"
@@ -89,7 +94,21 @@ frontend-dev-up:
 	@$(COMPOSE) --profile frontend-dev up -d frontend-dev
 
 frontend-prod-up:
-	@$(COMPOSE) --profile frontend-prod up -d frontend-prod
+	@$(COMPOSE) --profile frontend-prod up -d $(FRONTEND_PROD_STACK)
+
+frontend-prod-cert:
+	@$(COMPOSE) --profile frontend-prod up -d $(FRONTEND_PROD_STACK)
+	@$(COMPOSE) --profile frontend-prod run --rm frontend-certbot sh -ec 'test -n "$$LETSENCRYPT_EMAIL" || { echo "LETSENCRYPT_EMAIL is required in .env"; exit 1; }; test "$$DOMAIN" != "localhost" || { echo "DOMAIN must be set to a public hostname in .env"; exit 1; }; certbot certonly --webroot --webroot-path /var/www/certbot --email "$$LETSENCRYPT_EMAIL" --agree-tos --no-eff-email --non-interactive --keep-until-expiring -d "$$DOMAIN"'
+	@$(COMPOSE) restart haproxy
+
+frontend-prod-renew:
+	@$(COMPOSE) --profile frontend-prod up -d $(FRONTEND_PROD_STACK)
+	@$(COMPOSE) --profile frontend-prod run --rm frontend-certbot renew
+	@$(COMPOSE) restart haproxy
+
+frontend-vps-up:
+	@$(COMPOSE) --profile frontend-prod up -d --build $(BACKEND_SCALE) $(FRONTEND_PROD_STACK)
+	@$(MAKE) frontend-prod-cert
 
 frontend-down:
 	-@$(COMPOSE) stop $(FRONTEND_SERVICES)

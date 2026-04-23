@@ -1,0 +1,208 @@
+global
+    lua-load-per-thread /usr/local/etc/haproxy/auth_validate.lua
+    log stdout format raw local0 info
+    maxconn 4096
+
+defaults
+    log global
+    mode http
+    option httplog
+    option http-keep-alive
+    option forwardfor
+    http-reuse safe
+    timeout connect 5s
+    timeout client 50s
+    timeout server 50s
+    timeout http-request 10s
+    timeout tunnel 1h
+
+resolvers docker
+    nameserver dns 127.0.0.11:53
+    resolve_retries 3
+    timeout retry 1s
+    timeout resolve 1s
+    hold valid 10s
+
+frontend stats
+    bind *:8404
+    stats enable
+    stats uri /stats
+    stats refresh 10s
+    stats show-modules
+
+frontend gateway_frontend
+    bind :80
+    bind :443 ssl crt ${HAPROXY_CERT_PEM_PATH}
+    http-request set-header X-Forwarded-Host %[req.hdr(Host)]
+    http-request set-header X-Forwarded-Proto https if { ssl_fc }
+    http-request set-header X-Forwarded-Proto http unless { ssl_fc }
+
+    acl from_localhost src 127.0.0.1
+    acl is_acme_challenge path_beg /.well-known/acme-challenge/
+    acl is_internal_sso_validate path -i /__internal/auth/validate
+    acl is_internal_matchmaking_lookup path_beg /__internal/matchmaking/
+    acl is_internal_route path_beg /__internal/
+    acl is_sso_swagger path_beg /swagger/sso
+    acl is_game_swagger path_beg /swagger/game
+    acl is_matchmaking_swagger path_beg /swagger/matchmaking
+    acl is_user_swagger path_beg /swagger/users
+    acl is_sso_route path_beg /api/auth /api/oauth
+    acl is_game_route path_beg /api/game
+    acl is_matchmaking_route path_beg /api/matchmaking
+    acl is_user_route path_beg /api/users
+    acl is_api_route path_beg /api
+    acl is_swagger_route path_beg /swagger
+    acl is_preflight method OPTIONS
+    acl is_public_service_path path -i /api/game/ping /api/game/healthz /api/matchmaking/ping /api/matchmaking/healthz /api/users/ping /api/users/healthz
+    acl requires_jwt path_beg /api/game /api/matchmaking /api/users
+    http-request redirect scheme https code 301 if !{ ssl_fc } !from_localhost !is_acme_challenge !is_internal_route
+    http-request lua.mark_cors_origin
+    acl cors_origin_allowed var(txn.cors_origin_allowed) -m bool
+
+    http-after-response set-header Access-Control-Allow-Origin %[var(txn.cors_origin)] if cors_origin_allowed
+    http-after-response set-header Access-Control-Allow-Credentials true if cors_origin_allowed
+    http-after-response set-header Access-Control-Allow-Methods "GET, POST, PUT, PATCH, DELETE, OPTIONS" if cors_origin_allowed
+    http-after-response set-header Access-Control-Allow-Headers "Authorization, Content-Type, X-Room-ID" if cors_origin_allowed
+    http-after-response set-header Access-Control-Max-Age 600 if cors_origin_allowed
+    http-after-response set-header Vary Origin if cors_origin_allowed
+
+    http-request return status 204 if is_preflight cors_origin_allowed
+
+    http-request lua.authorize_internal_service if is_internal_matchmaking_lookup !from_localhost
+    acl internal_service_ok var(txn.internal_service_ok) -m bool
+    http-request return status 403 content-type text/plain string "Forbidden" if is_internal_sso_validate !from_localhost
+    http-request return status 403 content-type text/plain string "Forbidden" if is_internal_matchmaking_lookup !from_localhost !internal_service_ok
+    http-request return status 403 content-type text/plain string "Forbidden" if is_internal_route !from_localhost !is_internal_matchmaking_lookup !is_internal_sso_validate
+    http-request redirect location /swagger/sso/index.html if { path -i /swagger/sso /swagger/sso/ }
+    http-request redirect location /swagger/game/index.html if { path -i /swagger/game /swagger/game/ }
+    http-request redirect location /swagger/matchmaking/index.html if { path -i /swagger/matchmaking /swagger/matchmaking/ }
+    http-request redirect location /swagger/users/index.html if { path -i /swagger/users /swagger/users/ }
+
+    http-request set-var(txn.auth_header) req.hdr(Authorization) if requires_jwt !is_public_service_path !is_preflight
+    http-request set-var(txn.bearer) http_auth_bearer if requires_jwt !is_public_service_path !is_preflight
+    http-request set-var(txn.jwt_alg) var(txn.bearer),jwt_header_query('$.alg') if requires_jwt !is_public_service_path !is_preflight
+    http-request set-var(txn.jwt_token_type) var(txn.bearer),jwt_payload_query('$.token_type') if requires_jwt !is_public_service_path !is_preflight
+    http-request set-var(txn.user_id) var(txn.bearer),jwt_payload_query('$.user_id','int') if requires_jwt !is_public_service_path !is_preflight
+
+    acl has_bearer var(txn.bearer) -m found
+    acl has_jwt_alg var(txn.jwt_alg) -m found
+    acl token_alg_hs256 var(txn.jwt_alg) -m str HS256
+    acl has_token_type var(txn.jwt_token_type) -m found
+    acl access_token_type var(txn.jwt_token_type) -m str access_token
+    acl has_user_id var(txn.user_id) -m int gt 0
+
+    http-request return status 401 content-type text/plain string "Missing or malformed Authorization header" if requires_jwt !is_public_service_path !is_preflight !has_bearer
+    http-request return status 401 content-type text/plain string "Malformed JWT header" if requires_jwt !is_public_service_path !is_preflight has_bearer !has_jwt_alg
+    http-request return status 401 content-type text/plain string "Unsupported JWT algorithm" if requires_jwt !is_public_service_path !is_preflight has_bearer has_jwt_alg !token_alg_hs256
+    http-request return status 401 content-type text/plain string "Malformed JWT payload" if requires_jwt !is_public_service_path !is_preflight has_bearer has_jwt_alg token_alg_hs256 !has_token_type
+    http-request return status 401 content-type text/plain string "Wrong token type" if requires_jwt !is_public_service_path !is_preflight has_bearer has_jwt_alg token_alg_hs256 has_token_type !access_token_type
+    http-request return status 401 content-type text/plain string "Missing user_id claim" if requires_jwt !is_public_service_path !is_preflight has_bearer has_jwt_alg token_alg_hs256 has_token_type access_token_type !has_user_id
+
+    http-request lua.validate_sso_access_token if requires_jwt !is_public_service_path !is_preflight has_bearer has_jwt_alg token_alg_hs256 has_token_type access_token_type has_user_id
+    http-request return status 503 content-type text/plain string "SSO authorization service unavailable" if requires_jwt !is_public_service_path !is_preflight { var(txn.sso_validate_outage) -m bool }
+    http-request return status 401 content-type text/plain string "Token is revoked or invalid" if requires_jwt !is_public_service_path !is_preflight !{ var(txn.sso_validate_ok) -m bool }
+    http-request set-header X-Authenticated-User %[var(txn.user_id)] if requires_jwt !is_public_service_path !is_preflight { var(txn.sso_validate_ok) -m bool }
+
+    # Sticky routing for room-scoped game requests. The room id may arrive via:
+    # 1. X-Room-ID header
+    # 2. room_id query parameter
+    # 3. /api/game/rooms/<room_id> path
+    http-request lua.extract_game_room_id if is_game_route
+    acl has_game_room_id var(txn.game_room_id) -m found
+    acl is_game_room_scoped_path path_beg /api/game/rooms /api/game/room /api/game/rounds /api/game/round
+    http-request return status 400 content-type text/plain string "room_id is required for room-scoped game requests" if is_game_route is_game_room_scoped_path !has_game_room_id
+    http-request set-header X-Game-Room-ID %[var(txn.game_room_id)] if is_game_route has_game_room_id
+    http-request lua.resolve_game_room_owner if is_game_route has_game_room_id
+
+    acl game_owner_lookup_ok var(txn.game_owner_lookup_ok) -m bool
+    acl game_owner_lookup_outage var(txn.game_owner_lookup_outage) -m bool
+    acl known_game_owner var(txn.game_owner_instance_key) -m str game-server-core-1 game-server-core-2
+
+    http-request return status 503 content-type text/plain string "Room owner resolution service unavailable" if is_game_route has_game_room_id game_owner_lookup_outage
+    http-request return status 404 content-type text/plain string "Room owner not found" if is_game_route has_game_room_id !game_owner_lookup_ok
+    http-request return status 503 content-type text/plain string "Resolved room owner is not routable" if is_game_route has_game_room_id game_owner_lookup_ok !known_game_owner
+    http-request set-header X-Game-Owner-Instance-Key %[var(txn.game_owner_instance_key)] if is_game_route has_game_room_id game_owner_lookup_ok
+
+    use_backend frontend_backend if is_acme_challenge
+    use_backend sso_internal_validate_backend if is_internal_sso_validate
+    use_backend matchmaking_internal_backend if is_internal_matchmaking_lookup
+    use_backend sso_swagger_backend if is_sso_swagger
+    use_backend game_server_swagger_backend if is_game_swagger
+    use_backend matchmaking_swagger_backend if is_matchmaking_swagger
+    use_backend user_service_swagger_backend if is_user_swagger
+    use_backend sso_backend if is_sso_route
+    use_backend game_server_room_backend if is_game_route has_game_room_id
+    use_backend game_server_backend if is_game_route
+    use_backend matchmaking_backend if is_matchmaking_route
+    use_backend user_service_backend if is_user_route
+    use_backend not_found_backend if is_api_route
+    use_backend not_found_backend if is_swagger_route
+    use_backend not_found_backend if is_internal_route
+    default_backend frontend_backend
+
+backend frontend_backend
+    option httpchk GET /
+    server frontend-prod frontend-prod:80 check resolvers docker init-addr none
+
+backend sso_swagger_backend
+    http-request set-path %[path,regsub(^/swagger/sso,/swagger)]
+    server sso-core sso-core:8080 check resolvers docker init-addr none
+
+backend sso_internal_validate_backend
+    http-request set-path /api/auth/validate
+    server sso-core sso-core:8080 check resolvers docker init-addr none
+
+backend sso_backend
+    option httpchk GET /healthz
+    server sso-core sso-core:8080 check resolvers docker init-addr none
+
+backend game_server_swagger_backend
+    balance roundrobin
+    http-request set-path %[path,regsub(^/swagger/game,/swagger)]
+    server game-server-swagger-1 game-server-core-1:8080 check resolvers docker init-addr none
+    server game-server-swagger-2 game-server-core-2:8080 check resolvers docker init-addr none
+
+backend game_server_room_backend
+    option httpchk GET /healthz
+    http-request set-path %[path,regsub(^/api/game,/api)]
+    use-server game-server-room-1 if { req.hdr(X-Game-Owner-Instance-Key) -m str game-server-core-1 }
+    use-server game-server-room-2 if { req.hdr(X-Game-Owner-Instance-Key) -m str game-server-core-2 }
+    server game-server-room-1 game-server-core-1:8080 check resolvers docker init-addr none
+    server game-server-room-2 game-server-core-2:8080 check resolvers docker init-addr none
+
+backend game_server_backend
+    balance roundrobin
+    option httpchk GET /healthz
+    http-request set-path %[path,regsub(^/api/game,/api)]
+    server game-server-1 game-server-core-1:8080 check resolvers docker init-addr none
+    server game-server-2 game-server-core-2:8080 check resolvers docker init-addr none
+
+backend matchmaking_swagger_backend
+    balance roundrobin
+    http-request set-path %[path,regsub(^/swagger/matchmaking,/swagger)]
+    server-template matchmaking-swagger 10 matchmaking-core:8080 check resolvers docker init-addr none
+
+backend matchmaking_backend
+    balance roundrobin
+    option httpchk GET /healthz
+    http-request set-path %[path,regsub(^/api/matchmaking,/api)]
+    server-template matchmaking 10 matchmaking-core:8080 check resolvers docker init-addr none
+
+backend matchmaking_internal_backend
+    balance roundrobin
+    http-request set-path %[path,regsub(^/__internal/matchmaking,/internal)]
+    server-template matchmaking-internal 10 matchmaking-core:8080 check resolvers docker init-addr none
+
+backend user_service_swagger_backend
+    balance roundrobin
+    http-request set-path %[path,regsub(^/swagger/users,/swagger)]
+    server-template user-service-swagger 10 user-service-core:8080 check resolvers docker init-addr none
+
+backend user_service_backend
+    balance roundrobin
+    option httpchk GET /healthz
+    http-request set-path %[path,regsub(^/api/users,/api)]
+    server-template user-service 10 user-service-core:8080 check resolvers docker init-addr none
+
+backend not_found_backend
+    http-request return status 404 content-type text/plain string "Route not found"

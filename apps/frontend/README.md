@@ -21,7 +21,9 @@
 
 ```bash
 make frontend-up
-make frontend-up-prod
+make frontend-prod-up
+make frontend-prod-cert
+make frontend-prod-renew
 make frontend-down
 ```
 
@@ -71,3 +73,14 @@ npm run test:unit
 npm run lint
 npm run build
 ```
+
+## Production TLS
+
+- The standalone `apps/frontend/docker-compose.yml` remains a local-only flow.
+- VPS deployment uses the root `docker-compose.yml`, root `Makefile`, and the root `haproxy`.
+- Before `make frontend-vps-up`, set these values in the root `.env`:
+  - `DOMAIN`
+  - `LETSENCRYPT_EMAIL`
+  - `PUBLIC_URL=https://DOMAIN`
+  - `FRONTEND_BASE_URL=https://DOMAIN`
+  - `VITE_API_BASE_URL=https://DOMAIN/api`

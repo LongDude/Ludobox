@@ -82,7 +82,7 @@ make tools-up
 - API gateway: `http://localhost`
 - HAProxy stats: `http://localhost:8404/stats`
 - Frontend dev: `http://localhost:5173`
-- Frontend prod: `http://localhost:8080`
+- Frontend prod via HAProxy: `http://localhost/`
 - pgAdmin: `http://localhost:8081`
 - Redis Commander: `http://localhost:9001`, `9002`, `9003`, `9004`
 
@@ -94,7 +94,10 @@ make up
 make build
 make down
 make frontend-up
-make frontend-up-prod
+make frontend-prod-up
+make frontend-prod-cert
+make frontend-prod-renew
+make frontend-vps-up
 make frontend-down
 make tools-up
 make tools-down
@@ -111,6 +114,22 @@ make redis-up
 
 ```bash
 make MATCHMAKING_SCALE=2 USER_SERVICE_SCALE=1 up
+```
+
+## Frontend Production TLS
+
+- Root `haproxy` is now the single public ingress for `https://DOMAIN/` and `https://DOMAIN/api/...`.
+- Before `make frontend-prod-cert`, set `DOMAIN` and `LETSENCRYPT_EMAIL` in the root `.env`.
+- For VPS production, also set:
+  - `PUBLIC_URL=https://DOMAIN`
+  - `FRONTEND_BASE_URL=https://DOMAIN`
+  - `VITE_API_BASE_URL=https://DOMAIN/api`
+  - `ALLOWED_REDIRECT_URLS` and `ALLOWED_CORS_ORIGINS` to include `https://DOMAIN`
+- Deployment flow:
+
+```bash
+make frontend-vps-up
+make frontend-prod-renew
 ```
 
 ## Сетевая схема

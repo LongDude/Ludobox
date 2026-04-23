@@ -36,6 +36,7 @@ frontend gateway_frontend
     http-request set-header X-Forwarded-Host %[req.hdr(Host)]
 
     acl from_localhost src 127.0.0.1
+    acl is_acme_challenge path_beg /.well-known/acme-challenge/
     acl is_internal_sso_validate path -i /__internal/auth/validate
     acl is_internal_matchmaking_lookup path_beg /__internal/matchmaking/
     acl is_internal_route path_beg /__internal/
@@ -47,6 +48,8 @@ frontend gateway_frontend
     acl is_game_route path_beg /api/game
     acl is_matchmaking_route path_beg /api/matchmaking
     acl is_user_route path_beg /api/users
+    acl is_api_route path_beg /api
+    acl is_swagger_route path_beg /swagger
     acl is_preflight method OPTIONS
     acl is_public_service_path path -i /api/game/ping /api/game/healthz /api/matchmaking/ping /api/matchmaking/healthz /api/users/ping /api/users/healthz
     acl requires_jwt path_beg /api/game /api/matchmaking /api/users
@@ -117,6 +120,7 @@ frontend gateway_frontend
     http-request return status 503 content-type text/plain string "Resolved room owner is not routable" if is_game_route has_game_room_id game_owner_lookup_ok !known_game_owner
     http-request set-header X-Game-Owner-Instance-Key %[var(txn.game_owner_instance_key)] if is_game_route has_game_room_id game_owner_lookup_ok
 
+    use_backend frontend_backend if is_acme_challenge
     use_backend sso_internal_validate_backend if is_internal_sso_validate
     use_backend matchmaking_internal_backend if is_internal_matchmaking_lookup
     use_backend sso_swagger_backend if is_sso_swagger
@@ -128,7 +132,14 @@ frontend gateway_frontend
     use_backend game_server_backend if is_game_route
     use_backend matchmaking_backend if is_matchmaking_route
     use_backend user_service_backend if is_user_route
-    default_backend not_found_backend
+    use_backend not_found_backend if is_api_route
+    use_backend not_found_backend if is_swagger_route
+    use_backend not_found_backend if is_internal_route
+    default_backend frontend_backend
+
+backend frontend_backend
+    option httpchk GET /
+    server frontend-prod frontend-prod:80 check resolvers docker init-addr none
 
 backend sso_swagger_backend
     http-request set-path %[path,regsub(^/swagger/sso,/swagger)]
