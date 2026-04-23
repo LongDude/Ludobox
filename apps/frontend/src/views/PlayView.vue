@@ -905,7 +905,7 @@ function eventDescription(event: GameRoundEvent) {
 
   if (event.type === 'player_joined') {
     return t('gameRoom.events.playerJoinedDetails', {
-      participant: Number(data.participant_id ?? 0) || '-',
+      participant: String(data.nickname ?? 0) || '-',
       seat: Number(data.number_in_room ?? 0) || '-',
       players: Number(data.current_players ?? 0) || '-',
     })
@@ -913,7 +913,7 @@ function eventDescription(event: GameRoundEvent) {
 
   if (event.type === 'player_left') {
     return t('gameRoom.events.playerLeftDetails', {
-      participant: Number(data.participant_id ?? 0) || '-',
+      participant: String(data.nickname ?? 0) || '-',
       seat: Number(data.number_in_room ?? 0) || '-',
       players: Number(data.current_players ?? 0) || '-',
     })
@@ -921,14 +921,14 @@ function eventDescription(event: GameRoundEvent) {
 
   if (event.type === 'boost_purchased') {
     return t('gameRoom.events.boostPurchasedDetails', {
-      participant: Number(data.participant_id ?? 0) || '-',
+      participant: String(data.nickname ?? 0) || '-',
       power: Number(data.boost_power ?? 0) || '-',
     })
   }
 
   if (event.type === 'boost_cancelled') {
     return t('gameRoom.events.boostCancelledDetails', {
-      participant: Number(data.participant_id ?? 0) || '-',
+      participant: String(data.nickname ?? 0) || '-',
     })
   }
 

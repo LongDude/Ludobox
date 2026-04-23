@@ -237,7 +237,6 @@ function enterRoom(room: RoomRecommendationResponse) {
           <h1>{{ t('matchmaking.results.title') }}</h1>
           <p class="description">{{ t('matchmaking.results.description') }}</p>
         </div>
-        <span v-if="cached" class="status-pill">{{ t('matchmaking.results.cached') }}</span>
       </div>
 
       <form class="filters-form" @submit.prevent="applyFilters">

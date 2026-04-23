@@ -6,7 +6,6 @@ const { t } = useI18n()
 </script>
 <template>
   <div class="footer" :class="{ collapsed: useSetting.LeftTabHidden }">
-    <p>{{ t('footer.copy') }}</p>
   </div>
 </template>
 <style lang="css" scoped>

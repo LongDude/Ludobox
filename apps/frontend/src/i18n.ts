@@ -475,8 +475,6 @@ const messages: Record<Locale, Record<string, string>> = {
     'notFound.desc': 'The page you are looking for does not exist.',
     'notFound.home': 'Go back to Home',
 
-    'footer.copy': '© 2025 LiveisFPV Dev. All rights reserved.',
-
     'search.title': 'Search View',
     'search.placeholder': 'This is a placeholder page.',
 
@@ -647,7 +645,6 @@ const messages: Record<Locale, Record<string, string>> = {
     'matchmaking.results.title': 'Recommended rooms',
     'matchmaking.results.description':
       'The list is loaded from live matchmaking recommendations and sorted by score in descending order.',
-    'matchmaking.results.cached': 'Cached response',
     'matchmaking.results.listEyebrow': 'Open rooms',
     'matchmaking.results.listTitle': 'Choose a room',
     'matchmaking.results.listDescription': 'Recommended rooms will appear here after the request completes.',
@@ -756,13 +753,13 @@ const messages: Record<Locale, Record<string, string>> = {
       'Match results are still displayed. Seat reservation will reopen after you switch to the next round.',
     'gameRoom.entry.seats': 'Available seats',
     'gameRoom.entry.selectedSeats': 'Selected seats: {seats}',
-    'gameRoom.entry.randomSeatsCount': 'Random seats to reserve',
-    'gameRoom.entry.randomSeatsHint': 'Random reservation count: {count}. The limit is half of the room.',
+    'gameRoom.entry.randomSeatsCount': 'Count seats to reserve',
+    'gameRoom.entry.randomSeatsHint': 'Reservation count: {count}. The limit is half of the room.',
     'gameRoom.entry.seatNumber': 'Seat number',
     'gameRoom.entry.seatPlaceholder': 'Example: 3',
     'gameRoom.entry.joining': 'Joining...',
     'gameRoom.entry.reserveRandom': 'Reserve random seat',
-    'gameRoom.entry.reserveRandomCount': 'Reserve {count} random seats',
+    'gameRoom.entry.reserveRandomCount': 'Reserve {count} seats',
     'gameRoom.entry.reserveSelected': 'Reserve selected seats ({count})',
     'gameRoom.entry.joinAuto': 'Join automatically',
     'gameRoom.entry.joinAutoMore': 'Occupy automatic seat',
@@ -820,11 +817,11 @@ const messages: Record<Locale, Record<string, string>> = {
     'gameRoom.events.round_started': 'Round started',
     'gameRoom.events.round_finalized': 'Round finalized',
     'gameRoom.events.playerJoinedDetails':
-      'Participant #{participant}, seat #{seat}. Active players: {players}.',
+      'Participant {participant} sit on seat {seat}. Active players: {players}.',
     'gameRoom.events.playerLeftDetails':
-      'Participant #{participant}, seat #{seat}. Active players: {players}.',
-    'gameRoom.events.boostPurchasedDetails': 'Participant #{participant}, boost power {power}%.',
-    'gameRoom.events.boostCancelledDetails': 'Participant #{participant}.',
+      'Participant {participant} leave seat {seat}. Active players: {players}.',
+    'gameRoom.events.boostPurchasedDetails': 'Participant {participant}, boost power {power}%.',
+    'gameRoom.events.boostCancelledDetails': 'Participant {participant}.',
     'gameRoom.events.roundStartedDetails': '{players} players, game duration {seconds}s.',
     'gameRoom.events.roundFinalizedDetails': 'Winners: {winners}.',
     'gameRoom.events.genericDetails': 'Round state changed.',
@@ -870,11 +867,11 @@ const messages: Record<Locale, Record<string, string>> = {
     'gameRoom.events.round_started': 'Раунд начался',
     'gameRoom.events.round_finalized': 'Раунд завершён',
     'gameRoom.events.playerJoinedDetails':
-      'Участник #{participant}, место #{seat}. Активных игроков: {players}.',
+      'Участник {participant} занял место {seat}. Активных игроков: {players}.',
     'gameRoom.events.playerLeftDetails':
-      'Участник #{participant}, место #{seat}. Активных игроков: {players}.',
-    'gameRoom.events.boostPurchasedDetails': 'Участник #{participant}, сила буста {power}%.',
-    'gameRoom.events.boostCancelledDetails': 'Участник #{participant}.',
+      'Участник {participant} освободил место {seat}. Активных игроков: {players}.',
+    'gameRoom.events.boostPurchasedDetails': 'Участник {participant}, сила буста {power}%.',
+    'gameRoom.events.boostCancelledDetails': 'Участник {participant}.',
     'gameRoom.events.roundStartedDetails': '{players} игроков, длительность игры {seconds}с.',
     'gameRoom.events.roundFinalizedDetails': 'Победителей: {winners}.',
     'gameRoom.events.genericDetails': 'Состояние раунда изменилось.',
@@ -926,15 +923,18 @@ const messages: Record<Locale, Record<string, string>> = {
       'Достигнут лимит выбора. Подтвердите выбранные места или снимите одно из них, чтобы выбрать другое.',
     'gameRoom.entry.roomFull': 'В этом раунде нет свободных мест.',
     'gameRoom.entry.notJoinedTitle': 'Вы ещё не вошли',
-    'gameRoom.entry.notJoinedHint': 'Вход резервирует стоимость участия и назначает participant id.',
+    'gameRoom.entry.notJoinedHint': 'Вход резервирует стоимость участия.',
     'gameRoom.entry.waitForNextRound':
       'Сейчас показываются результаты матча. Бронирование мест откроется после перехода в следующий раунд.',
     'gameRoom.entry.seats': 'Доступные места',
     'gameRoom.entry.selectedSeats': 'Выбраны места: {seats}',
+    'gameRoom.entry.randomSeatsCount': 'Выбрано мест',
+    'gameRoom.entry.randomSeatsHint': 'Выбрано мест: {count}. Максимум половина мест.',
     'gameRoom.entry.seatNumber': 'Номер места',
     'gameRoom.entry.seatPlaceholder': 'Например: 3',
     'gameRoom.entry.joining': 'Входим...',
     'gameRoom.entry.reserveRandom': 'Зарезервировать случайное место',
+    'gameRoom.entry.reserveRandomCount': 'Зарезервировать места',
     'gameRoom.entry.reserveSelected': 'Зарезервировать выбранные места ({count})',
     'gameRoom.entry.joinAuto': 'Войти автоматически',
     'gameRoom.entry.joinAutoMore': 'Занять автоматическое место',
@@ -1003,16 +1003,16 @@ const messages: Record<Locale, Record<string, string>> = {
     'matchmaking.home.eyebrow': 'Подбор для игрока',
     'matchmaking.home.title': 'Начните прямо сейчас',
     'matchmaking.home.description':
-      'Используйте quick match для самого быстрого входа или настройте фильтры перед просмотром рекомендованных комнат.',
+      'Используйте быструю игру для моментального подключения или подберите комнату по параметрам.',
     'matchmaking.home.status.ready': 'Готово к входу',
     'matchmaking.home.status.authRequired': 'Нужна авторизация',
     'matchmaking.home.status.filtersReady': 'Фильтры настроены',
     'matchmaking.home.noFilters':
       'Фильтры не заданы. Quick match выполнит максимально широкий поиск доступной комнаты.',
     'matchmaking.quick.eyebrow': 'Мгновенный вход',
-    'matchmaking.quick.title': 'Quick match',
+    'matchmaking.quick.title': 'Быстрая игра',
     'matchmaking.quick.description':
-      'Сразу вызывает matchmaking и открывает выбранную комнату в SPA-экране входа.',
+      'Сразу переводит игрока в наиболее подходящую именно ему комнату',
     'matchmaking.quick.cta': 'Найти комнату сейчас',
     'matchmaking.quick.loading': 'Подключаем комнату...',
     'matchmaking.filters.eyebrow': 'Фильтры комнаты',
@@ -1049,8 +1049,7 @@ const messages: Record<Locale, Record<string, string>> = {
     'matchmaking.results.eyebrow': 'Рекомендации',
     'matchmaking.results.title': 'Рекомендованные комнаты',
     'matchmaking.results.description':
-      'Список загружается из live-рекомендаций matchmaking и по умолчанию отсортирован по score по убыванию.',
-    'matchmaking.results.cached': 'Кэшированный ответ',
+      'Список формируется с наиболее подходящих комнат.',
     'matchmaking.results.listEyebrow': 'Открытые комнаты',
     'matchmaking.results.listTitle': 'Выберите комнату',
     'matchmaking.results.listDescription':
@@ -1557,8 +1556,6 @@ const messages: Record<Locale, Record<string, string>> = {
     'notFound.title': '404 - Страница не найдена',
     'notFound.desc': 'Страница, которую вы ищете, не существует.',
     'notFound.home': 'Вернуться на главную',
-
-    'footer.copy': '© 2025 LiveisFPV Dev. Все права защищены.',
 
     'search.title': 'Поиск',
     'search.placeholder': 'Временная страница-заглушка.',
