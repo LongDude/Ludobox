@@ -3,8 +3,7 @@
 Ludobox — микросервисная платформа для проведения игр и лотерей. Корневой `docker-compose.yml` теперь является единой точкой входа для backend-контура, фронтенда и вспомогательных инструментов, а все общие переменные окружения задаются из корневого файла `.env`.
 
 ## Архитектура
-<a href="docs/Architecture.png">
-
+![Architecture](docs/Architecture2.png?raw=true "Architecture")
 ## Состав проекта
 
 - `services/sso` — авторизация, сессии, OAuth и внутренний gRPC API.
