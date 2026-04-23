@@ -179,43 +179,34 @@ function nextPage() {
       </div>
     </div>
 
-      <div class="list-card">
-        <div class="list-head">
-          <div>
-            <h3>{{ t('admin.gamesSection.listTitle') }}</h3>
-            <p class="muted">{{ t('admin.gamesSection.listHint') }}</p>
-          </div>
+    <p v-if="loading" class="state-copy">{{ t('admin.gamesSection.loading') }}</p>
+
+    <div v-else class="game-list">
+      <article
+        v-for="game in games"
+        :key="game.game_id"
+        class="game-card"
+        :class="{ selected: editingGameId === game.game_id }"
+      >
+        <div class="game-topline">
+          <strong>#{{ game.game_id }} - {{ game.name_game }}</strong>
         </div>
+      </article>
 
-        <p v-if="loading" class="state-copy">{{ t('admin.gamesSection.loading') }}</p>
+      <p v-if="games.length === 0" class="state-copy">{{ t('admin.gamesSection.noMatches') }}</p>
+    </div>
 
-        <div v-else class="game-list">
-          <article
-            v-for="game in games"
-            :key="game.game_id"
-            class="game-card"
-            :class="{ selected: editingGameId === game.game_id }"
-          >
-            <div class="game-topline">
-              <strong>#{{ game.game_id }} - {{ game.name_game }}</strong>
-            </div>
-          </article>
-
-          <p v-if="games.length === 0" class="state-copy">{{ t('admin.gamesSection.noMatches') }}</p>
-        </div>
-
-        <div v-if="total > 0" class="pager">
-          <button class="button ghost" :disabled="page <= 1" @click="prevPage">{{ t('common.prev') }}</button>
-          <span class="pager-copy">{{ pageSummary }}</span>
-          <button
-            class="button ghost"
-            :disabled="page >= Math.max(1, Math.ceil(total / pageSize))"
-            @click="nextPage"
-          >
-            {{ t('common.next') }}
-          </button>
-        </div>
-      </div>
+    <div v-if="total > 0" class="pager">
+      <button class="button ghost" :disabled="page <= 1" @click="prevPage">{{ t('common.prev') }}</button>
+      <span class="pager-copy">{{ pageSummary }}</span>
+      <button
+        class="button ghost"
+        :disabled="page >= Math.max(1, Math.ceil(total / pageSize))"
+        @click="nextPage"
+      >
+        {{ t('common.next') }}
+      </button>
+    </div>
   </section>
 </template>
 
@@ -280,15 +271,13 @@ function nextPage() {
 }
 
 .editor-card,
-.list-card,
 .game-card {
   border: 1px solid color-mix(in oklab, var(--color-border), transparent 10%);
   border-radius: 1.35rem;
   background: color-mix(in oklab, var(--color-surface), white 12%);
 }
 
-.editor-card,
-.list-card {
+.editor-card {
   display: grid;
   gap: 1rem;
   padding: 1.15rem;

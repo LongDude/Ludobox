@@ -1250,7 +1250,7 @@ const messages: Record<Locale, Record<string, string>> = {
     'admin.gamesSection.eyebrow': 'Каталог',
     'admin.gamesSection.title': 'Управление играми',
     'admin.gamesSection.description':
-      'Создавайте, переименовывайте и архивируйте игры.',
+      'Доступные в данный момент игры',
     'admin.gamesSection.newGame': 'Новая игра',
     'admin.gamesSection.createTitle': 'Создать новую игру',
     'admin.gamesSection.editTitle': 'Редактирование игры #{id}',
