@@ -105,6 +105,7 @@ func roomStateResponse(
 ) dto.RoomStateResponse {
 	response := dto.RoomStateResponse{
 		RoomID:         roomInfo.Room.RoomID,
+		GameName:       roomInfo.Config.GameName,
 		RoomCapacity:   roomInfo.Config.Capacity,
 		CurrentPlayers: roomInfo.ActiveParticipantsCount,
 		MinPlayers:     roomInfo.Config.MinUsers,
@@ -149,6 +150,19 @@ func roomStateResponse(
 	return response
 }
 
+// GetRoomState godoc
+// @Summary Get room state
+// @Description Returns current room state, including the game name and recent room events.
+// @Tags Rooms
+// @Accept json
+// @Produce json
+// @Param Authorization header string true "Bearer access token"
+// @Param roomID path int64 true "Room ID"
+// @Success 200 {object} dto.RoomStateResponse
+// @Failure 400 {object} dto.ErrorResponse
+// @Failure 404 {object} dto.ErrorResponse
+// @Failure 500 {object} dto.ErrorResponse
+// @Router /rooms/{roomID} [get]
 func GetRoomState(ctx *gin.Context, a *app.App) {
 	roomID, err := routeRoomID(ctx)
 	if err != nil {

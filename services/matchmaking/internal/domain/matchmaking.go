@@ -31,6 +31,7 @@ type RoomRecommendation struct {
 	ConfigID          int64
 	ServerID          int64
 	GameID            int64
+	GameName          string
 	RegistrationPrice int64
 	Capacity          int32
 	MinUsers          int32

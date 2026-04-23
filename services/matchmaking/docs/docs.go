@@ -313,6 +313,9 @@ const docTemplate = `{
                 "game_id": {
                     "type": "integer"
                 },
+                "game_name": {
+                    "type": "string"
+                },
                 "instance_key": {
                     "type": "string"
                 },

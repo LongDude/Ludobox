@@ -172,6 +172,7 @@ func toRoomRecommendationResponse(recommendation domain.RoomRecommendation) pres
 		ConfigID:          recommendation.ConfigID,
 		ServerID:          recommendation.ServerID,
 		GameID:            recommendation.GameID,
+		GameName:          recommendation.GameName,
 		RegistrationPrice: recommendation.RegistrationPrice,
 		Capacity:          recommendation.Capacity,
 		MinUsers:          recommendation.MinUsers,

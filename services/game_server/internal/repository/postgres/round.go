@@ -30,11 +30,12 @@ func (s *txScope) GetRoomForUpdate(ctx context.Context, roomID int64) (*domain.R
 
 	var config domain.RoomConfig
 	err = s.tx.QueryRow(ctx, `
-		SELECT config_id, game_id, capacity, registration_price, is_boost, boost_price,
-		       boost_power, number_winners, winning_distribution, commission, time, round_time, next_round_delay, min_users, archived_at
-		FROM config
-		WHERE config_id = $1
-	`, room.ConfigID).Scan(&config.ConfigID, &config.GameID, &config.Capacity, &config.RegistrationPrice,
+		SELECT c.config_id, c.game_id, g.name_game, c.capacity, c.registration_price, c.is_boost, c.boost_price,
+		       c.boost_power, c.number_winners, c.winning_distribution, c.commission, c.time, c.round_time, c.next_round_delay, c.min_users, c.archived_at
+		FROM config c
+		INNER JOIN games g ON g.game_id = c.game_id
+		WHERE c.config_id = $1
+	`, room.ConfigID).Scan(&config.ConfigID, &config.GameID, &config.GameName, &config.Capacity, &config.RegistrationPrice,
 		&config.IsBoost, &config.BoostPrice, &config.BoostPower, &config.NumberWinners,
 		&config.WinningDistribution, &config.Commission, &config.Time, &config.RoundTime, &config.NextRoundDelay, &config.MinUsers, &config.ArchivedAt)
 	if err != nil {

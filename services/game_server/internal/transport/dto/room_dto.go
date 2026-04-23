@@ -20,6 +20,7 @@ type JoinRoomResponse struct {
 
 type RoomStateResponse struct {
 	RoomID                  int64             `json:"room_id"`
+	GameName                string            `json:"game_name"`
 	RoundID                 int64             `json:"round_id"`
 	RoomCapacity            int               `json:"room_capacity"`
 	CurrentPlayers          int               `json:"current_players"`

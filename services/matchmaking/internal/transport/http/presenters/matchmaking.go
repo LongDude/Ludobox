@@ -5,6 +5,7 @@ type RoomRecommendationResponse struct {
 	ConfigID          int64   `json:"config_id"`
 	ServerID          int64   `json:"server_id"`
 	GameID            int64   `json:"game_id"`
+	GameName          string  `json:"game_name"`
 	RegistrationPrice int64   `json:"registration_price"`
 	Capacity          int32   `json:"capacity"`
 	MinUsers          int32   `json:"min_users"`

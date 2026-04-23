@@ -22,6 +22,7 @@ type Room struct {
 type RoomConfig struct {
 	ConfigID            int64      `json:"config_id"`
 	GameID              int64      `json:"game_id"`
+	GameName            string     `json:"game_name"`
 	Capacity            int        `json:"capacity"`
 	RegistrationPrice   int64      `json:"registration_price"`
 	IsBoost             bool       `json:"is_boost"`

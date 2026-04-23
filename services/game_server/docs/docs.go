@@ -54,6 +54,7 @@ const docTemplate = `{
                 "parameters": [
                     {
                         "type": "integer",
+                        "format": "int64",
                         "description": "Round ID",
                         "name": "roundID",
                         "in": "path",
@@ -93,6 +94,7 @@ const docTemplate = `{
                 "parameters": [
                     {
                         "type": "integer",
+                        "format": "int64",
                         "description": "Round ID",
                         "name": "roundID",
                         "in": "path",
@@ -109,6 +111,64 @@ const docTemplate = `{
                     },
                     "400": {
                         "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/rooms/{roomID}": {
+            "get": {
+                "description": "Returns current room state, including the game name and recent room events.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Rooms"
+                ],
+                "summary": "Get room state",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Bearer access token",
+                        "name": "Authorization",
+                        "in": "header",
+                        "required": true
+                    },
+                    {
+                        "type": "integer",
+                        "format": "int64",
+                        "description": "Room ID",
+                        "name": "roomID",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/dto.RoomStateResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
                         "schema": {
                             "$ref": "#/definitions/dto.ErrorResponse"
                         }
@@ -139,6 +199,7 @@ const docTemplate = `{
                     },
                     {
                         "type": "integer",
+                        "format": "int64",
                         "description": "Room ID",
                         "name": "roomID",
                         "in": "path",
@@ -190,6 +251,7 @@ const docTemplate = `{
                     },
                     {
                         "type": "integer",
+                        "format": "int64",
                         "description": "Room ID",
                         "name": "roomID",
                         "in": "path",
@@ -250,6 +312,7 @@ const docTemplate = `{
                     },
                     {
                         "type": "integer",
+                        "format": "int64",
                         "description": "Room ID",
                         "name": "roomID",
                         "in": "path",
@@ -304,6 +367,7 @@ const docTemplate = `{
                     },
                     {
                         "type": "integer",
+                        "format": "int64",
                         "description": "Room ID",
                         "name": "roomID",
                         "in": "path",
@@ -311,6 +375,7 @@ const docTemplate = `{
                     },
                     {
                         "type": "integer",
+                        "format": "int64",
                         "description": "Round participant ID",
                         "name": "roundParticipantID",
                         "in": "path",
@@ -360,6 +425,7 @@ const docTemplate = `{
                     },
                     {
                         "type": "integer",
+                        "format": "int64",
                         "description": "Room ID",
                         "name": "roomID",
                         "in": "path",
@@ -367,6 +433,7 @@ const docTemplate = `{
                     },
                     {
                         "type": "integer",
+                        "format": "int64",
                         "description": "Round participant ID",
                         "name": "roundParticipantID",
                         "in": "path",
@@ -412,6 +479,7 @@ const docTemplate = `{
                     },
                     {
                         "type": "integer",
+                        "format": "int64",
                         "description": "Room ID",
                         "name": "roomID",
                         "in": "path",
@@ -419,6 +487,7 @@ const docTemplate = `{
                     },
                     {
                         "type": "integer",
+                        "format": "int64",
                         "description": "Round participant ID",
                         "name": "roundParticipantID",
                         "in": "path",
@@ -470,6 +539,7 @@ const docTemplate = `{
                     },
                     {
                         "type": "integer",
+                        "format": "int64",
                         "description": "Room ID",
                         "name": "roomID",
                         "in": "path",
@@ -477,6 +547,7 @@ const docTemplate = `{
                     },
                     {
                         "type": "integer",
+                        "format": "int64",
                         "description": "Round ID",
                         "name": "roundID",
                         "in": "path",
@@ -516,6 +587,7 @@ const docTemplate = `{
                     },
                     {
                         "type": "integer",
+                        "format": "int64",
                         "description": "Room ID",
                         "name": "roomID",
                         "in": "path",
@@ -523,6 +595,7 @@ const docTemplate = `{
                     },
                     {
                         "type": "integer",
+                        "format": "int64",
                         "description": "Round ID",
                         "name": "roundID",
                         "in": "path",
@@ -645,6 +718,9 @@ const docTemplate = `{
                 "is_bot": {
                     "type": "boolean"
                 },
+                "nickname": {
+                    "type": "string"
+                },
                 "number_in_room": {
                     "type": "integer"
                 },
@@ -676,6 +752,68 @@ const docTemplate = `{
                 }
             }
         },
+        "dto.RoomStateResponse": {
+            "type": "object",
+            "properties": {
+                "boost_power": {
+                    "type": "integer"
+                },
+                "boost_price": {
+                    "type": "integer"
+                },
+                "current_players": {
+                    "type": "integer"
+                },
+                "current_user_participants": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/dto.ParticipantInfo"
+                    }
+                },
+                "entry_price": {
+                    "type": "integer"
+                },
+                "game_name": {
+                    "type": "string"
+                },
+                "is_boost": {
+                    "type": "boolean"
+                },
+                "min_players": {
+                    "type": "integer"
+                },
+                "next_round_delay": {
+                    "type": "integer"
+                },
+                "recent_events": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/dto.SSEEvent"
+                    }
+                },
+                "room_capacity": {
+                    "type": "integer"
+                },
+                "room_id": {
+                    "type": "integer"
+                },
+                "round_id": {
+                    "type": "integer"
+                },
+                "round_status": {
+                    "type": "string"
+                },
+                "round_time": {
+                    "type": "integer"
+                },
+                "timer_starts_at": {
+                    "type": "string"
+                },
+                "waiting_time": {
+                    "type": "integer"
+                }
+            }
+        },
         "dto.RoundStatusResponse": {
             "type": "object",
             "properties": {
@@ -702,6 +840,18 @@ const docTemplate = `{
                     "items": {
                         "$ref": "#/definitions/dto.ParticipantInfo"
                     }
+                }
+            }
+        },
+        "dto.SSEEvent": {
+            "type": "object",
+            "properties": {
+                "data": {},
+                "timestamp": {
+                    "type": "string"
+                },
+                "type": {
+                    "type": "string"
                 }
             }
         }

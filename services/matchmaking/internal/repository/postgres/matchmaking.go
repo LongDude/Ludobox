@@ -93,6 +93,7 @@ func (ar *internalRepository) RecommendRooms(ctx context.Context, preferences do
 			r.config_id,
 			r.server_id,
 			c.game_id,
+			g.name_game,
 			c.registration_price,
 			c.capacity,
 			c.min_users,
@@ -133,6 +134,7 @@ func (ar *internalRepository) RecommendRooms(ctx context.Context, preferences do
 			)::DOUBLE PRECISION AS score
 		FROM rooms r
 		INNER JOIN config c ON c.config_id = r.config_id AND c.archived_at IS NULL
+		INNER JOIN games g ON g.game_id = c.game_id AND g.archived_at IS NULL
 		INNER JOIN game_servers gs ON gs.server_id = r.server_id
 		LEFT JOIN active_players ap ON ap.room_id = r.room_id
 		CROSS JOIN user_history uh
@@ -181,6 +183,7 @@ func (ar *internalRepository) RecommendRooms(ctx context.Context, preferences do
 			&recommendation.ConfigID,
 			&recommendation.ServerID,
 			&recommendation.GameID,
+			&recommendation.GameName,
 			&recommendation.RegistrationPrice,
 			&recommendation.Capacity,
 			&recommendation.MinUsers,
@@ -229,6 +232,7 @@ func loadUserActiveRoom(ctx context.Context, db queryRower, userID int64) (*doma
 			r.config_id,
 			r.server_id,
 			c.game_id,
+			g.name_game,
 			c.registration_price,
 			c.capacity,
 			c.min_users,
@@ -244,6 +248,7 @@ func loadUserActiveRoom(ctx context.Context, db queryRower, userID int64) (*doma
 		INNER JOIN rounds rd ON rd.rounds_id = rp.rounds_id
 		INNER JOIN rooms r ON r.room_id = rd.room_id
 		INNER JOIN config c ON c.config_id = r.config_id
+		INNER JOIN games g ON g.game_id = c.game_id AND g.archived_at IS NULL
 		INNER JOIN game_servers gs ON gs.server_id = r.server_id
 		LEFT JOIN LATERAL (
 			SELECT COUNT(*)::INT AS current_players
@@ -267,6 +272,7 @@ func loadUserActiveRoom(ctx context.Context, db queryRower, userID int64) (*doma
 		&membership.ConfigID,
 		&membership.ServerID,
 		&membership.GameID,
+		&membership.GameName,
 		&membership.RegistrationPrice,
 		&membership.Capacity,
 		&membership.MinUsers,
@@ -298,6 +304,7 @@ func getJoinableRoom(ctx context.Context, db queryRower, roomID int64, staleAfte
 			r.config_id,
 			r.server_id,
 			c.game_id,
+			g.name_game,
 			c.registration_price,
 			c.capacity,
 			c.min_users,
@@ -307,6 +314,7 @@ func getJoinableRoom(ctx context.Context, db queryRower, roomID int64, staleAfte
 			gs.redis_host
 		FROM rooms r
 		INNER JOIN config c ON c.config_id = r.config_id
+		INNER JOIN games g ON g.game_id = c.game_id AND g.archived_at IS NULL
 		INNER JOIN game_servers gs ON gs.server_id = r.server_id
 		WHERE r.room_id = $1
 		  AND r.archived_at IS NULL
@@ -323,6 +331,7 @@ func getJoinableRoom(ctx context.Context, db queryRower, roomID int64, staleAfte
 		&recommendation.ConfigID,
 		&recommendation.ServerID,
 		&recommendation.GameID,
+		&recommendation.GameName,
 		&recommendation.RegistrationPrice,
 		&recommendation.Capacity,
 		&recommendation.MinUsers,
