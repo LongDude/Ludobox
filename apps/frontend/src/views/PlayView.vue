@@ -1570,7 +1570,7 @@ onBeforeUnmount(() => {
                       'own-seat': ownedSeatNumbers.has(seat),
                       'winner-seat': winnerSeat === seat && roundFinalized,
                       'clickable-own-seat': occupiedSeats.has(seat) && ownedSeatNumbers.has(seat) && !isRoundActive,
-                      'has-boost': getParticipantOnSeat(seat)?.boost > 0
+                      'has-boost': (getParticipantOnSeat(seat)?.boost ?? 0) > 0
                     }"
                     :style="getSeatPosition(index, seatOptions.length)"
                     type="button"
@@ -1599,7 +1599,7 @@ onBeforeUnmount(() => {
                       
                       <!-- Boost indicator for seats that already have boost -->
                       <div 
-                        v-if="getParticipantOnSeat(seat)?.boost > 0"
+                        v-if="(getParticipantOnSeat(seat)?.boost ?? 0) > 0"
                         class="boost-active-indicator"
                         :title="t('gameRoom.controls.boostActiveOnSeat', { seat })"
                       >
