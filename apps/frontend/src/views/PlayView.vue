@@ -1426,9 +1426,9 @@ onBeforeUnmount(() => {
           {{ t('matchmaking.play.meta.boost') }}: {{ formatBoost() }}
         </p>
       </div>
-      <button class="btn" type="button" @click="openRooms">
-              {{ t('matchmaking.play.backRooms') }}
-            </button>
+      <button class="btn back-btn" type="button" @click="openRooms">
+        {{ t('matchmaking.play.backRooms') }}
+      </button>
     </section>
 
     <section class="game-area">
@@ -1599,53 +1599,8 @@ onBeforeUnmount(() => {
               <span v-else-if="participant.user_id">
                 {{ t('gameRoom.participant.user', { id: participant.user_id }) }}
               </span>
-              <span>{{ participantState(participant) }}</span>
-              <span>{{ t('gameRoom.participant.boost', { value: participant.boost }) }}</span>
-              <span v-if="participant.winning_money">
-                {{ t('gameRoom.participant.winning', { value: participant.winning_money }) }}
-              </span>
             </div>
           </div>
-        </div>
-
-        <div v-if="winners.length" class="winners">
-          <h3>{{ t('gameRoom.round.winners') }}</h3>
-          <div class="winner-list">
-            <article
-              v-for="winner in winners"
-              :key="`${winner.participant_id}:${winner.number_in_room}`"
-              class="winner-card"
-              :class="{ own: isOwnWinner(winner), bot: winner.is_bot }"
-            >
-              <div class="winner-head">
-                <strong>{{ t('gameRoom.participant.seat', { seat: winner.number_in_room }) }}</strong>
-                <span v-if="isOwnWinner(winner)" class="own-badge">
-                  {{ t('gameRoom.participant.you') }}
-                </span>
-                <span v-else-if="winner.is_bot" class="winner-bot">
-                  {{ t('gameRoom.round.winnerBot') }}
-                </span>
-              </div>
-              <span v-if="!winner.is_bot">{{ winnerLabel(winner) }}</span>
-              <span>{{ t('gameRoom.round.winnerGross', { value: formatMoney(winner.gross_winnings) }) }}</span>
-              <span>{{ t('gameRoom.round.winnerNet', { value: formatMoney(winner.winnings) }) }}</span>
-            </article>
-          </div>
-        </div>
-
-        <div v-if="nextRoundAvailable" class="next-round-box">
-          <div>
-            <h3>{{ t('gameRoom.round.nextRoundTitle') }}</h3>
-            <p class="description" v-if="showNextRoundCountdown">
-              {{ t('gameRoom.round.nextRoundHint', { seconds: pendingNextRoundCountdown }) }}
-            </p>
-            <p class="description" v-else>
-              {{ t('gameRoom.round.nextRoundManualHint') }}
-            </p>
-          </div>
-          <button class="btn btn--primary" type="button" @click="goToNextRound">
-            {{ t('gameRoom.round.goToNextRound') }}
-          </button>
         </div>
 
         <div class="live-events">
@@ -1665,12 +1620,11 @@ onBeforeUnmount(() => {
       </article>
     </section>
 
+    <!-- bottom menu -->
     <section class="panel-card controls-card">
       <div class="card-head">
         <div>
-          <p class="eyebrow accent">{{ t('gameRoom.controls.eyebrow') }}</p>
           <h2>{{ t('gameRoom.controls.title') }}</h2>
-          <p class="description">{{ t('gameRoom.controls.description') }}</p>
         </div>
       </div>
 
@@ -1735,6 +1689,7 @@ onBeforeUnmount(() => {
   inset: var(--layout-inset, 92px 20px 20px 304px);
   display: grid;
   gap: 1rem;
+  margin-top: 0.5rem;
   overflow: auto;
   align-content: start;
   transition: all var(--transition-slow) ease;
@@ -1754,6 +1709,9 @@ onBeforeUnmount(() => {
 .right-info {
   width: 30%;
   min-width: 350px;
+
+  display: flex;
+  flex-direction: column;
 }
 
 .circular-seat-container {
@@ -1930,6 +1888,10 @@ onBeforeUnmount(() => {
   align-items: center;
   gap: 0.5rem;
   padding: 0.5rem;
+}
+
+.random-count-control span {
+  text-wrap: nowrap;
 }
 
 .selected-seats-info {
@@ -2118,7 +2080,7 @@ onBeforeUnmount(() => {
   gap: 1rem;
 }
 
-.panel-card,
+/*.panel-card,*/
 .control-block,
 .join-box,
 .next-round-box {
@@ -2138,12 +2100,13 @@ onBeforeUnmount(() => {
 }
 
 .card-head {
-  display: grid;
+/*  display: grid;*/
   gap: 0.5rem;
 }
 
 .card-head.row {
-  grid-template-columns: minmax(0, 1fr) auto;
+  display: flex;
+  justify-content: space-between;
   align-items: start;
 }
 
@@ -2249,8 +2212,14 @@ strong.live {
 .meta-item,
 .participant-card,
 .control-block,
-.join-box,
 .next-round-box {
+  padding: 0.45rem;
+  border-radius: 1rem;
+  border: 1px solid color-mix(in oklab, var(--color-border), transparent 10%);
+  background: color-mix(in oklab, var(--color-surface), white 10%);
+}
+
+.join-box {
   padding: 0.85rem;
   border-radius: 1rem;
   border: 1px solid color-mix(in oklab, var(--color-border), transparent 10%);
@@ -2310,16 +2279,55 @@ strong.live {
 label,
 .seat-input,
 .own-seats,
-.own-seat-list,
 .join-flow,
-.participants,
 .winners,
 .winner-list,
-.participant-list,
 .live-events,
 .event-list {
   display: grid;
   gap: 0.55rem;
+}
+
+.live-events {
+  max-height: 400px;
+  overflow-y: auto;
+}
+
+.participants {
+  flex-grow: 1;
+  max-height: 40%;
+}
+
+.participants h3 {
+  flex-grow: 0;
+}
+
+.description {
+  flex-grow: 1;
+}
+
+.card-head {
+  flex-grow: 0;
+}
+
+.own-seat-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.participant-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.participant-card {
+  display: flex;
+  max-width: 48%;
+
+  align-items: center;
+  gap: 0.5rem;
 }
 
 .winner-list {
@@ -2364,10 +2372,11 @@ label,
   justify-content: space-between;
   align-items: center;
   gap: 0.85rem;
-  padding: 0.85rem;
+  padding: 0.55rem;
   border-radius: 1rem;
   border: 1px solid color-mix(in oklab, var(--color-primary-secondary), transparent 35%);
   background: color-mix(in oklab, var(--color-primary-secondary), transparent 91%);
+  max-width: 40%;
 }
 
 .own-seat-card div {
@@ -2475,6 +2484,12 @@ input[type='number'] {
   cursor: not-allowed;
   opacity: 0.6;
   transform: none;
+}
+
+.back-btn {
+  border-radius: 1rem;
+  background: color-mix(in oklab, var(--color-surface), white 4%);
+  border: 1px solid color-mix(in oklab, var(--color-surface), white 18%);
 }
 
 .btn--primary {
