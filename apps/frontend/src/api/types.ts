@@ -142,6 +142,7 @@ export interface RoomRecommendationResponse {
   config_id: number
   server_id: number
   game_id: number
+  game_name: string
   registration_price: number
   capacity: number
   min_users: number

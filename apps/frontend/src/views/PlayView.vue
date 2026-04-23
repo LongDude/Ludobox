@@ -419,6 +419,32 @@ const waitingForFinishedStatus = computed(
     Number(roundStatus.value?.time_left_seconds ?? 1) <= 0,
 )
 
+const boostButtonState = computed(() => {
+  if (!isJoined.value) return { action: null, text: t('gameRoom.errors.joinFirst'), disabled: true }
+  if (!canManageCurrentRound.value) return { action: null, text: t('gameRoom.controls.actionsLocked'), disabled: true }
+  if ((roomState.value?.is_boost ?? room.value?.is_boost) !== true) return { action: null, text: t('gameRoom.controls.boostDisabled'), disabled: true }
+  
+  if (hasOwnedBoost.value && boostedParticipant.value) {
+    return { 
+      action: 'cancel', 
+      text: t('gameRoom.controls.cancelBoost'), 
+      disabled: false,
+      seat: boostedParticipant.value.number_in_room
+    }
+  }
+  
+  if (selectedBoostParticipant.value) {
+    return { 
+      action: 'buy', 
+      text: t('gameRoom.controls.buyBoost'), 
+      disabled: false,
+      seat: selectedBoostParticipant.value.number_in_room
+    }
+  }
+  
+  return { action: null, text: t('gameRoom.controls.boostSelectSeat'), disabled: true }
+})
+
 // ==================================================================
 // Watchers
 // ==================================================================
@@ -950,7 +976,7 @@ function eventDescription(event: GameRoundEvent) {
     return t('gameRoom.events.playerJoinedDetails', {
       participant: String(data.nickname ?? 0) || '-',
       seat: Number(data.number_in_room ?? 0) || '-',
-      players: Number(data.current_players ?? 0) || '-',
+      players: Number(data.current_players ?? 0) || '0',
     })
   }
 
@@ -958,7 +984,7 @@ function eventDescription(event: GameRoundEvent) {
     return t('gameRoom.events.playerLeftDetails', {
       participant: String(data.nickname ?? 0) || '-',
       seat: Number(data.number_in_room ?? 0) || '-',
-      players: Number(data.current_players ?? 0) || '-',
+      players: Number(data.current_players ?? 0) || '0',
     })
   }
 
@@ -1182,7 +1208,6 @@ async function purchaseBoost() {
       cost: response.boost_cost,
     })
     refreshCabinetBalance()
-    // await refreshRoundView()
   } catch (error: any) {
     errorMsg.value = normalizeError(error, t('gameRoom.errors.boost'))
   } finally {
@@ -1205,50 +1230,8 @@ async function cancelBoost() {
     const response = await GameApi.cancelBoost(roomId.value, participant.participant_id)
     successMsg.value = t('gameRoom.messages.boostCancelled', { refund: response.refund ?? 0 })
     refreshCabinetBalance()
-    // await refreshRoundView()
   } catch (error: any) {
     errorMsg.value = normalizeError(error, t('gameRoom.errors.cancelBoost'))
-  } finally {
-    actionLoading.value = ''
-  }
-}
-
-function canBuyBoostForSeat(seatNumber: number) {
-  const participant = getParticipantOnSeat(seatNumber)
-  if (!participant) return false
-  if (!ownedSeatNumbers.value.has(seatNumber)) return false
-  if (participant.boost > 0) return false
-  if (!canManageCurrentRound.value) return false
-  if ((roomState.value?.is_boost ?? room.value?.is_boost) !== true) return false
-  
-  return true
-}
-
-async function purchaseBoostForSeat(seatNumber: number) {
-  clearFeedback()
-  
-  const participant = getParticipantOnSeat(seatNumber)
-  if (!participant) {
-    errorMsg.value = t('gameRoom.errors.joinFirst')
-    return
-  }
-  
-  if (participant.boost > 0) {
-    errorMsg.value = t('gameRoom.errors.boostAlreadyPurchased')
-    return
-  }
-
-  actionLoading.value = `boost-${participant.participant_id}`
-
-  try {
-    const response = await GameApi.purchaseBoost(roomId.value, participant.participant_id)
-    successMsg.value = t('gameRoom.messages.boostPurchased', {
-      power: response.boost_power,
-      cost: response.boost_cost,
-    })
-    refreshCabinetBalance()
-  } catch (error: any) {
-    errorMsg.value = normalizeError(error, t('gameRoom.errors.boost'))
   } finally {
     actionLoading.value = ''
   }
@@ -1538,7 +1521,27 @@ onBeforeUnmount(() => {
 
     <section class="game-area">
         <div class="join-box" :class="{ joined: isJoined, 'round-active': isRoundActive }">
-
+          <!-- Boost button at top left -->
+          <div v-if="isJoined && (roomState?.is_boost ?? room?.is_boost)" class="boost-action-button">
+            <button 
+              class="btn boost-btn" 
+              :class="{ 
+                'boost-active': hasOwnedBoost,
+                'boost-inactive': !hasOwnedBoost && boostButtonState.action === 'buy'
+              }"
+              :disabled="boostButtonState.disabled || actionLoading === 'boost' || actionLoading === 'cancel-boost'"
+              @click="hasOwnedBoost ? cancelBoost() : purchaseBoost()"
+            >
+              <span class="boost-icon">⚡</span>
+              <span>{{ boostButtonState.text }}</span>
+              <span v-if="boostButtonState.seat" class="boost-seat-hint">
+                ({{ t('gameRoom.participant.seat', { seat: boostButtonState.seat }) }})
+              </span>
+              <span v-if="actionLoading === 'boost' || actionLoading === 'cancel-boost'" class="loading-spinner">
+                ...
+              </span>
+            </button>
+          </div>
 
           <div class="join-flow">
             <p class="join-title">
@@ -1570,7 +1573,6 @@ onBeforeUnmount(() => {
                       'own-seat': ownedSeatNumbers.has(seat),
                       'winner-seat': winnerSeat === seat && roundFinalized,
                       'clickable-own-seat': occupiedSeats.has(seat) && ownedSeatNumbers.has(seat) && !isRoundActive,
-                      'has-boost': (getParticipantOnSeat(seat)?.boost ?? 0) > 0
                     }"
                     :style="getSeatPosition(index, seatOptions.length)"
                     type="button"
@@ -1581,30 +1583,6 @@ onBeforeUnmount(() => {
                     <span v-if="getParticipantOnSeat(seat)" class="seat-player">
                       {{ getParticipantOnSeat(seat)?.nickname || `P${getParticipantOnSeat(seat)?.participant_id}` }}
                     </span>
-
-                    <!-- Boost button overlay on hover for own seats without boost -->
-                      <div 
-                        v-if="canBuyBoostForSeat(seat) && !isRoundActive"
-                        class="boost-overlay"
-                        @click.stop="purchaseBoostForSeat(seat)"
-                      >
-                        <button 
-                          class="boost-seat-btn"
-                          :disabled="actionLoading === `boost-${getParticipantOnSeat(seat)?.participant_id}`"
-                          :title="t('gameRoom.controls.buyBoost')"
-                        >
-                          ⚡
-                        </button>
-                      </div>
-                      
-                      <!-- Boost indicator for seats that already have boost -->
-                      <div 
-                        v-if="(getParticipantOnSeat(seat)?.boost ?? 0) > 0"
-                        class="boost-active-indicator"
-                        :title="t('gameRoom.controls.boostActiveOnSeat', { seat })"
-                      >
-                        ⚡
-                      </div>
                   </button>
                 </div>
                 
@@ -1716,64 +1694,6 @@ onBeforeUnmount(() => {
       </article>
     </section>
 
-    <!-- bottom menu -->
-    <section class="panel-card controls-card">
-      <div class="card-head">
-        <div>
-          <h2>{{ t('gameRoom.controls.title') }}</h2>
-        </div>
-      </div>
-
-      <div class="control-grid">
-        <div class="control-block">
-          <h3>{{ t('gameRoom.controls.boostTitle') }}</h3>
-          <p class="description">
-            {{ boostHint }}
-          </p>
-          <p class="boost-value">
-            <span>{{ t('gameRoom.controls.boostValue') }}</span>
-            <strong>{{ formatBoost() }}</strong>
-          </p>
-          <label class="seat-input">
-            <span>{{ t('gameRoom.controls.boostSeat') }}</span>
-            <select v-model="selectedBoostParticipantId" :disabled="!ownedParticipants.length || hasOwnedBoost">
-              <option value="">{{ t('gameRoom.controls.boostSeatPlaceholder') }}</option>
-              <option
-                v-for="participant in ownedParticipants"
-                :key="participant.participant_id"
-                :value="String(participant.participant_id)"
-              >
-                {{
-                  t('gameRoom.controls.boostSeatOption', {
-                    seat: participant.number_in_room,
-                    participant: participant.participant_id,
-                  })
-                }}
-              </option>
-            </select>
-          </label>
-          <div class="actions stretch">
-            <button
-              class="btn btn--primary"
-              type="button"
-              :disabled="!canBoost || actionLoading === 'boost'"
-              @click="purchaseBoost"
-            >
-              {{ actionLoading === 'boost' ? t('common.loading') : t('gameRoom.controls.buyBoost') }}
-            </button>
-            <button
-              class="btn"
-              type="button"
-              :disabled="!canCancelBoost || actionLoading === 'cancel-boost'"
-              @click="cancelBoost"
-            >
-              {{ actionLoading === 'cancel-boost' ? t('common.loading') : t('gameRoom.controls.cancelBoost') }}
-            </button>
-          </div>
-        </div>
-
-      </div>
-    </section>
   </main>
 
   <FooterTab />
@@ -2194,7 +2114,10 @@ onBeforeUnmount(() => {
 
 .join-box {
   min-width: 460px;
+  min-height: 740px;
   flex-grow: 1;
+
+  position: relative;
 
   background:
     radial-gradient(circle at top left, rgba(245, 158, 11, 0.18), transparent 8%),
@@ -2388,77 +2311,6 @@ strong.live {
   border-color: color-mix(in oklab, var(--color-primary-secondary), transparent 20%);
 }
 
-.circular-seat-button {
-  position: relative;
-}
-
-.boost-overlay {
-  position: absolute;
-  top: -12px;
-  right: -12px;
-  z-index: 5;
-}
-
-.boost-seat-btn {
-  width: 28px;
-  height: 28px;
-  border-radius: 50%;
-  background: linear-gradient(135deg, #f59e0b, #d97706);
-  border: 2px solid #fff;
-  color: white;
-  font-size: 14px;
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  transition: all 0.2s ease;
-  box-shadow: 0 2px 8px rgba(0,0,0,0.2);
-}
-
-.boost-seat-btn:hover:not(:disabled) {
-  transform: scale(1.1);
-  box-shadow: 0 0 12px rgba(245, 158, 11, 0.6);
-}
-
-.boost-seat-btn:disabled {
-  opacity: 0.6;
-  cursor: not-allowed;
-}
-
-.boost-active-indicator {
-  position: absolute;
-  top: -8px;
-  right: -8px;
-  width: 24px;
-  height: 24px;
-  border-radius: 50%;
-  background: linear-gradient(135deg, #10b981, #059669);
-  border: 2px solid #fff;
-  color: white;
-  font-size: 12px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  animation: boostPulse 2s ease-in-out infinite;
-  z-index: 5;
-}
-
-.circular-seat-button.has-boost {
-  border-color: #10b981;
-  box-shadow: 0 0 15px rgba(16, 185, 129, 0.3);
-}
-
-@keyframes boostPulse {
-  0%, 100% {
-    transform: scale(1);
-    box-shadow: 0 0 5px rgba(16, 185, 129, 0.5);
-  }
-  50% {
-    transform: scale(1.05);
-    box-shadow: 0 0 12px rgba(16, 185, 129, 0.8);
-  }
-}
-
 label,
 .seat-input,
 .own-seats,
@@ -2555,16 +2407,18 @@ label,
   display: flex;
   justify-content: space-between;
   align-items: center;
+  flex-wrap: nowrap;
   gap: 0.85rem;
   padding: 0.55rem;
   border-radius: 1rem;
   border: 1px solid color-mix(in oklab, var(--color-primary-secondary), transparent 35%);
   background: color-mix(in oklab, var(--color-primary-secondary), transparent 91%);
-  max-width: 40%;
+  max-width: 48%;
+  width: 48%;
 }
 
 .own-seat-card div {
-  display: grid;
+/*  display: grid;*/
   gap: 0.25rem;
 }
 
@@ -2576,13 +2430,13 @@ label,
 .circular-seat-button.clickable-own-seat:hover::after {
   content: "✕";
   position: absolute;
-  top: -11px;
-  right: 45px;
+  top: -8px;
+  right: -8px;
   background: #ef4444;
   color: white;
   border-radius: 50%;
-  width: 28px;
-  height: 28px;
+  width: 20px;
+  height: 20px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -2710,6 +2564,64 @@ input[type='number'] {
   border-color: transparent;
   background: linear-gradient(135deg, #b91c1c, #ea580c);
   color: #fff7ed;
+}
+
+.boost-action-button {
+  position: absolute;
+  top: 1rem;
+  right: 1rem;
+  z-index: 10;
+}
+
+.boost-btn {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.6rem 1.2rem;
+  background: linear-gradient(135deg, #2d2d2d, #1a1a1a);
+  border: 1px solid #f59e0b;
+  color: #f59e0b;
+  font-weight: bold;
+  transition: all 0.3s ease;
+}
+
+.boost-btn.boost-inactive {
+  background: linear-gradient(135deg, #f59e0b, #d97706);
+  color: white;
+  border-color: transparent;
+  animation: pulse 2s infinite;
+}
+
+.boost-btn.boost-active {
+  background: linear-gradient(135deg, #10b981, #059669);
+  color: white;
+  border-color: transparent;
+}
+
+.boost-btn.boost-active:hover {
+  background: linear-gradient(135deg, #ef4444, #dc2626);
+}
+
+.boost-icon {
+  font-size: 1.2rem;
+}
+
+.boost-seat-hint {
+  font-size: 0.8rem;
+  opacity: 0.9;
+}
+
+.loading-spinner {
+  margin-left: 0.25rem;
+}
+
+@keyframes pulse {
+  0%, 100% {
+    box-shadow: 0 0 5px rgba(245, 158, 11, 0.5);
+  }
+  50% {
+    box-shadow: 0 0 20px rgba(245, 158, 11, 0.8);
+  }
 }
 
 @media (max-width: 1120px) {

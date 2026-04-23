@@ -655,7 +655,7 @@ const messages: Record<Locale, Record<string, string>> = {
     'matchmaking.results.empty': 'No rooms matched the current filters.',
     'matchmaking.results.roomsEntity': 'rooms',
     'matchmaking.results.enterRoom': 'Enter room',
-    'matchmaking.results.roomLabel': 'Room #{id}',
+    'matchmaking.results.roomLabel': 'Room #{id} - {game_name}',
     'matchmaking.results.roomTitle': '{players}/{seats} players joined',
     'matchmaking.results.score': 'Score {value}',
     'matchmaking.results.boostValue': '{value}%',
@@ -867,9 +867,9 @@ const messages: Record<Locale, Record<string, string>> = {
     'gameRoom.events.round_started': 'Раунд начался',
     'gameRoom.events.round_finalized': 'Раунд завершён',
     'gameRoom.events.playerJoinedDetails':
-      'Участник {participant} занял место {seat}. Активных игроков: {players}.',
+      '{participant} занял место {seat}. Активных игроков: {players}.',
     'gameRoom.events.playerLeftDetails':
-      'Участник {participant} освободил место {seat}. Активных игроков: {players}.',
+      '{participant} освободил место {seat}. Активных игроков: {players}.',
     'gameRoom.events.boostPurchasedDetails': 'Участник {participant}, сила буста {power}%.',
     'gameRoom.events.boostCancelledDetails': 'Участник {participant}.',
     'gameRoom.events.roundStartedDetails': '{players} игроков, длительность игры {seconds}с.',
@@ -1049,7 +1049,7 @@ const messages: Record<Locale, Record<string, string>> = {
     'matchmaking.results.eyebrow': 'Рекомендации',
     'matchmaking.results.title': 'Рекомендованные комнаты',
     'matchmaking.results.description':
-      'Список формируется с наиболее подходящих комнат.',
+      'Список формируется из наиболее подходящих комнат.',
     'matchmaking.results.listEyebrow': 'Открытые комнаты',
     'matchmaking.results.listTitle': 'Выберите комнату',
     'matchmaking.results.listDescription':
@@ -1061,7 +1061,7 @@ const messages: Record<Locale, Record<string, string>> = {
     'matchmaking.results.empty': 'По текущим фильтрам комнаты не найдены.',
     'matchmaking.results.roomsEntity': 'комнат',
     'matchmaking.results.enterRoom': 'Войти в комнату',
-    'matchmaking.results.roomLabel': 'Комната #{id}',
+    'matchmaking.results.roomLabel': 'Комната {id} - {game_name}',
     'matchmaking.results.roomTitle': 'Игроков {players} из {seats}',
     'matchmaking.results.score': 'Score {value}',
     'matchmaking.results.boostValue': '{value}%',
@@ -1234,7 +1234,7 @@ const messages: Record<Locale, Record<string, string>> = {
     'admin.usersSection.eyebrow': 'Доступ',
     'admin.usersSection.title': 'Пользователи и роли',
     'admin.usersSection.description':
-      'Просматривайте администраторские аккаунты, обновляйте роли и правьте профильные данные, не покидая дашборд.',
+      'Управляйте пользователями, не покидая дашборд.',
     'admin.usersSection.searchPlaceholder': 'Поиск по email или имени',
     'admin.usersSection.rolePlaceholder': 'Роль',
     'admin.usersSection.localePlaceholder': 'Язык',
@@ -1427,9 +1427,9 @@ const messages: Record<Locale, Record<string, string>> = {
 
     'admin.rooms.entity': 'комнат',
     'admin.roomsSection.eyebrow': 'Операции',
-    'admin.roomsSection.title': 'Управление жизненным циклом комнат',
+    'admin.roomsSection.title': 'Управление комнатами',
     'admin.roomsSection.description':
-      'Создавайте комнаты из ревизии конфига, переносите их между серверами и архивируйте устаревшие записи активного пула комнат.',
+      'Создавайте комнаты с нужным конфигом, переносите их между серверами комнат.',
     'admin.roomsSection.createTitle': 'Создать комнату',
     'admin.roomsSection.createDescription':
       'При создании комнаты автоматически выбирает наименее загруженный активный игровой сервер.',

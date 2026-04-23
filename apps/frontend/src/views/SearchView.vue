@@ -233,7 +233,6 @@ function enterRoom(room: RoomRecommendationResponse) {
     <section class="panel-card filters-panel">
       <div class="card-head">
         <div>
-          <p class="eyebrow">{{ t('matchmaking.results.eyebrow') }}</p>
           <h1>{{ t('matchmaking.results.title') }}</h1>
           <p class="description">{{ t('matchmaking.results.description') }}</p>
         </div>
@@ -338,7 +337,6 @@ function enterRoom(room: RoomRecommendationResponse) {
     <section class="panel-card results-panel">
       <div class="card-head">
         <div>
-          <p class="eyebrow accent">{{ t('matchmaking.results.listEyebrow') }}</p>
           <h2>{{ t('matchmaking.results.listTitle') }}</h2>
           <p class="description">
             {{
@@ -394,7 +392,7 @@ function enterRoom(room: RoomRecommendationResponse) {
           >
             <div class="room-head">
               <div>
-                <p class="room-kicker">{{ t('matchmaking.results.roomLabel', { id: room.room_id }) }}</p>
+                <p class="room-kicker">{{ t('matchmaking.results.roomLabel', { id: room.room_id, game_name: room.game_name }) }}</p>
                 <h3>{{ t('matchmaking.results.roomTitle', { players: room.current_players, seats: room.capacity }) }}</h3>
               </div>
               <span class="score-pill">
@@ -475,10 +473,29 @@ function enterRoom(room: RoomRecommendationResponse) {
   padding: 1.35rem;
   border-radius: 1.6rem;
   border: 1px solid color-mix(in oklab, var(--color-border), transparent 8%);
-  background:
-    radial-gradient(circle at top left, color-mix(in oklab, #0ea5e9, white 88%), transparent 28%),
-    linear-gradient(180deg, color-mix(in oklab, var(--color-surface), white 14%), var(--color-surface));
   box-shadow: var(--shadow-md);
+}
+
+.filters-panel {
+  background:
+    radial-gradient(circle at top left, rgba(245, 158, 11, 0.18), transparent 10%),
+    radial-gradient(circle at top right, rgba(14, 165, 233, 0.16), transparent 22%),
+    linear-gradient(
+      35deg,
+      color-mix(in oklab, var(--color-bg-secondary), white 12%),
+      color-mix(in oklab, var(--color-surface), transparent 4%)
+    );
+
+  margin-top: 0.5rem;
+}
+
+.results-panel {
+  background:
+    linear-gradient(
+      135deg,
+      color-mix(in oklab, var(--color-bg-secondary), white 16%),
+      color-mix(in oklab, var(--color-surface), transparent 4%)
+    );
 }
 
 .card-head,
