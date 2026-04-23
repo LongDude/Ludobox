@@ -1489,7 +1489,7 @@ const messages: Record<Locale, Record<string, string>> = {
     'admin.overviewSection.serverTitle': 'Сервер {id}',
     'admin.overviewSection.serverRooms': 'Сейчас назначено комнат: {count}',
     'admin.overviewSection.serverMeta.status': 'Статус',
-    'admin.overviewSection.serverMeta.instanceKey': 'Ключ инстанса',
+    'admin.overviewSection.serverMeta.instanceKey': 'Название сервера',
     'admin.overviewSection.serverMeta.redisHost': 'Redis host',
     'admin.overviewSection.serverMeta.heartbeat': 'Последний отклик',
     'admin.overviewSection.serverStatus.up': 'Доступен',

@@ -15,6 +15,8 @@ interface ServerBucket {
 }
 
 const OVERVIEW_METADATA_RELOAD_DELAY_MS = 700
+const SERVER_EVENT_STALE_MS = 60_000
+const SERVER_STATUS_REFRESH_INTERVAL_MS = 5_000
 
 const props = defineProps<{
   adminEventVersions?: AdminEventVersions
@@ -26,8 +28,10 @@ const backgroundRefreshing = ref(false)
 const errorMsg = ref('')
 const servers = ref<GameServerResponse[]>([])
 const rooms = ref<RoomResponse[]>([])
+const statusClock = ref(Date.now())
 const { locale, t } = useI18n()
 let overviewReloadTimer: ReturnType<typeof setTimeout> | undefined
+let serverStatusTimer: ReturnType<typeof setInterval> | undefined
 let processedAdminEvents = 0
 
 const roomsByServer = computed(() => {
@@ -70,11 +74,13 @@ const hasOverviewData = computed(() => servers.value.length > 0 || rooms.value.l
 const refreshDisabled = computed(() => loading.value || backgroundRefreshing.value)
 
 onMounted(async () => {
+  startServerStatusTimer()
   await loadOverview()
 })
 
 onBeforeUnmount(() => {
   clearOverviewReloadTimer()
+  stopServerStatusTimer()
 })
 
 watch(
@@ -112,6 +118,20 @@ function clearOverviewReloadTimer() {
   if (!overviewReloadTimer) return
   clearTimeout(overviewReloadTimer)
   overviewReloadTimer = undefined
+}
+
+function startServerStatusTimer() {
+  if (serverStatusTimer) return
+
+  serverStatusTimer = setInterval(() => {
+    statusClock.value = Date.now()
+  }, SERVER_STATUS_REFRESH_INTERVAL_MS)
+}
+
+function stopServerStatusTimer() {
+  if (!serverStatusTimer) return
+  clearInterval(serverStatusTimer)
+  serverStatusTimer = undefined
 }
 
 function scheduleOverviewReload() {
@@ -210,7 +230,7 @@ async function loadAllRooms() {
 }
 
 function isAvailableServer(server: GameServerResponse) {
-  return !server.archived_at && server.status.trim().toLowerCase() === 'up'
+  return normalizedServerStatus(server) === 'up'
 }
 
 function applyAdminEvent(event: AdminEvent) {
@@ -272,7 +292,7 @@ function normalizeServerEventData(event: AdminEvent): GameServerResponse | null 
     redis_host: String(data?.redis_host ?? ''),
     status: String(data?.status ?? ''),
     started_at: stringOrNull(data?.started_at),
-    last_heartbeat_at: stringOrNull(data?.last_heartbeat_at),
+    last_heartbeat_at: stringOrNull(data?.last_heartbeat_at) ?? event.timestamp,
     archived_at: stringOrNull(data?.archived_at),
   }
 }
@@ -332,7 +352,19 @@ function normalizedServerStatus(server: GameServerResponse) {
   if (server.archived_at) return 'archived'
 
   const normalized = server.status.trim().toLowerCase()
+  if (shouldMarkServerDown(server, normalized)) return 'down'
+
   return normalized || 'unknown'
+}
+
+function shouldMarkServerDown(server: GameServerResponse, normalizedStatus?: string) {
+  const status = normalizedStatus ?? server.status.trim().toLowerCase()
+  if (status === 'maintenance' || status === 'archived' || status === 'down') return false
+
+  const lastActivityAt = parseTimestamp(server.last_heartbeat_at ?? server.started_at)
+  if (lastActivityAt === null) return status === 'up'
+
+  return statusClock.value - lastActivityAt > SERVER_EVENT_STALE_MS
 }
 
 function serverStatusLabel(server: GameServerResponse) {
@@ -366,6 +398,13 @@ function formatTimestamp(value?: string | null) {
     dateStyle: 'medium',
     timeStyle: 'short',
   }).format(date)
+}
+
+function parseTimestamp(value?: string | null) {
+  if (!value) return null
+
+  const parsed = new Date(value).getTime()
+  return Number.isNaN(parsed) ? null : parsed
 }
 </script>
 
@@ -418,18 +457,6 @@ function formatTimestamp(value?: string | null) {
         </div>
 
         <dl class="server-meta">
-          <div>
-            <dt>{{ t('admin.overviewSection.serverMeta.status') }}</dt>
-            <dd>{{ bucket.server.status || t('admin.overviewSection.serverStatus.unknown') }}</dd>
-          </div>
-          <div>
-            <dt>{{ t('admin.overviewSection.serverMeta.instanceKey') }}</dt>
-            <dd>{{ bucket.server.instance_key || '-' }}</dd>
-          </div>
-          <div>
-            <dt>{{ t('admin.overviewSection.serverMeta.redisHost') }}</dt>
-            <dd>{{ bucket.server.redis_host || '-' }}</dd>
-          </div>
           <div>
             <dt>{{ t('admin.overviewSection.serverMeta.heartbeat') }}</dt>
             <dd>{{ formatTimestamp(bucket.server.last_heartbeat_at) }}</dd>
