@@ -1224,7 +1224,7 @@ const messages: Record<Locale, Record<string, string>> = {
     'admin.dashboard.tabs.rooms.label': 'Комнаты',
     'admin.dashboard.tabs.rooms.title': 'Жизненный цикл',
     'admin.dashboard.tabs.rooms.description':
-      'Создание, перенос и архивирование комнат из одного рабочего места.',
+      'Создание, перенос и архивирование комнат.',
     'admin.dashboard.tabs.users.label': 'Пользователи',
     'admin.dashboard.tabs.users.title': 'Управление доступом',
     'admin.dashboard.tabs.users.description':
@@ -1429,7 +1429,7 @@ const messages: Record<Locale, Record<string, string>> = {
     'admin.roomsSection.eyebrow': 'Операции',
     'admin.roomsSection.title': 'Управление жизненным циклом комнат',
     'admin.roomsSection.description':
-      'Создавайте комнаты из ревизии конфига, переносите их между серверами и архивируйте устаревшие записи активного пула.',
+      'Создавайте комнаты из ревизии конфига, переносите их между серверами и архивируйте устаревшие записи активного пула комнат.',
     'admin.roomsSection.createTitle': 'Создать комнату',
     'admin.roomsSection.createDescription':
       'При создании комнаты автоматически выбирает наименее загруженный активный игровой сервер.',
@@ -1439,15 +1439,15 @@ const messages: Record<Locale, Record<string, string>> = {
     'admin.roomsSection.filters.statusAny': 'Статус: любой',
     'admin.roomsSection.filters.serverName': 'Фильтр по серверу',
     'admin.roomsSection.filters.gameName': 'Фильтр по игре',
-    'admin.roomsSection.filters.playersOrderDefault': 'Игроки: порядок по умолчанию',
-    'admin.roomsSection.filters.playersOrderDesc': 'Игроки: по убыванию',
-    'admin.roomsSection.filters.playersOrderAsc': 'Игроки: по возрастанию',
+    'admin.roomsSection.filters.playersOrderDefault': 'Активные игроки: порядок по умолчанию',
+    'admin.roomsSection.filters.playersOrderDesc': 'Активные игроки: по убыванию',
+    'admin.roomsSection.filters.playersOrderAsc': 'Активные игроки: по возрастанию',
     'admin.roomsSection.filters.serverId': 'Фильтр по ID сервера',
     'admin.roomsSection.filters.configId': 'Фильтр по ID конфига',
     'admin.roomsSection.loading': 'Загрузка комнат...',
     'admin.roomsSection.meta.config': 'Конфиг',
     'admin.roomsSection.meta.server': 'Сервер',
-    'admin.roomsSection.meta.players': 'Игроки',
+    'admin.roomsSection.meta.players': 'Активные игроки',
     'admin.roomsSection.meta.configId': 'ID конфига',
     'admin.roomsSection.meta.serverId': 'ID сервера',
     'admin.roomsSection.meta.status': 'Статус',

@@ -21,9 +21,11 @@
 
 ```bash
 make frontend-up
+make frontend-dev-up
 make frontend-prod-up
 make frontend-prod-cert
 make frontend-prod-renew
+make frontend-vps-up
 make frontend-down
 ```
 
@@ -76,11 +78,19 @@ npm run build
 
 ## Production TLS
 
-- The standalone `apps/frontend/docker-compose.yml` remains a local-only flow.
-- VPS deployment uses the root `docker-compose.yml`, root `Makefile`, and the root `haproxy`.
-- Before `make frontend-vps-up`, set these values in the root `.env`:
+- Локальный `apps/frontend/docker-compose.yml` остаётся standalone-сценарием только для изолированной разработки фронтенда.
+- VPS и production TLS теперь поднимаются через корневые `docker-compose.yml`, `Makefile` и общий `haproxy`.
+- Для генерации и продления сертификатов используется сервис `frontend-certbot`.
+- Сертификаты и ACME webroot сохраняются в `apps/frontend/certbot/conf` и `apps/frontend/certbot/www`.
+- Перед `make frontend-vps-up` или `make frontend-prod-cert` заполните в корневом `.env`:
   - `DOMAIN`
   - `LETSENCRYPT_EMAIL`
   - `PUBLIC_URL=https://DOMAIN`
   - `FRONTEND_BASE_URL=https://DOMAIN`
   - `VITE_API_BASE_URL=https://DOMAIN/api`
+  - `ALLOWED_REDIRECT_URLS` и `ALLOWED_CORS_ORIGINS`, включив `https://DOMAIN`
+- Команды для production-сценария:
+  - `make frontend-prod-up` — поднять `frontend-prod` и `haproxy` без выпуска сертификата.
+  - `make frontend-prod-cert` — выпустить или переиспользовать сертификат Let's Encrypt.
+  - `make frontend-prod-renew` — продлить сертификаты.
+  - `make frontend-vps-up` — полный запуск backend + production frontend + выпуск сертификата.

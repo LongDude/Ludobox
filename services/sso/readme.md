@@ -42,10 +42,18 @@ make up
 - `SSO_REDIS_*`
 - `SSO_HTTP_PORT`
 - `SSO_GRPC_PORT`
+- `SSO_REQUIRE_EMAIL_VERIFICATION`
 - `JWT_SECRET_KEY`
 - `ACCESS_TOKEN_TTL`, `REFRESH_TOKEN_TTL`
 - `SMTP_*`, `FROM_EMAIL`, `SMTP_JWT_SECRET`
 - `GOOGLE_CLIENT_*`, `YANDEX_CLIENT_*`, `VK_CLIENT_*`
+
+## Тестовый режим без SMTP-подтверждения
+
+- Для локального тестирования можно установить в корневом `.env` `SSO_REQUIRE_EMAIL_VERIFICATION=false`.
+- В этом режиме регистрация не требует письма-подтверждения: пользователь создаётся сразу с `email_confirmed=true`.
+- Логин для неподтверждённых email тоже не блокируется, что удобно для QA и ручного тестирования.
+- SMTP-параметры всё ещё нужны для сценариев, которые реально отправляют письма, например password reset.
 
 ## Standalone-запуск
 
