@@ -1172,8 +1172,11 @@ async function logout() {
   border-radius: 1.5rem;
   border: 1px solid color-mix(in oklab, var(--color-border), transparent 8%);
   background:
-    radial-gradient(circle at top left, color-mix(in oklab, #0ea5e9, white 88%), transparent 26%),
-    linear-gradient(180deg, color-mix(in oklab, var(--color-surface), white 16%), var(--color-surface));
+    linear-gradient(
+      35deg,
+      color-mix(in oklab, var(--color-bg-secondary), white 14%),
+      color-mix(in oklab, var(--color-surface), transparent 4%)
+    );
   box-shadow: var(--shadow-md);
 }
 
@@ -1184,7 +1187,7 @@ async function logout() {
 }
 
 .identity-card {
-  max-width: 760px;
+/*  max-width: 760px;*/
 }
 
 .game-card {
