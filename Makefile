@@ -98,7 +98,7 @@ frontend-prod-up:
 
 frontend-prod-cert:
 	@$(COMPOSE) --profile frontend-prod up -d $(FRONTEND_PROD_STACK)
-	@$(COMPOSE) --profile frontend-prod run --rm frontend-certbot sh -ec 'test -n "$$LETSENCRYPT_EMAIL" || { echo "LETSENCRYPT_EMAIL is required in .env"; exit 1; }; test "$$DOMAIN" != "localhost" || { echo "DOMAIN must be set to a public hostname in .env"; exit 1; }; certbot certonly --webroot --webroot-path /var/www/certbot --email "$$LETSENCRYPT_EMAIL" --agree-tos --no-eff-email --non-interactive --keep-until-expiring -d "$$DOMAIN"'
+	@$(COMPOSE) --profile frontend-prod run --rm --entrypoint sh frontend-certbot -ec 'test -n "$$LETSENCRYPT_EMAIL" || { echo "LETSENCRYPT_EMAIL is required in .env"; exit 1; }; test "$$DOMAIN" != "localhost" || { echo "DOMAIN must be set to a public hostname in .env"; exit 1; }; certbot certonly --webroot --webroot-path /var/www/certbot --email "$$LETSENCRYPT_EMAIL" --agree-tos --no-eff-email --non-interactive --keep-until-expiring -d "$$DOMAIN"'
 	@$(COMPOSE) restart haproxy
 
 frontend-prod-renew:
