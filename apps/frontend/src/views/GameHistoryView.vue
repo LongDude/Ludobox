@@ -463,7 +463,7 @@ function formatSeats(value?: number[] | null) {
   display: grid;
   gap: 0.9rem;
   padding: 1rem;
-  border: 1px solid color-mix(in oklab, var(--color-border), transparent 10%);
+  border: 1px solid color-mix(in oklab, var(--color-border), white 20%);
   border-radius: 1.1rem;
   background: color-mix(in oklab, var(--color-surface), white 2%);
 }

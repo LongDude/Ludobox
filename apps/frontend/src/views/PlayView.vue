@@ -2031,11 +2031,11 @@ onBeforeUnmount(() => {
 }
 
 .timer-circle {
-  background: rgba(0, 0, 0, 0.85);
+  background: linear-gradient(135deg, var(--color-bg), var(--color-surface));
   backdrop-filter: blur(10px);
   border-radius: 50%;
-  width: 120px;
-  height: 120px;
+  width: 130px;
+  height: 130px;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -2047,7 +2047,7 @@ onBeforeUnmount(() => {
 
 .timer-label {
   font-size: 0.7rem;
-  color: #fbbf24;
+  color: color-mix(in oklab, #fbbf24, var(--color-text) 5%);
   text-transform: uppercase;
   letter-spacing: 1px;
 }
