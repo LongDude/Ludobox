@@ -261,21 +261,6 @@ export function projectConfigEconomics(config: ConfigUpsertRequest): ConfigProje
         }),
       },
       {
-        label: t('admin.configsSection.metrics.waitingTimer.label'),
-        value: `${formatInteger(config.time)}s`,
-        hint: t('admin.configsSection.metrics.waitingTimer.hint'),
-      },
-      {
-        label: t('admin.configsSection.metrics.activeTimer.label'),
-        value: `${formatInteger(config.round_time)}s`,
-        hint: t('admin.configsSection.metrics.activeTimer.hint'),
-      },
-      {
-        label: t('admin.configsSection.metrics.nextRoundDelay.label'),
-        value: `${formatInteger(config.next_round_delay)}s`,
-        hint: t('admin.configsSection.metrics.nextRoundDelay.hint'),
-      },
-      {
         label: t('admin.configsSection.metrics.maxBoostRevenue.label'),
         value: formatInteger(maxBoostRevenue),
         hint: config.is_boost

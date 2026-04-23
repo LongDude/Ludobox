@@ -51,16 +51,16 @@ function makeDraft(): ConfigUpsertRequest {
     game_id: 1,
     capacity: 4,
     registration_price: 100,
-    is_boost: false,
-    boost_price: 0,
-    boost_power: 0,
+    is_boost: true,
+    boost_price: 30,
+    boost_power: 20,
     number_winners: 1,
     winning_distribution: [100],
-    commission: 12,
+    commission: 20,
     time: 60,
-    round_time: 60,
-    next_round_delay: 0,
-    min_users: 2,
+    round_time: 15,
+    next_round_delay: 15,
+    min_users: 1,
   }
 }
 
@@ -356,7 +356,6 @@ function distributionLabel(value: number, index: number) {
         <div class="editor-head">
           <div>
             <h3>{{ editorTitle }}</h3>
-            <p class="muted">{{ t('admin.configsSection.editorHint') }}</p>
           </div>
           <span class="mode-pill">
             {{ mode === 'edit' ? t('admin.configsSection.revisionMode') : t('admin.configsSection.draftMode') }}

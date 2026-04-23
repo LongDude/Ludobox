@@ -422,7 +422,7 @@ const messages: Record<Locale, Record<string, string>> = {
     'admin.overviewSection.completed': '{count} completed',
     'admin.overviewSection.roomTitle': 'Room #{id}',
     'admin.overviewSection.roomSummary':
-      '{game} - {capacity} seats - {players} players - entry {price}',
+      '{game} - {capacity} seats - {players} players',
     'admin.overviewSection.noAssignedRooms': 'No rooms are currently assigned to this server.',
     'admin.overviewSection.noServers': 'No game servers were returned by the admin API.',
     'admin.overviewSection.idleServers': '{count} servers are currently idle with no rooms assigned.',
@@ -1399,17 +1399,17 @@ const messages: Record<Locale, Record<string, string>> = {
     'admin.configsSection.validation.boostDisabled':
       'Цена и сила буста должны быть равны нулю, пока буст выключен.',
 
-    'admin.configsSection.metrics.fullRoomBank.label': 'Банк полной комнаты',
+    'admin.configsSection.metrics.fullRoomBank.label': 'Максимальный банк',
     'admin.configsSection.metrics.fullRoomBank.hint': '{capacity} мест x {price}',
     'admin.configsSection.metrics.prizePool.label': 'Призовой фонд',
     'admin.configsSection.metrics.prizePool.hint':
       '{percent}% от общего банка после комиссии',
-    'admin.configsSection.metrics.operatorShare.label': 'Доля оператора',
+    'admin.configsSection.metrics.operatorShare.label': 'Доход с комиссии',
     'admin.configsSection.metrics.operatorShare.hint':
-      '{commission}% комиссии при полной загрузке комнаты',
-    'admin.configsSection.metrics.startThresholdBank.label': 'Банк порога запуска',
+      '{commission}% при полной комнате',
+    'admin.configsSection.metrics.startThresholdBank.label': 'Минимальный банк',
     'admin.configsSection.metrics.startThresholdBank.hint':
-      '{minUsers} минимум игроков перед добивкой ботами и стартом раунда',
+      '{minUsers} минимум игроков перед стартом раунда',
     'admin.configsSection.metrics.waitingTimer.label': 'Таймер ожидания',
     'admin.configsSection.metrics.waitingTimer.hint':
       'Отсчёт до перехода раунда из ожидания в active',
@@ -1421,7 +1421,7 @@ const messages: Record<Locale, Record<string, string>> = {
       'Задержка после результатов перед переходом к следующему раунду',
     'admin.configsSection.metrics.maxBoostRevenue.label': 'Макс. доход от буста',
     'admin.configsSection.metrics.maxBoostRevenue.hint':
-      '{capacity} потенциальных бустов x {price}',
+      'Потенциальный доход с бустов',
     'admin.configsSection.metrics.maxBoostRevenue.disabled':
       'Для этой комнаты буст выключен',
 
@@ -1503,7 +1503,7 @@ const messages: Record<Locale, Record<string, string>> = {
     'admin.overviewSection.completed': 'Завершено: {count}',
     'admin.overviewSection.roomTitle': 'Комната #{id}',
     'admin.overviewSection.roomSummary':
-      '{game} - {capacity} мест - {players} игроков - вход {price}',
+      '{game} - {capacity} мест - {players} игроков',
     'admin.overviewSection.noAssignedRooms': 'На этот сервер сейчас не назначено ни одной комнаты.',
     'admin.overviewSection.noServers': 'Admin API не вернул ни одного игрового сервера.',
     'admin.overviewSection.idleServers': 'Сейчас без назначенных комнат простаивает серверов: {count}.',

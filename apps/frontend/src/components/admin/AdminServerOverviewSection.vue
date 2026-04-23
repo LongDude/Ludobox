@@ -337,8 +337,7 @@ function roomSummary(room: RoomResponse) {
   return t('admin.overviewSection.roomSummary', {
     game: config.game?.name_game ?? t('admin.configsSection.gameLabel', { id: config.game_id }),
     capacity: config.capacity,
-    players: room.current_players,
-    price: config.registration_price,
+    players: room.current_players
   })
 }
 

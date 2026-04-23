@@ -179,7 +179,6 @@ function nextPage() {
       </div>
     </div>
 
-    <div>
       <div class="list-card">
         <div class="list-head">
           <div>
@@ -217,7 +216,6 @@ function nextPage() {
           </button>
         </div>
       </div>
-    </div>
   </section>
 </template>
 
