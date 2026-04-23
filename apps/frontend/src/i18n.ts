@@ -983,7 +983,7 @@ const messages: Record<Locale, Record<string, string>> = {
     'layout.route.playKicker': 'Вход в комнату',
     'layout.route.playTitle': 'Контекст подключения к выбранной комнате',
     'matchmaking.home.eyebrow': 'Подбор для игрока',
-    'matchmaking.home.title': 'Найдите комнату и сразу переходите в игру',
+    'matchmaking.home.title': 'Начните прямо сейчас',
     'matchmaking.home.description':
       'Используйте quick match для самого быстрого входа или настройте фильтры перед просмотром рекомендованных комнат.',
     'matchmaking.home.status.ready': 'Готово к входу',

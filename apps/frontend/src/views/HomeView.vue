@@ -169,6 +169,7 @@ function handleBrowseRooms() {
   router.push(target)
 }
 </script>
+
 <template>
   <UpTab :show-menu="true" :show-upload="true" />
   <LeftTab />
@@ -178,162 +179,65 @@ function handleBrowseRooms() {
     :class="{ collapsed: leftHidden }"
     :style="{ '--layout-inset': layoutInset }"
   >
-    <section class="hero-card">
-      <div class="hero-copy">
-        <p class="eyebrow">{{ t('matchmaking.home.eyebrow') }}</p>
-        <h1>{{ t('matchmaking.home.title') }}</h1>
-        <p class="description">{{ t('matchmaking.home.description') }}</p>
-      </div>
+    <!-- Minimalist hero section -->
+    <div class="hero-minimal">
+      <h1 class="hero-title">{{ t('matchmaking.home.title') }}</h1>
+      <p class="hero-subtitle">{{ t('matchmaking.home.description') }}</p>
+    </div>
 
-      <div class="hero-status">
-        <span class="status-pill status-pill--accent">
-          {{
-            auth.isAuthenticated
-              ? t('matchmaking.home.status.ready')
-              : t('matchmaking.home.status.authRequired')
-          }}
-        </span>
-        <span v-if="activeFilterSummary.length" class="status-pill">
-          {{ t('matchmaking.home.status.filtersReady') }}
-        </span>
-      </div>
-    </section>
-
-    <section class="home-grid">
-      <article class="panel-card quick-card">
-        <div class="card-head">
-          <div>
-            <p class="eyebrow accent">{{ t('matchmaking.quick.eyebrow') }}</p>
-            <h2>{{ t('matchmaking.quick.title') }}</h2>
-            <p class="description">{{ t('matchmaking.quick.description') }}</p>
-          </div>
+    <!-- Two clear choices -->
+    <div class="choices-container">
+      <!-- Choice 1: Start Now -->
+      <button class="choice-card choice-primary" @click="handleQuickMatch">
+        <div class="choice-icon">⚡</div>
+        <h2 class="choice-title">{{ t('matchmaking.quick.title') }}</h2>
+        <p class="choice-description">{{ t('matchmaking.quick.description') }}</p>
+        <div class="choice-action">
+          <span>{{ t('matchmaking.quick.cta') }}</span>
         </div>
+      </button>
 
-        <div class="summary-list">
-          <template v-if="activeFilterSummary.length">
-            <span v-for="item in activeFilterSummary" :key="item" class="summary-chip">
-              {{ item }}
-            </span>
-          </template>
-          <p v-else class="muted-copy">{{ t('matchmaking.home.noFilters') }}</p>
+      <!-- Choice 2: Search Rooms -->
+      <div class="choice-card choice-secondary">
+        <div class="choice-icon">🔍</div>
+        <h2 class="choice-title">{{ t('matchmaking.filters.title') }}</h2>
+        <p class="choice-description">{{ t('matchmaking.filters.description') }}</p>
+        
+        <!-- Minimal filters inline -->
+        <div class="inline-filters">
+          <select v-model="draft.boostMode" class="filter-select">
+            <option value="any">{{ t('matchmaking.filters.boostAny') }}</option>
+            <option value="true">{{ t('matchmaking.filters.boostOnly') }}</option>
+            <option value="false">{{ t('matchmaking.filters.noBoost') }}</option>
+          </select>
+          
+          <input
+            v-model="draft.minRegistrationPrice"
+            type="number"
+            placeholder="Min entry"
+            class="filter-input"
+          />
+          
+          <input
+            v-model="draft.maxRegistrationPrice"
+            type="number"
+            placeholder="Max entry"
+            class="filter-input"
+          />
         </div>
-
-        <p v-if="formError" class="feedback feedback--error">{{ formError }}</p>
-
-        <button class="btn btn--primary btn--block" :disabled="submittingQuickMatch" @click="handleQuickMatch">
-          {{
-            submittingQuickMatch
-              ? t('matchmaking.quick.loading')
-              : t('matchmaking.quick.cta')
-          }}
+        
+        <button class="choice-action-btn" @click="handleBrowseRooms">
+          <span>{{ t('matchmaking.filters.findRooms') }}</span>
+          <span class="arrow">→</span>
         </button>
-      </article>
+      </div>
+    </div>
 
-      <article class="panel-card filters-card">
-        <div class="card-head">
-          <div>
-            <p class="eyebrow">{{ t('matchmaking.filters.eyebrow') }}</p>
-            <h2>{{ t('matchmaking.filters.title') }}</h2>
-            <p class="description">{{ t('matchmaking.filters.description') }}</p>
-          </div>
-        </div>
-
-        <form class="filters-form" @submit.prevent="handleBrowseRooms">
-          <label>
-            <span>{{ t('matchmaking.filters.minEntry') }}</span>
-            <input
-              v-model="draft.minRegistrationPrice"
-              inputmode="numeric"
-              type="number"
-              min="0"
-              step="1"
-              :placeholder="t('matchmaking.filters.placeholder.any')"
-            />
-            <small v-if="getFieldError('minRegistrationPrice')" class="field-error">
-              {{ getFieldError('minRegistrationPrice') }}
-            </small>
-          </label>
-
-          <label>
-            <span>{{ t('matchmaking.filters.maxEntry') }}</span>
-            <input
-              v-model="draft.maxRegistrationPrice"
-              inputmode="numeric"
-              type="number"
-              min="0"
-              step="1"
-              :placeholder="t('matchmaking.filters.placeholder.any')"
-            />
-            <small v-if="getFieldError('maxRegistrationPrice')" class="field-error">
-              {{ getFieldError('maxRegistrationPrice') }}
-            </small>
-          </label>
-
-          <label>
-            <span>{{ t('matchmaking.filters.minCapacity') }}</span>
-            <input
-              v-model="draft.minCapacity"
-              inputmode="numeric"
-              type="number"
-              min="1"
-              step="1"
-              :placeholder="t('matchmaking.filters.placeholder.any')"
-            />
-            <small v-if="getFieldError('minCapacity')" class="field-error">
-              {{ getFieldError('minCapacity') }}
-            </small>
-          </label>
-
-          <label>
-            <span>{{ t('matchmaking.filters.maxCapacity') }}</span>
-            <input
-              v-model="draft.maxCapacity"
-              inputmode="numeric"
-              type="number"
-              min="1"
-              step="1"
-              :placeholder="t('matchmaking.filters.placeholder.any')"
-            />
-            <small v-if="getFieldError('maxCapacity')" class="field-error">
-              {{ getFieldError('maxCapacity') }}
-            </small>
-          </label>
-
-          <label>
-            <span>{{ t('matchmaking.filters.boost') }}</span>
-            <select v-model="draft.boostMode">
-              <option value="any">{{ t('matchmaking.filters.boostAny') }}</option>
-              <option value="true">{{ t('matchmaking.filters.boostOnly') }}</option>
-              <option value="false">{{ t('matchmaking.filters.noBoost') }}</option>
-            </select>
-          </label>
-
-          <label>
-            <span>{{ t('matchmaking.filters.minBoostPower') }}</span>
-            <input
-              v-model="draft.minBoostPower"
-              inputmode="numeric"
-              type="number"
-              min="0"
-              step="1"
-              :placeholder="t('matchmaking.filters.placeholder.any')"
-            />
-            <small v-if="getFieldError('minBoostPower')" class="field-error">
-              {{ getFieldError('minBoostPower') }}
-            </small>
-          </label>
-
-          <div class="form-actions">
-            <button class="btn" type="button" @click="resetFilters">
-              {{ t('common.reset') }}
-            </button>
-            <button class="btn btn--primary" type="submit">
-              {{ t('matchmaking.filters.findRooms') }}
-            </button>
-          </div>
-        </form>
-      </article>
-    </section>
+    <!-- Status indicator (minimal) -->
+    <div v-if="auth.isAuthenticated && activeFilterSummary.length" class="status-minimal">
+      <span class="status-dot"></span>
+      <span>{{ activeFilterSummary[0] }}</span>
+    </div>
   </main>
 
   <FooterTab />
@@ -343,222 +247,224 @@ function handleBrowseRooms() {
 .home-area {
   position: fixed;
   inset: var(--layout-inset, 92px 20px 20px 304px);
-  display: grid;
-  gap: 1rem;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  gap: 3rem;
   overflow: auto;
-  align-content: start;
   transition: all var(--transition-slow) ease;
+  padding: 2rem;
 }
 
 .home-area.collapsed {
   --layout-inset: 92px 20px 20px 120px;
 }
 
-.hero-card,
-.panel-card {
-  border-radius: 1.6rem;
-  border: 1px solid color-mix(in oklab, var(--color-border), transparent 8%);
-  box-shadow: var(--shadow-md);
+/* Hero section - minimal */
+.hero-minimal {
+  text-align: center;
+/*  max-width: 600px;*/
 }
 
-.hero-card {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
-  gap: 1rem;
-  padding: 1.5rem;
-  background:
-    radial-gradient(circle at top right, rgba(245, 158, 11, 0.18), transparent 24%),
-    linear-gradient(
-      135deg,
-      color-mix(in oklab, var(--color-bg-secondary), white 18%),
-      color-mix(in oklab, var(--color-surface), transparent 6%)
-    );
+.hero-title {
+  font-size: 3.5rem;
+  font-weight: 700;
+  margin: 0 0 1rem 0;
+  background: linear-gradient(135deg, #fff 0%, #94a3b8 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  letter-spacing: -0.02em;
 }
 
-.hero-copy,
-.card-head,
-.filters-form,
-.summary-list,
-.hero-status {
-  display: grid;
-  gap: 0.85rem;
-}
-
-.home-grid {
-  display: grid;
-  grid-template-columns: minmax(320px, 0.9fr) minmax(0, 1.1fr);
-  gap: 1rem;
-}
-
-.panel-card {
-  padding: 1.35rem;
-  background:
-    radial-gradient(circle at top left, color-mix(in oklab, #0ea5e9, white 88%), transparent 28%),
-    linear-gradient(180deg, color-mix(in oklab, var(--color-surface), white 14%), var(--color-surface));
-}
-
-.card-head {
-  align-items: start;
-}
-
-.eyebrow {
-  margin: 0;
-  font-size: 0.72rem;
-  text-transform: uppercase;
-  letter-spacing: 0.12em;
-  color: #0369a1;
-}
-
-.eyebrow.accent {
-  color: #b45309;
-}
-
-h1,
-h2,
-p {
-  margin: 0;
-}
-
-.description,
-.muted-copy {
+.hero-subtitle {
+  font-size: 1.1rem;
   color: var(--color-muted);
+  margin: 0;
+  line-height: 1.5;
 }
 
-.hero-status {
-  align-content: start;
-  justify-items: end;
-}
-
-.status-pill,
-.summary-chip {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  border-radius: 999px;
-  padding: 0.55rem 0.85rem;
-  background: color-mix(in oklab, var(--color-surface), white 10%);
-  border: 1px solid color-mix(in oklab, var(--color-border), transparent 8%);
-  font-weight: 600;
-}
-
-.status-pill--accent {
-  background: color-mix(in oklab, var(--color-primary-secondary), transparent 84%);
-}
-
-.summary-list {
-  align-content: start;
-}
-
-.filters-form {
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-}
-
-label {
-  display: grid;
-  gap: 0.35rem;
-}
-
-label span,
-.field-error {
-  font-size: 0.9rem;
-}
-
-label span {
-  color: var(--color-muted);
-}
-
-input,
-select {
-  width: 100%;
-  padding: 0.8rem 0.95rem;
-  border: 1px solid color-mix(in oklab, var(--color-border), transparent 8%);
-  border-radius: 0.9rem;
-  background: color-mix(in oklab, var(--color-surface), white 14%);
-  color: var(--color-text);
-}
-
-.field-error,
-.feedback--error {
-  color: var(--color-danger);
-}
-
-.form-actions {
-  grid-column: 1 / -1;
+/* Two choice cards */
+.choices-container {
   display: flex;
-  justify-content: flex-end;
-  gap: 0.75rem;
+  gap: 2rem;
+  max-width: 1000px;
+  width: 100%;
+  justify-content: center;
   flex-wrap: wrap;
 }
 
-.btn {
-  appearance: none;
-  border: 1px solid color-mix(in oklab, var(--color-border), transparent 10%);
-  background: color-mix(in oklab, var(--color-surface), white 8%);
-  color: var(--color-text);
-  border-radius: 999px;
-  padding: 0.8rem 1rem;
-  font-weight: 600;
+.choice-card {
+  flex: 1;
+  min-width: 280px;
+  max-width: 400px;
+  padding: 2rem;
+  border-radius: 1.5rem;
+  background: rgba(255, 255, 255, 0.03);
+  backdrop-filter: blur(10px);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  text-align: center;
+}
+
+.choice-card:hover {
+  transform: translateY(-4px);
+  border-color: rgba(255, 255, 255, 0.2);
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.choice-primary {
+  background: linear-gradient(135deg, rgba(15, 118, 110, 0.15), rgba(2, 132, 199, 0.15));
+  border-color: rgba(15, 118, 110, 1);
+
   cursor: pointer;
-  transition:
-    transform var(--transition-fast) ease,
-    border-color var(--transition-fast) ease,
-    background var(--transition-fast) ease;
 }
 
-.btn:hover {
-  transform: translateY(-1px);
+.choice-primary:hover {
+  background: linear-gradient(135deg, rgba(15, 118, 110, 0.25), rgba(2, 132, 199, 0.25));
+  border-color: rgba(15, 118, 110, 0.5);
 }
 
-.btn:disabled {
-  cursor: not-allowed;
-  opacity: 0.6;
-  transform: none;
+.choice-secondary {
+  background: rgba(255, 255, 255, 0.03);
 }
 
-.btn--primary {
-  border-color: transparent;
-  background: linear-gradient(135deg, #0f766e, #0284c7);
-  color: #f0fdfa;
+.choice-icon {
+  font-size: 2.5rem;
+  margin-bottom: 1rem;
 }
 
-.btn--block {
-  width: 100%;
+.choice-title {
+  font-size: 1.5rem;
+  font-weight: 600;
+  margin: 0 0 0.5rem 0;
+  color: var(--color-text);
 }
 
-@media (max-width: 1180px) {
-  .home-grid {
-    grid-template-columns: 1fr;
-  }
+.choice-description {
+  font-size: 0.9rem;
+  color: var(--color-muted);
+  margin: 0 0 1.5rem 0;
+  line-height: 1.4;
 }
 
+.choice-action {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-weight: 600;
+  color: #0ea5e9;
+  margin-top: 1rem;
+}
+
+.choice-action-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-weight: 600;
+  color: #0ea5e9;
+  background: none;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  font-size: 1rem;
+  margin-top: 1rem;
+  transition: gap 0.2s ease;
+}
+
+.choice-action-btn:hover .arrow,
+.choice-action:hover .arrow {
+  transform: translateX(4px);
+}
+
+.arrow {
+  transition: transform 0.2s ease;
+}
+
+/* Inline filters for secondary card */
+.inline-filters {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  margin: 1rem 0;
+}
+
+.filter-select,
+.filter-input {
+  padding: 0.6rem 0.8rem;
+  border-radius: 0.5rem;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(0, 0, 0, 0.3);
+  color: var(--color-text);
+  font-size: 0.85rem;
+  transition: all 0.2s ease;
+}
+
+.filter-select:focus,
+.filter-input:focus {
+  outline: none;
+  border-color: #0ea5e9;
+  background: rgba(0, 0, 0, 0.5);
+}
+
+/* Minimal status */
+.status-minimal {
+  position: fixed;
+  bottom: 2rem;
+  right: 2rem;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 1rem;
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.5);
+  backdrop-filter: blur(10px);
+  font-size: 0.8rem;
+  color: var(--color-muted);
+}
+
+.status-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #10b981;
+  animation: pulse 2s infinite;
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.5; }
+}
+
+/* Responsive */
 @media (max-width: 960px) {
   .home-area,
   .home-area.collapsed {
     position: static;
     inset: auto;
     margin: calc(76px + 0.75rem) 1rem 5.75rem;
-  }
-}
-
-@media (max-width: 760px) {
-  .hero-card {
-    grid-template-columns: 1fr;
+    justify-content: flex-start;
+    padding: 1rem;
   }
 
-  .hero-status {
-    justify-items: start;
+  .hero-title {
+    font-size: 2.5rem;
   }
 
-  .filters-form {
-    grid-template-columns: 1fr;
+  .choices-container {
+    flex-direction: column;
+    align-items: center;
   }
 
-  .form-actions {
-    justify-content: stretch;
-  }
-
-  .form-actions .btn {
+  .choice-card {
     width: 100%;
+  }
+
+  .status-minimal {
+    position: static;
+    margin-top: 1rem;
+    justify-content: center;
   }
 }
 </style>
