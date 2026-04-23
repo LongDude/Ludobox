@@ -1558,7 +1558,7 @@ onBeforeUnmount(() => {
                       <rect x="48" y="30" width="4" height="40" fill="#f59e0b" />
                     </svg>
                   </div>
-                  
+
                   <!-- Seat Buttons - disabled during round but visible -->
                   <button
                     v-for="(seat, index) in seatOptions"
@@ -1594,7 +1594,7 @@ onBeforeUnmount(() => {
                 <!-- Winner Display -->
                 <div v-if="winnerSeat && roundFinalized" class="winner-announcement">
                   <div class="winner-content">
-                    <span class="winner-label">🏆 Подбедитель! 🏆</span>
+                    <span class="winner-label">🏆 Победитель! 🏆</span>
                     <span class="winner-name">Место {{ winnerSeat }} - {{ winnerName }}</span>
                     <span class="winner-prize">Выиграл {{ formatMoney(winnerAmount) }}</span>
                     <span class="winner-timer">{{ t('gameRoom.round.nextRoundTimer') }}: {{ pendingNextRoundCountdown }}</span>
