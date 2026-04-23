@@ -152,22 +152,8 @@ function isAdminEventResource(value: unknown): value is AdminEventResource {
   <div class="admin-shell" :class="{ collapsed: leftHidden }" :style="{ '--layout-inset': layoutInset }">
     <section class="intro-card">
       <div class="intro-copy">
-        <p class="eyebrow">{{ t('admin.dashboard.kicker') }}</p>
         <h1>{{ t('admin.dashboard.title') }}</h1>
         <p class="intro-text">{{ t('admin.dashboard.intro') }}</p>
-      </div>
-
-      <div class="intro-metrics">
-        <article class="metric-tile">
-          <span>{{ t('admin.dashboard.scopeLabel') }}</span>
-          <strong>{{ t('admin.dashboard.scopeValue') }}</strong>
-          <small>{{ t('admin.dashboard.scopeHint') }}</small>
-        </article>
-        <article class="metric-tile">
-          <span>{{ t('admin.dashboard.visibilityLabel') }}</span>
-          <strong>{{ t('admin.dashboard.visibilityValue') }}</strong>
-          <small>{{ t('admin.dashboard.visibilityHint') }}</small>
-        </article>
       </div>
     </section>
 
@@ -185,19 +171,9 @@ function isAdminEventResource(value: unknown): value is AdminEventResource {
       </button>
     </nav>
 
-    <section class="section-frame">
-      <div class="section-header">
-        <div>
-          <p class="eyebrow accent">{{ activeMeta.label }}</p>
-          <h2>{{ activeMeta.title }}</h2>
-          <p class="section-text">{{ activeMeta.description }}</p>
-        </div>
-      </div>
-
-      <KeepAlive>
-        <component :is="activeComponent" v-bind="activeComponentProps" />
-      </KeepAlive>
-    </section>
+    <KeepAlive>
+      <component :is="activeComponent" v-bind="activeComponentProps" />
+    </KeepAlive>
   </div>
 </template>
 
@@ -205,8 +181,10 @@ function isAdminEventResource(value: unknown): value is AdminEventResource {
 .admin-shell {
   position: fixed;
   inset: var(--layout-inset, 92px 20px 20px 304px);
-  display: grid;
+  display: flex;
+  flex-direction: column;
   gap: 1rem;
+  margin-top: 0.5rem;
   overflow: auto;
   transition: all var(--transition-slow) ease;
 }
@@ -291,6 +269,7 @@ function isAdminEventResource(value: unknown): value is AdminEventResource {
 
 .tab-pill {
   min-width: 12rem;
+/*  height: 60px;*/
   display: grid;
   gap: 0.2rem;
   padding: 0.85rem 1rem;

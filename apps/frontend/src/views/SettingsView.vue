@@ -131,10 +131,17 @@ function chooseLang(l: 'en' | 'ru') {
   --layout-inset: 60px 20px 20px 80px;
 }
 .container {
-  max-width: 800px;
-  margin: auto;
+  max-width: none;
+  margin-top: 0.5rem;
   display: grid;
   gap: var(--space-4);
+  border: 1px solid color-mix(in oklab, var(--color-border), transparent 8%);
+  border-radius: 1.5rem;
+  width: 100%;
+  padding: 1rem;
+  background: 
+    radial-gradient(circle at top right, color-mix(in oklab, #0ea5e9, var(--color-surface) 95%), transparent 60%),
+    linear-gradient(180deg, color-mix(in oklab, var(--color-surface), white 12%), var(--color-surface));
 }
 .option-grid {
   display: grid;
@@ -148,7 +155,7 @@ function chooseLang(l: 'en' | 'ru') {
   gap: 12px;
   padding: 12px 14px;
   border: 1px solid var(--color-border);
-  background: var(--color-surface);
+  background: color-mix(in oklab, var(--color-surface), white 4%);
   color: var(--color-text);
   border-radius: var(--radius-md);
   text-align: left;
@@ -192,7 +199,7 @@ function chooseLang(l: 'en' | 'ru') {
   font-weight: 700;
 }
 .card {
-  background: var(--color-bg);
+  background: color-mix(in oklab, var(--color-surface), white 14%);
   border: 1px solid var(--color-border);
   border-radius: 8px;
   padding: var(--space-4);

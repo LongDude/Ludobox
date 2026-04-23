@@ -210,10 +210,12 @@ async function logout() {
   border: 1px solid color-mix(in oklab, var(--color-border), transparent 8%);
   border-radius: 1.4rem;
   background:
+    radial-gradient(circle at top left, rgba(245, 158, 11, 0.18), transparent 25%),
+    radial-gradient(circle at bottom right, rgba(14, 165, 233, 0.16), transparent 26%),
     linear-gradient(
       135deg,
-      color-mix(in oklab, var(--color-bg-secondary), white 22%),
-      color-mix(in oklab, var(--color-surface), transparent 6%)
+      color-mix(in oklab, var(--color-bg-secondary), white 16%),
+      color-mix(in oklab, var(--color-surface), transparent 4%)
     );
   box-shadow: var(--shadow-md);
   backdrop-filter: blur(18px);

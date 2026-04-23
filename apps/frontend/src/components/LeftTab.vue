@@ -291,7 +291,7 @@ function isActive(path: string) {
   border: 1px solid color-mix(in oklab, var(--color-border), transparent 6%);
   border-radius: 1.6rem;
   background:
-    radial-gradient(circle at top left, rgba(245, 158, 11, 0.14), transparent 28%),
+    radial-gradient(circle at top , rgba(245, 158, 11, 0.14), transparent 32%),
     linear-gradient(
       180deg,
       color-mix(in oklab, var(--color-bg-secondary), white 12%),

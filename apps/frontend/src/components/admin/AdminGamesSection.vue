@@ -171,7 +171,6 @@ function nextPage() {
   <section class="section-card">
     <div class="section-header">
       <div>
-        <p class="eyebrow">{{ t('admin.gamesSection.eyebrow') }}</p>
         <h2>{{ t('admin.gamesSection.title') }}</h2>
         <p class="section-copy">{{ t('admin.gamesSection.description') }}</p>
       </div>
@@ -230,8 +229,8 @@ function nextPage() {
   border-radius: 1.5rem;
   border: 1px solid color-mix(in oklab, var(--color-border), transparent 8%);
   background:
-    radial-gradient(circle at top left, color-mix(in oklab, #f97316, white 82%), transparent 24%),
-    linear-gradient(180deg, color-mix(in oklab, var(--color-surface), white 22%), var(--color-surface));
+    radial-gradient(circle at top right, color-mix(in oklab, #0ea5e9, var(--color-surface) 92%), transparent 60%),
+    linear-gradient(180deg, color-mix(in oklab, var(--color-surface), white 12%), var(--color-surface));
   box-shadow: var(--shadow-md);
 }
 
