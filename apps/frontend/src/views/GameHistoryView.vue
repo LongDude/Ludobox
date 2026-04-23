@@ -298,9 +298,6 @@ function formatSeats(value?: number[] | null) {
             <h2>{{ t('profile.history.title') }}</h2>
             <p class="section-copy">{{ t('profile.history.description') }}</p>
           </div>
-          <button class="btn" :disabled="historyLoading" @click="loadGameHistory">
-            {{ t('common.refresh') }}
-          </button>
         </div>
 
         <p v-if="historyLoading && gameHistory.length === 0" class="state-copy">

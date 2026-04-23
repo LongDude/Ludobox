@@ -173,12 +173,6 @@ function changeLimit(nextLimit: number) {
           type="text"
           :placeholder="t('admin.usersSection.rolePlaceholder')"
         />
-        <input
-          v-model="filters.locale"
-          class="input"
-          type="text"
-          :placeholder="t('admin.usersSection.localePlaceholder')"
-        />
         <select v-model="filters.email_confirmed" class="input">
           <option value="">{{ t('admin.usersSection.emailAny') }}</option>
           <option value="true">{{ t('admin.usersSection.emailConfirmed') }}</option>

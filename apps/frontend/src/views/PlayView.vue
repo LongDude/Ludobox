@@ -950,7 +950,7 @@ function eventDescription(event: GameRoundEvent) {
     return t('gameRoom.events.playerJoinedDetails', {
       participant: String(data.nickname ?? 0) || '-',
       seat: Number(data.number_in_room ?? 0) || '-',
-      players: Number(data.current_players ?? 0) || '-',
+      players: Number(data.current_players ?? 0) || '0',
     })
   }
 
@@ -958,7 +958,7 @@ function eventDescription(event: GameRoundEvent) {
     return t('gameRoom.events.playerLeftDetails', {
       participant: String(data.nickname ?? 0) || '-',
       seat: Number(data.number_in_room ?? 0) || '-',
-      players: Number(data.current_players ?? 0) || '-',
+      players: Number(data.current_players ?? 0) || '0',
     })
   }
 

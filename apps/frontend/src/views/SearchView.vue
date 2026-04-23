@@ -394,7 +394,7 @@ function enterRoom(room: RoomRecommendationResponse) {
           >
             <div class="room-head">
               <div>
-                <p class="room-kicker">{{ t('matchmaking.results.roomLabel', { id: room.room_id }) }}</p>
+                <p class="room-kicker">{{ t('matchmaking.results.roomLabel', { id: room.room_id, game_name: room.game_name }) }}</p>
                 <h3>{{ t('matchmaking.results.roomTitle', { players: room.current_players, seats: room.capacity }) }}</h3>
               </div>
               <span class="score-pill">

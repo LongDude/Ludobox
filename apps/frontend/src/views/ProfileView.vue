@@ -785,9 +785,6 @@ async function logout() {
               <h2>{{ t('profile.game.title') }}</h2>
               <p class="section-copy">{{ t('profile.game.description') }}</p>
             </div>
-            <button class="btn" :disabled="cabinet.loading" @click="refreshGameProfile">
-              {{ t('common.refresh') }}
-            </button>
           </div>
 
           <p v-if="cabinet.loading && !cabinet.profile" class="state-copy">
@@ -879,9 +876,6 @@ async function logout() {
               <h2>{{ t('profile.game.ratingHistoryTitle') }}</h2>
               <p class="section-copy">{{ t('profile.game.ratingHistoryDescription') }}</p>
             </div>
-            <button class="btn" :disabled="ratingHistoryLoading" @click="loadRatingHistory()">
-              {{ t('common.refresh') }}
-            </button>
           </div>
 
           <p v-if="cabinet.loading && !cabinet.profile" class="state-copy">
