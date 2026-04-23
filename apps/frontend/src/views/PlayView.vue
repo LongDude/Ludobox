@@ -1016,7 +1016,6 @@ async function refreshRoundView(silent = false) {
 
 async function reserveSeats() {
   clearFeedback()
-
   if (!canJoinMoreSeats.value) {
     errorMsg.value = joinBlockedHint.value
     return
@@ -1036,17 +1035,28 @@ async function reserveSeats() {
         throw new Error(t('gameRoom.entry.roomFull'))
       }
 
-      for (let attempt = 0; attempt < targetRandomCount; attempt += 1) {
-        try {
-          joinResult.value = await GameApi.joinRoom(roomId.value)
-          rememberOwnedParticipantIds([joinResult.value.participant_id])
-          reservedSeats.push(joinResult.value.number_in_room)
-        } catch (error: any) {
-          if (reservedSeats.length > 0 && isRecoverableRandomJoinError(error)) {
-            break
-          }
-          throw error
-        }
+      // Get all free seats
+      const allFreeSeats = getFreeSeatsList()
+      
+      if (allFreeSeats.length < targetRandomCount) {
+        throw new Error(t('gameRoom.entry.roomFull'))
+      }
+      
+      // Shuffle and pick random seats
+      const shuffledFreeSeats = [...allFreeSeats]
+      for (let i = shuffledFreeSeats.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [shuffledFreeSeats[i], shuffledFreeSeats[j]] = [shuffledFreeSeats[j], shuffledFreeSeats[i]]
+      }
+      
+      const randomSeatsToReserve = shuffledFreeSeats.slice(0, targetRandomCount)
+      
+      // Reserve each random seat
+      for (const seat of randomSeatsToReserve) {
+        const response = await GameApi.joinRoomWithSeat(roomId.value, { number_in_room: seat })
+        joinResult.value = response
+        rememberOwnedParticipantIds([response.participant_id])
+        reservedSeats.push(response.number_in_room)
       }
     } else {
       for (const seat of requestedSeats) {
@@ -1094,6 +1104,17 @@ async function reserveSeats() {
   } finally {
     joining.value = false
   }
+}
+
+// filter free seats
+function getFreeSeatsList(): number[] {
+  const freeSeats: number[] = []
+  for (let i = 1; i <= roomCapacity.value; i++) {
+    if (!occupiedSeats.value.has(i)) {
+      freeSeats.push(i)
+    }
+  }
+  return freeSeats
 }
 
 async function purchaseBoost() {
@@ -1712,6 +1733,14 @@ onBeforeUnmount(() => {
 
   display: flex;
   flex-direction: column;
+
+  background:
+  radial-gradient(circle at top right, rgba(14, 165, 233, 0.16), transparent 26%),
+  linear-gradient(
+    310deg,
+    color-mix(in oklab, var(--color-bg-secondary), white 16%),
+    color-mix(in oklab, var(--color-surface), transparent 4%)
+  );
 }
 
 .circular-seat-container {
@@ -2057,11 +2086,12 @@ onBeforeUnmount(() => {
   grid-template-columns: minmax(0, 1fr) auto;
   gap: 1rem;
   background:
-    radial-gradient(circle at top right, rgba(245, 158, 11, 0.18), transparent 24%),
+    radial-gradient(circle at left, rgba(245, 158, 11, 0.18), transparent 18%),
+    radial-gradient(circle at right, rgba(14, 165, 233, 0.16), transparent 26%),
     linear-gradient(
       135deg,
-      color-mix(in oklab, var(--color-bg-secondary), white 18%),
-      color-mix(in oklab, var(--color-surface), transparent 6%)
+      color-mix(in oklab, var(--color-bg-secondary), white 16%),
+      color-mix(in oklab, var(--color-surface), transparent 4%)
     );
 }
 
@@ -2091,9 +2121,17 @@ onBeforeUnmount(() => {
 .join-box {
   min-width: 460px;
   flex-grow: 1;
+
+  background:
+    radial-gradient(circle at top left, rgba(245, 158, 11, 0.18), transparent 8%),
+    linear-gradient(
+      20deg,
+      color-mix(in oklab, var(--color-bg-secondary), white 14%),
+      color-mix(in oklab, var(--color-surface), transparent 4%)
+    );
 }
 
-.panel-card {
+.panel-card:not(.right-info) {
   background: color-mix(in oklab, var(--color-surface), white 10%);
     /*radial-gradient(circle at top left, color-mix(in oklab, #0ea5e9, white 88%), transparent 28%),
     linear-gradient(180deg, color-mix(in oklab, var(--color-surface), white 14%), var(--color-surface));*/
@@ -2223,7 +2261,7 @@ strong.live {
   padding: 0.85rem;
   border-radius: 1rem;
   border: 1px solid color-mix(in oklab, var(--color-border), transparent 10%);
-  background: color-mix(in oklab, var(--color-surface), white 10%);
+/*  background: color-mix(in oklab, var(--color-surface), white 10%);*/
 }
 
 .join-box.joined,
@@ -2325,6 +2363,7 @@ label,
 .participant-card {
   display: flex;
   max-width: 48%;
+  width: 48%;
 
   align-items: center;
   gap: 0.5rem;
@@ -2426,7 +2465,7 @@ input[type='number'] {
   padding: 0.8rem 0.9rem;
   border-radius: 1rem;
   border: 1px solid color-mix(in oklab, var(--color-border), transparent 10%);
-  background: color-mix(in oklab, var(--color-surface), white 8%);
+  background: color-mix(in oklab, var(--color-surface), white 6%);
 }
 
 .event-card div {
