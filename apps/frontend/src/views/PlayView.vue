@@ -1201,13 +1201,54 @@ async function cancelBoost() {
 
   actionLoading.value = 'cancel-boost'
 
-  try {
+  try {own-seat
     const response = await GameApi.cancelBoost(roomId.value, participant.participant_id)
     successMsg.value = t('gameRoom.messages.boostCancelled', { refund: response.refund ?? 0 })
     refreshCabinetBalance()
     // await refreshRoundView()
   } catch (error: any) {
     errorMsg.value = normalizeError(error, t('gameRoom.errors.cancelBoost'))
+  } finally {
+    actionLoading.value = ''
+  }
+}
+
+function canBuyBoostForSeat(seatNumber: number) {
+  const participant = getParticipantOnSeat(seatNumber)
+  if (!participant) return false
+  if (!ownedSeatNumbers.value.has(seatNumber)) return false
+  if (participant.boost > 0) return false
+  if (!canManageCurrentRound.value) return false
+  if ((roomState.value?.is_boost ?? room.value?.is_boost) !== true) return false
+  
+  return true
+}
+
+async function purchaseBoostForSeat(seatNumber: number) {
+  clearFeedback()
+  
+  const participant = getParticipantOnSeat(seatNumber)
+  if (!participant) {
+    errorMsg.value = t('gameRoom.errors.joinFirst')
+    return
+  }
+  
+  if (participant.boost > 0) {
+    errorMsg.value = t('gameRoom.errors.boostAlreadyPurchased')
+    return
+  }
+
+  actionLoading.value = `boost-${participant.participant_id}`
+
+  try {
+    const response = await GameApi.purchaseBoost(roomId.value, participant.participant_id)
+    successMsg.value = t('gameRoom.messages.boostPurchased', {
+      power: response.boost_power,
+      cost: response.boost_cost,
+    })
+    refreshCabinetBalance()
+  } catch (error: any) {
+    errorMsg.value = normalizeError(error, t('gameRoom.errors.boost'))
   } finally {
     actionLoading.value = ''
   }
@@ -1528,7 +1569,8 @@ onBeforeUnmount(() => {
                       selected: selectedSeatNumbers.has(seat),
                       'own-seat': ownedSeatNumbers.has(seat),
                       'winner-seat': winnerSeat === seat && roundFinalized,
-                      'clickable-own-seat': occupiedSeats.has(seat) && ownedSeatNumbers.has(seat) && !isRoundActive
+                      'clickable-own-seat': occupiedSeats.has(seat) && ownedSeatNumbers.has(seat) && !isRoundActive,
+                      'has-boost': getParticipantOnSeat(seat)?.boost > 0
                     }"
                     :style="getSeatPosition(index, seatOptions.length)"
                     type="button"
@@ -1539,6 +1581,30 @@ onBeforeUnmount(() => {
                     <span v-if="getParticipantOnSeat(seat)" class="seat-player">
                       {{ getParticipantOnSeat(seat)?.nickname || `P${getParticipantOnSeat(seat)?.participant_id}` }}
                     </span>
+
+                    <!-- Boost button overlay on hover for own seats without boost -->
+                      <div 
+                        v-if="canBuyBoostForSeat(seat) && !isRoundActive"
+                        class="boost-overlay"
+                        @click.stop="purchaseBoostForSeat(seat)"
+                      >
+                        <button 
+                          class="boost-seat-btn"
+                          :disabled="actionLoading === `boost-${getParticipantOnSeat(seat)?.participant_id}`"
+                          :title="t('gameRoom.controls.buyBoost')"
+                        >
+                          ⚡
+                        </button>
+                      </div>
+                      
+                      <!-- Boost indicator for seats that already have boost -->
+                      <div 
+                        v-if="getParticipantOnSeat(seat)?.boost > 0"
+                        class="boost-active-indicator"
+                        :title="t('gameRoom.controls.boostActiveOnSeat', { seat })"
+                      >
+                        ⚡
+                      </div>
                   </button>
                 </div>
                 
@@ -1983,7 +2049,6 @@ onBeforeUnmount(() => {
   }
 }
 
-
 .circular-seat-button.winner-seat {
   border-color: #fbbf24;
   background: linear-gradient(135deg, #fbbf24, #f59e0b);
@@ -2323,6 +2388,77 @@ strong.live {
   border-color: color-mix(in oklab, var(--color-primary-secondary), transparent 20%);
 }
 
+.circular-seat-button {
+  position: relative;
+}
+
+.boost-overlay {
+  position: absolute;
+  top: -12px;
+  right: -12px;
+  z-index: 5;
+}
+
+.boost-seat-btn {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #f59e0b, #d97706);
+  border: 2px solid #fff;
+  color: white;
+  font-size: 14px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s ease;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+}
+
+.boost-seat-btn:hover:not(:disabled) {
+  transform: scale(1.1);
+  box-shadow: 0 0 12px rgba(245, 158, 11, 0.6);
+}
+
+.boost-seat-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.boost-active-indicator {
+  position: absolute;
+  top: -8px;
+  right: -8px;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #10b981, #059669);
+  border: 2px solid #fff;
+  color: white;
+  font-size: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  animation: boostPulse 2s ease-in-out infinite;
+  z-index: 5;
+}
+
+.circular-seat-button.has-boost {
+  border-color: #10b981;
+  box-shadow: 0 0 15px rgba(16, 185, 129, 0.3);
+}
+
+@keyframes boostPulse {
+  0%, 100% {
+    transform: scale(1);
+    box-shadow: 0 0 5px rgba(16, 185, 129, 0.5);
+  }
+  50% {
+    transform: scale(1.05);
+    box-shadow: 0 0 12px rgba(16, 185, 129, 0.8);
+  }
+}
+
 label,
 .seat-input,
 .own-seats,
@@ -2440,19 +2576,20 @@ label,
 .circular-seat-button.clickable-own-seat:hover::after {
   content: "✕";
   position: absolute;
-  top: -8px;
-  right: -8px;
+  top: -11px;
+  right: 45px;
   background: #ef4444;
   color: white;
   border-radius: 50%;
-  width: 20px;
-  height: 20px;
+  width: 28px;
+  height: 28px;
   display: flex;
   align-items: center;
   justify-content: center;
   font-size: 12px;
   font-weight: bold;
   box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+  border: 2px solid #fff;
 }
 
 .boost-value {
