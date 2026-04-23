@@ -667,6 +667,17 @@ function canSelectSeat(seat: number) {
 }
 
 function toggleSeatSelection(seat: number) {
+  // If clicking on a seat you already own (occupied by you)
+  if (occupiedSeats.value.has(seat) && ownedSeatNumbers.value.has(seat)) {
+    const participant = getParticipantOnSeat(seat)
+    if (participant && canLeaveSeats.value) {
+      // Directly leave the participant without confirmation
+      leaveParticipantDirect(participant)
+    }
+    return
+  }
+  
+  // Normal seat selection for empty seats
   if (!canJoinMoreSeats.value) return
 
   const alreadySelected = selectedSeatNumbers.value.has(seat)
@@ -678,6 +689,38 @@ function toggleSeatSelection(seat: number) {
   }
 
   selectedSeats.value = [...selectedSeats.value, seat].sort((left, right) => left - right)
+}
+
+async function leaveParticipantDirect(participant: GameParticipantInfo) {
+  clearFeedback()
+
+  if (!canLeaveSeats.value) {
+    errorMsg.value = isJoined.value ? t('gameRoom.controls.actionsLocked') : t('gameRoom.errors.joinFirst')
+    return
+  }
+
+  actionLoading.value = `leave-${participant.participant_id}`
+
+  try {
+    await GameApi.leaveParticipant(roomId.value, participant.participant_id)
+    successMsg.value = t('gameRoom.messages.leftSeat', { seat: participant.number_in_room })
+    if (joinResult.value?.participant_id === participant.participant_id) {
+      clearInitialJoinContext()
+    }
+    displayedRoundId.value = null
+    clearPendingNextRound()
+    await refreshRoundView(true)
+    if (!activeRoundId.value) {
+      roundStatus.value = null
+      stopStatusPolling()
+      stopRoundEvents()
+    }
+    refreshCabinetBalance()
+  } catch (error: any) {
+    errorMsg.value = normalizeError(error, t('gameRoom.errors.leave'))
+  } finally {
+    actionLoading.value = ''
+  }
 }
 
 function stopNextRoundCountdown() {
@@ -1454,42 +1497,7 @@ onBeforeUnmount(() => {
 
     <section class="game-area">
         <div class="join-box" :class="{ joined: isJoined, 'round-active': isRoundActive }">
-          <div v-if="isJoined" class="own-seats">
-            <p class="join-title">
-              {{ t('gameRoom.entry.ownedSeatsTitle', { count: ownedParticipants.length }) }}
-            </p>
-            <p class="description">
-              {{ t('gameRoom.entry.ownedSeatsHint', { limit: maxOwnSeats }) }}
-            </p>
 
-            <div class="own-seat-list">
-              <article
-                v-for="participant in ownedParticipants"
-                :key="participant.participant_id"
-                class="own-seat-card"
-              >
-                <div>
-                  <strong>{{ t('gameRoom.participant.seat', { seat: participant.number_in_room }) }}</strong>
- 
-                  <span v-if="participant.boost > 0">
-                    {{ t('gameRoom.entry.boostActiveSeat', { seat: participant.number_in_room }) }}
-                  </span>
-                </div>
-                <button
-                  class="btn btn--danger"
-                  type="button"
-                  :disabled="!canLeaveSeats || actionLoading === `leave-${participant.participant_id}`"
-                  @click="leaveParticipant(participant)"
-                >
-                  {{
-                    actionLoading === `leave-${participant.participant_id}`
-                      ? t('common.loading')
-                      : t('gameRoom.entry.releaseSeat')
-                  }}
-                </button>
-              </article>
-            </div>
-          </div>
 
           <div class="join-flow">
             <p class="join-title">
@@ -1519,11 +1527,12 @@ onBeforeUnmount(() => {
                       occupied: occupiedSeats.has(seat),
                       selected: selectedSeatNumbers.has(seat),
                       'own-seat': ownedSeatNumbers.has(seat),
-                      'winner-seat': winnerSeat === seat && roundFinalized
+                      'winner-seat': winnerSeat === seat && roundFinalized,
+                      'clickable-own-seat': occupiedSeats.has(seat) && ownedSeatNumbers.has(seat) && !isRoundActive
                     }"
                     :style="getSeatPosition(index, seatOptions.length)"
                     type="button"
-                    :disabled="isRoundActive || !canSelectSeat(seat) || occupiedSeats.has(seat)"
+                    :disabled="isRoundActive || (occupiedSeats.has(seat) && !ownedSeatNumbers.has(seat))"
                     @click="toggleSeatSelection(seat)"
                   >
                     <span class="seat-number">{{ seat }}</span>
@@ -2421,6 +2430,29 @@ label,
 .own-seat-card div {
   display: grid;
   gap: 0.25rem;
+}
+
+.circular-seat-button.clickable-own-seat {
+  cursor: pointer;
+  position: relative;
+}
+
+.circular-seat-button.clickable-own-seat:hover::after {
+  content: "✕";
+  position: absolute;
+  top: -8px;
+  right: -8px;
+  background: #ef4444;
+  color: white;
+  border-radius: 50%;
+  width: 20px;
+  height: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  font-weight: bold;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.2);
 }
 
 .boost-value {
