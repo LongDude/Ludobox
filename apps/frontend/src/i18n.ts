@@ -876,10 +876,10 @@ const messages: Record<Locale, Record<string, string>> = {
     'gameRoom.events.roundFinalizedDetails': 'Победителей: {winners}.',
     'gameRoom.events.genericDetails': 'Состояние раунда изменилось.',
     'gameRoom.prototypeDescription':
-      'Рабочий прототип для тестирования game_server flow: вход в комнату, выбор места, статус раунда, буст и выход.',
+      'Рабочий прототип для тестирования сценария игры: вход в комнату, выбор места, статус раунда, буст и выход.',
     'gameRoom.state.joined': 'Участвует',
     'gameRoom.state.notJoined': 'Не в комнате',
-    'gameRoom.messages.quickSessionRestored': 'Сессия quick match восстановлена из метаданных matchmaking.',
+    'gameRoom.messages.quickSessionRestored': 'Сессия быстрой игры восстановлена из метаданных matchmaking.',
     'gameRoom.messages.joined': 'Вход выполнен. Ваше место #{seat}.',
     'gameRoom.messages.joinedMultiple': 'Места зарезервированы: {count}. Ваши места: {seats}.',
     'gameRoom.messages.boostPurchased': 'Буст куплен: {power}% за {cost}.',
@@ -1602,7 +1602,7 @@ const messages: Record<Locale, Record<string, string>> = {
     'profile.game.rating': 'Рейтинг',
     'profile.game.rank': 'Ранг',
     'profile.game.periodGain': 'Прирост за период',
-    'profile.game.delta': 'Дельта баланса',
+    'profile.game.delta': 'Изменение баланса',
     'profile.game.deltaHelp':
       'Используйте положительное значение для пополнения и отрицательное для списания баланса.',
     'profile.game.nicknamePlaceholder': 'Введите никнейм',
@@ -1621,13 +1621,13 @@ const messages: Record<Locale, Record<string, string>> = {
     'profile.game.rankTooltip.bronze':
       'Бронза: 0-499 рейтинга. Стартовый ранг для новых игроков.',
     'profile.game.rankTooltip.silver':
-      'Серебро: 500-1499 рейтинга. Устойчивый прогресс после первых побед.',
+      'Серебро: 500-1499 рейтинга. Те, кто не боятся рисковать.',
     'profile.game.rankTooltip.gold':
-      'Золото: 1500-2999 рейтинга. Сильная игра в обычных комнатах.',
+      'Золото: 1500-2999 рейтинга. Те, кто умеет выигрывать.',
     'profile.game.rankTooltip.platinum':
-      'Платина: 3000-4999 рейтинга. Высокий ранг для стабильных победителей.',
+      'Платина: 3000-4999 рейтинга. Мастера в ставках.',
     'profile.game.rankTooltip.diamond':
-      'Алмаз: 5000+ рейтинга. Максимальный ранг для сильнейших игроков.',
+      'Алмаз: 5000+ рейтинга. Высший ранг для истинных лудоманов.',
     'profile.game.rankTooltip.unranked':
       'Ранг рассчитывается по текущему рейтингу после загрузки профиля.',
     'profile.game.ratingHistoryTitle': 'Динамика рейтинга',
@@ -1657,7 +1657,7 @@ const messages: Record<Locale, Record<string, string>> = {
     'profile.history.entity': 'игр',
     'profile.history.eyebrow': 'История игр',
     'profile.history.title': 'История участий',
-    'profile.history.description': 'Ваши завершенные, активные и отмененные игровые раунды.',
+    'profile.history.description': 'Все раунды, в которых Вы принимали участие.',
     'profile.history.loading': 'Загрузка истории игр...',
     'profile.history.empty': 'История игр пуста.',
     'profile.history.error.load': 'Не удалось загрузить историю игр.',
@@ -1681,7 +1681,7 @@ const messages: Record<Locale, Record<string, string>> = {
     'profile.history.result.finished': 'Завершен',
     'profile.history.result.unknown': 'Неизвестно',
     'profile.history.seatsSummary': '{count} мест выбрано',
-    'profile.history.seatsWinningSummary': '{count} из {selected} мест выиграло',
+    'profile.history.seatsWinningSummary': 'зарезервировано {selected} мест, выиграло {count}',
     'profile.history.seatsNone': 'Нет',
   },
 }
