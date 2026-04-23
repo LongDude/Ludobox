@@ -26,6 +26,7 @@ type EmailService interface {
 var (
 	ErrInvalidPasswordResetToken = errors.New("invalid password reset token")
 	ErrPasswordResetTokenExpired = errors.New("password reset token expired")
+	ErrEmailServiceNotConfigured = errors.New("email service is not configured")
 )
 
 type emailService struct {
@@ -52,8 +53,26 @@ func NewEmailService(config *config.EmailConfig, domainURL string, logger *logru
 	}
 }
 
+func (e *emailService) ensureTokenSecretConfigured() error {
+	if e.jwtSecret == "" {
+		return ErrEmailServiceNotConfigured
+	}
+	return nil
+}
+
+func (e *emailService) ensureSMTPConfigured() error {
+	if e.smtpHost == "" || e.smtpPort == "" || e.smtpUsername == "" || e.smtpPassword == "" || e.fromEmail == "" {
+		return ErrEmailServiceNotConfigured
+	}
+	return nil
+}
+
 // GenerateEmailConfirmationToken implements EmailService.
 func (e *emailService) GenerateEmailConfirmationToken(ctx context.Context, userID int, email string) (string, error) {
+	if err := e.ensureTokenSecretConfigured(); err != nil {
+		return "", err
+	}
+
 	claims := domain.EmailConfirmationClaims{
 		RegisteredClaims: jwt.RegisteredClaims{
 			Issuer:    e.domainURL,
@@ -69,6 +88,10 @@ func (e *emailService) GenerateEmailConfirmationToken(ctx context.Context, userI
 }
 
 func (e *emailService) generatePasswordResetToken(ctx context.Context, userID int, email string) (string, error) {
+	if err := e.ensureTokenSecretConfigured(); err != nil {
+		return "", err
+	}
+
 	claims := domain.PasswordResetClaims{
 		RegisteredClaims: jwt.RegisteredClaims{
 			Issuer:    e.domainURL,
@@ -86,6 +109,10 @@ func (e *emailService) generatePasswordResetToken(ctx context.Context, userID in
 
 // SendEmailConfirmation implements EmailService.
 func (e *emailService) SendEmailConfirmation(ctx context.Context, userID int, email string) error {
+	if err := e.ensureSMTPConfigured(); err != nil {
+		return err
+	}
+
 	token, err := e.GenerateEmailConfirmationToken(ctx, userID, email)
 	if err != nil {
 		return fmt.Errorf("failed to generate email confirmation token: %w", err)
@@ -105,6 +132,10 @@ func (e *emailService) SendEmailConfirmation(ctx context.Context, userID int, em
 
 // VerifyEmailConfirmationToken implements EmailService.
 func (e *emailService) VerifyEmailConfirmationToken(ctx context.Context, token string) (int, error) {
+	if err := e.ensureTokenSecretConfigured(); err != nil {
+		return 0, err
+	}
+
 	TokenClaims := &domain.EmailConfirmationClaims{}
 	parsedToken, err := jwt.ParseWithClaims(token, TokenClaims, func(t *jwt.Token) (any, error) {
 		if _, ok := t.Method.(*jwt.SigningMethodHMAC); !ok {
@@ -129,6 +160,10 @@ func (e *emailService) VerifyEmailConfirmationToken(ctx context.Context, token s
 
 // SendPasswordResetConfirmation sends the reset confirmation email with a 7-day token.
 func (e *emailService) SendPasswordResetConfirmation(ctx context.Context, userID int, email string) error {
+	if err := e.ensureSMTPConfigured(); err != nil {
+		return err
+	}
+
 	token, err := e.generatePasswordResetToken(ctx, userID, email)
 	if err != nil {
 		return fmt.Errorf("failed to generate password reset token: %w", err)
@@ -150,6 +185,10 @@ func (e *emailService) SendPasswordResetConfirmation(ctx context.Context, userID
 
 // VerifyPasswordResetToken validates the token embedded in the reset link.
 func (e *emailService) VerifyPasswordResetToken(ctx context.Context, token string) (int, string, string, time.Time, error) {
+	if err := e.ensureTokenSecretConfigured(); err != nil {
+		return 0, "", "", time.Time{}, err
+	}
+
 	claims := &domain.PasswordResetClaims{}
 	parsedToken, err := jwt.ParseWithClaims(token, claims, func(t *jwt.Token) (any, error) {
 		if _, ok := t.Method.(*jwt.SigningMethodHMAC); !ok {
@@ -177,6 +216,10 @@ func (e *emailService) VerifyPasswordResetToken(ctx context.Context, token strin
 
 // SendNewPassword emails a freshly generated password to the user.
 func (e *emailService) SendNewPassword(ctx context.Context, email string, password string) error {
+	if err := e.ensureSMTPConfigured(); err != nil {
+		return err
+	}
+
 	subject := "Your Password Has Been Reset"
 	body := fmt.Sprintf(
 		"Hello,\n\nYour password has been successfully reset. Use the password below to sign in:\n\n%s\n\nFor security, change this password after logging in.\n",

@@ -41,23 +41,25 @@ type AuthService interface {
 }
 
 type authService struct {
-	jwtService     JWTService
-	emailService   EmailService
-	sessionService SessionService
-	userRepository repository.UserRepository
-	tokenBlocklist repository.TokenBlocklist
-	logger         *logrus.Logger
+	requireEmailVerification bool
+	jwtService               JWTService
+	emailService             EmailService
+	sessionService           SessionService
+	userRepository           repository.UserRepository
+	tokenBlocklist           repository.TokenBlocklist
+	logger                   *logrus.Logger
 }
 
 func NewAuthService(jwtService JWTService, emailService EmailService,
-	sessionService SessionService, userRepository repository.UserRepository, tokenBlocklist repository.TokenBlocklist, logger *logrus.Logger) AuthService {
+	sessionService SessionService, userRepository repository.UserRepository, tokenBlocklist repository.TokenBlocklist, requireEmailVerification bool, logger *logrus.Logger) AuthService {
 	return &authService{
-		jwtService:     jwtService,
-		emailService:   emailService,
-		sessionService: sessionService,
-		userRepository: userRepository,
-		tokenBlocklist: tokenBlocklist,
-		logger:         logger,
+		requireEmailVerification: requireEmailVerification,
+		jwtService:               jwtService,
+		emailService:             emailService,
+		sessionService:           sessionService,
+		userRepository:           userRepository,
+		tokenBlocklist:           tokenBlocklist,
+		logger:                   logger,
 	}
 }
 
@@ -121,7 +123,7 @@ func (a *authService) CreateUser(ctx context.Context, user *domain.User) (*domai
 	p := string(pass)
 
 	user.Password = &p
-	user.EmailConfirmed = false
+	user.EmailConfirmed = !a.requireEmailVerification
 
 	if user.Roles == nil {
 		user.Roles = []string{"USER"}
@@ -143,15 +145,17 @@ func (a *authService) CreateUser(ctx context.Context, user *domain.User) (*domai
 		return nil, fmt.Errorf("failed to get created user by ID %d: %w", userID, err)
 	}
 
-	err = a.emailService.SendEmailConfirmation(ctx, userID, user.Email)
+	if a.requireEmailVerification {
+		err = a.emailService.SendEmailConfirmation(ctx, userID, user.Email)
 
-	if err != nil {
-		a.logger.WithError(err).Errorf("failed to send email confirmation: user_id=%d email=%s", userID, user.Email)
-		d_err := a.userRepository.DeleteUser(ctx, userID)
-		if d_err != nil {
-			return nil, fmt.Errorf("%w, failed to delete user", err)
+		if err != nil {
+			a.logger.WithError(err).Errorf("failed to send email confirmation: user_id=%d email=%s", userID, user.Email)
+			d_err := a.userRepository.DeleteUser(ctx, userID)
+			if d_err != nil {
+				return nil, fmt.Errorf("%w, failed to delete user", err)
+			}
+			return nil, err
 		}
-		return nil, err
 	}
 	return user, nil
 }
@@ -207,7 +211,7 @@ func (a *authService) Login(ctx context.Context, email string, password string) 
 		return nil, fmt.Errorf("invalid password for user with email %s: %w", email, err)
 	}
 
-	if !user.EmailConfirmed {
+	if a.requireEmailVerification && !user.EmailConfirmed {
 		return nil, fmt.Errorf("email for user with email %s is not confirmed", email)
 	}
 
