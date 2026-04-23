@@ -922,6 +922,7 @@ const messages: Record<Locale, Record<string, string>> = {
     'gameRoom.entry.joinAutoMore': 'Занять автоматическое место',
     'gameRoom.entry.joinSeat': 'Занять выбранное место',
     'gameRoom.entry.releaseSeat': 'Освободить место',
+    'gameRoom.round': 'Раунд',
     'gameRoom.round.eyebrow': 'Раунд',
     'gameRoom.round.title': 'Статус раунда',
     'gameRoom.round.description':

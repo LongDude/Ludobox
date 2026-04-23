@@ -77,7 +77,9 @@ const winnerSeat = computed(() => {
 const winnerName = computed(() => {
   if (!winners.value.length) return ''
   const winner = winners.value[0]
-  return winner.nickname || `Player ${winner.participant_id}`
+
+  if (winner.participant_id < 0) return '-1'
+  else return winner.nickname || `Player ${winner.participant_id}`
 })
 
 const winnerAmount = computed(() => {
@@ -748,8 +750,6 @@ function restartRoundEvents() {
 }
 
 function handleRoundEvent(event: GameRoundEvent) {
-  console.log(event)
-
   if (event.type === 'round_timer') {
     const data = eventData(event)
     const status = String(data.status || roundStatus.value?.status || 'waiting')
@@ -771,14 +771,12 @@ function handleRoundEvent(event: GameRoundEvent) {
 
   // Handle round_started event
   if (event.type === 'round_started') {
-    console.log('Round started - activating spinner')
     isRoundActive.value = true
     roundFinalized.value = false
     startRoundSpinning()
   }
 
   if (event.type === 'round_finalized') {
-    console.log('Round finalized - stopping spinner')
     const data = eventData(event)
     const finalizedRoundId = Number(data.round_id ?? activeRoundId.value ?? 0) || 0
     if (roundStatus.value && roundStatus.value.round_id === finalizedRoundId) {
@@ -1365,7 +1363,6 @@ function stopSpinningAndPointToWinner() {
   
   // Calculate target angle based on winner seat position
   const winnerIndex = seatOptions.value.indexOf(winnerSeat.value)
-  console.log(winnerIndex)
   const totalSeats = seatOptions.value.length
   // const targetAngle = (winnerIndex * 360) / totalSeats - 90
   const targetAngle = 360/totalSeats * winnerIndex
@@ -1528,9 +1525,9 @@ onBeforeUnmount(() => {
                 <div v-if="winnerSeat && roundFinalized" class="winner-announcement">
                   <div class="winner-content">
                     <span class="winner-label">🏆 WINNER! 🏆</span>
-                    <span class="winner-name">Seat {{ winnerSeat }}</span>
-                    <span class="winner-player">{{ winnerName }}</span>
+                    <span class="winner-name">Seat {{ winnerSeat }} - {{ winnerName<0 ? 'bot' : winnerName }}</span>
                     <span class="winner-prize">Won {{ formatMoney(winnerAmount) }}</span>
+                    <span class="winner-timer">{{ t('gameRoom.round.nextRoundTimer') }}: {{ pendingNextRoundCountdown }}</span>
                   </div>
                 </div>
               </div>
@@ -1571,71 +1568,16 @@ onBeforeUnmount(() => {
         </div>
 
 
-      <article class="panel-card">
+      <article class="panel-card right-info">
         <div class="card-head row">
           <div>
-            <p class="eyebrow">{{ t('gameRoom.round.eyebrow') }}</p>
-            <h2>{{ t('gameRoom.round.title') }}</h2>
-            <p class="description">{{ t('gameRoom.round.description') }}</p>
+            <h2>
+              {{ t('gameRoom.round') }} {{ activeRoundId ? `#${activeRoundId}` : '-' }}
+            </h2>
           </div>
           <button class="btn" type="button" :disabled="!activeRoundId || statusLoading" @click="refreshRoundView()">
             {{ statusLoading ? t('common.loading') : t('common.refresh') }}
           </button>
-        </div>
-
-        <div class="meta-grid">
-          <div class="meta-item">
-            <span>{{ t('matchmaking.play.meta.roundId') }}</span>
-            <strong>{{ activeRoundId ? `#${activeRoundId}` : '-' }}</strong>
-          </div>
-          <div class="meta-item">
-            <span>{{ t('gameRoom.round.status') }}</span>
-            <strong>{{ statusLabel }}</strong>
-          </div>
-          <div class="meta-item">
-            <span>{{ t('gameRoom.round.timer') }}</span>
-            <strong>{{ roundTimerValue }}</strong>
-          </div>
-          <div class="meta-item">
-            <span>{{ t('gameRoom.round.fallbackPolling') }}</span>
-            <label class="switch-line">
-              <input v-model="autoRefresh" type="checkbox" />
-              <span>{{ autoRefresh ? t('common.yes') : t('common.no') }}</span>
-            </label>
-          </div>
-          <div class="meta-item">
-            <span>{{ t('gameRoom.round.autoAdvanceNext') }}</span>
-            <label class="switch-line">
-              <input v-model="autoAdvanceNextRound" type="checkbox" />
-              <span>{{ autoAdvanceNextRound ? t('common.yes') : t('common.no') }}</span>
-            </label>
-          </div>
-          <div class="meta-item">
-            <span>{{ t('gameRoom.round.liveStatus') }}</span>
-            <strong :class="{ live: sseConnected }">
-              {{ sseConnected ? t('gameRoom.round.liveConnected') : t('gameRoom.round.liveDisconnected') }}
-            </strong>
-          </div>
-          <div v-if="showNextRoundCountdown" class="meta-item">
-            <span>{{ t('gameRoom.round.nextRoundTimer') }}</span>
-            <strong>{{ pendingNextRoundCountdown }}s</strong>
-          </div>
-        </div>
-
-        <p class="description live-hint">
-          {{ sseConnected ? t('gameRoom.round.ssePrimary') : t('gameRoom.round.pollingFallback') }}
-        </p>
-
-        <div class="round-timeline" :aria-label="t('gameRoom.round.timeline')">
-          <div
-            v-for="phase in roundPhases"
-            :key="phase.key"
-            class="phase-step"
-            :class="{ active: phase.active, complete: phase.complete }"
-          >
-            <strong>{{ phase.title }}</strong>
-            <span>{{ phase.description }}</span>
-          </div>
         </div>
 
         <div class="participants">
@@ -1806,8 +1748,13 @@ onBeforeUnmount(() => {
 /* game related */
 .game-area {
   display: flex;
-  flex-direction: column;
+/*  flex-direction: column;*/
   gap: 1rem;
+}
+
+.right-info {
+  width: 30%;
+  min-width: 350px;
 }
 
 .circular-seat-container {
@@ -1925,6 +1872,7 @@ onBeforeUnmount(() => {
   position: absolute;
   top: 60%;
   left: 50%;
+  min-width: 220px;
   transform: translateX(-50%);
   z-index: 20;
   animation: winnerFloatUp 0.5s ease-out;
@@ -2179,10 +2127,15 @@ onBeforeUnmount(() => {
   gap: 1rem;
 }
 
+.join-box {
+  min-width: 460px;
+  flex-grow: 1;
+}
+
 .panel-card {
-  background:
-    radial-gradient(circle at top left, color-mix(in oklab, #0ea5e9, white 88%), transparent 28%),
-    linear-gradient(180deg, color-mix(in oklab, var(--color-surface), white 14%), var(--color-surface));
+  background: color-mix(in oklab, var(--color-surface), white 10%);
+    /*radial-gradient(circle at top left, color-mix(in oklab, #0ea5e9, white 88%), transparent 28%),
+    linear-gradient(180deg, color-mix(in oklab, var(--color-surface), white 14%), var(--color-surface));*/
 }
 
 .card-head {
@@ -2541,6 +2494,14 @@ input[type='number'] {
   .play-grid,
   .control-grid {
     grid-template-columns: 1fr;
+  }
+
+  .game-area {
+    flex-direction: column;
+  }
+
+  .right-info {
+    width: 100%;
   }
 }
 
