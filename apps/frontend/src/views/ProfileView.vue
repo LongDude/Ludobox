@@ -923,7 +923,7 @@ async function logout() {
                   </button>
                 </div>
               </div>
-
+              
               <div v-if="ratingHistoryLoading" class="chart-empty">
                 {{ t('profile.game.ratingHistory.loading') }}
               </div>
@@ -934,7 +934,12 @@ async function logout() {
                 {{ t('profile.game.ratingHistory.empty') }}
               </div>
               <div v-else class="chart-shell">
-
+                <div v-if="latestRatingUpdate" class="chart-footnote">
+                  <span>
+                    {{ t('profile.game.ratingHistory.lastChange') }}
+                    <strong>{{ formatSignedNumber(latestRatingUpdate.delta) }}</strong>
+                  </span>
+                </div>
                 <p v-if="chartHelperText" class="chart-helper">
                   {{ chartHelperText }}
                 </p>
@@ -1051,20 +1056,21 @@ async function logout() {
                     :y1="RATING_CHART_TOP"
                     :y2="RATING_CHART_BOTTOM"
                   />
+                  <text
+                  class="chart-axis"
+                  :x="RATING_CHART_LEFT"
+                  :y="RATING_CHART_BOTTOM+12"
+                  >
+                  {{ chartStartLabel }}
+                  </text>
+                  <text
+                  class="chart-axis"
+                  :x="RATING_CHART_RIGHT-48"
+                  :y="RATING_CHART_BOTTOM+12"
+                  >
+                  {{ chartEndLabel }}
+                  </text>
                 </svg>
-
-                <div class="chart-axis">
-                  <span>{{ chartStartLabel }}</span>
-                  <span>{{ chartEndLabel }}</span>
-                </div>
-
-                <div v-if="latestRatingUpdate" class="chart-footnote">
-                  <span>
-                    {{ t('profile.game.ratingHistory.lastChange') }}
-                    <strong>{{ formatSignedNumber(latestRatingUpdate.delta) }}</strong>
-                  </span>
-                  <span>{{ formatRatingDateTime(latestRatingUpdate.created_at) }}</span>
-                </div>
               </div>
             </section>
           </template>
@@ -1539,6 +1545,7 @@ input[type='number'] {
 
 .chart-axis,
 .chart-footnote {
+  fill: var(--color-muted);
   width: 100%;
 }
 
