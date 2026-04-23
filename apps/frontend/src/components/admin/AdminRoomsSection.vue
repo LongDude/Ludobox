@@ -352,7 +352,6 @@ function playersLabel(count: number) {
         <dl class="room-meta">
           <div>
             <dt>{{ t('admin.roomsSection.meta.config') }}</dt>
-            <dd>{{ roomConfigLabel(room) }}</dd>
           </div>
           <div>
             <dt>{{ t('admin.roomsSection.meta.server') }}</dt>
