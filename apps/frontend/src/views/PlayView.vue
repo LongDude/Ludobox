@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onBeforeUnmount, ref, watch } from 'vue'
+import { computed, onBeforeUnmount, ref, watch, type CSSProperties } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import LeftTab from '@/components/LeftTab.vue'
 import UpTab from '@/components/UpTab.vue'
@@ -66,8 +66,7 @@ const isSpinning = ref(false)
 const arrowAngle = ref(0)
 const isRoundActive = ref(false)
 const roundFinalized = ref(false)
-let spinInterval = null
-let roundStartTime = null
+let spinInterval: ReturnType<typeof window.setInterval> | null = null
 
 const winnerSeat = computed(() => {
   if (!winners.value.length) return null
@@ -78,8 +77,8 @@ const winnerName = computed(() => {
   if (!winners.value.length) return ''
   const winner = winners.value[0]
 
-  if (winner.participant_id < 0) return '-1'
-  else return winner.nickname || `Player ${winner.participant_id}`
+  if (winner.is_bot || winner.participant_id < 0) return t('gameRoom.round.winnerBot')
+  return winner.nickname || `Player ${winner.participant_id}`
 })
 
 const winnerAmount = computed(() => {
@@ -1317,21 +1316,20 @@ function formatMoney(amount: number) {
   return amount
 }
 
-function getSeatPosition(index, totalSeats) {
-  // const angle = (index * 360) / totalSeats - 90
-  const angle = 360 / totalSeats * index - 90
+function getSeatPosition(index: number, totalSeats: number): CSSProperties {
+  const angle = (360 / totalSeats) * index - 90
   const radius = 200
   const x = Math.cos((angle * Math.PI) / 180) * radius
   const y = Math.sin((angle * Math.PI) / 180) * radius
-  
+
   return {
     transform: `translate(calc(-50% + ${x}px), calc(-50% + ${y}px))`,
-    position: 'absolute'
+    position: 'absolute',
   }
 }
 
-function getParticipantOnSeat(seatNumber) {
-  return participants.value.find(p => p.number_in_room === seatNumber)
+function getParticipantOnSeat(seatNumber: number) {
+  return participants.value.find((participant) => participant.number_in_room === seatNumber)
 }
 
 function startRoundSpinning() {
@@ -1373,7 +1371,7 @@ function stopSpinningAndPointToWinner() {
   const duration = 1000 // 1 second
   const startTime = performance.now()
   
-  function animate(currentTime) {
+  function animate(currentTime: number) {
     const elapsed = currentTime - startTime
     const progress = Math.min(1, elapsed / duration)
     
@@ -1525,7 +1523,7 @@ onBeforeUnmount(() => {
                 <div v-if="winnerSeat && roundFinalized" class="winner-announcement">
                   <div class="winner-content">
                     <span class="winner-label">🏆 WINNER! 🏆</span>
-                    <span class="winner-name">Seat {{ winnerSeat }} - {{ winnerName<0 ? 'bot' : winnerName }}</span>
+                    <span class="winner-name">Seat {{ winnerSeat }} - {{ winnerName }}</span>
                     <span class="winner-prize">Won {{ formatMoney(winnerAmount) }}</span>
                     <span class="winner-timer">{{ t('gameRoom.round.nextRoundTimer') }}: {{ pendingNextRoundCountdown }}</span>
                   </div>
