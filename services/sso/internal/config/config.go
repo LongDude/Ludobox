@@ -7,25 +7,26 @@ import (
 )
 
 type Config struct {
-	PostgresConfig      PostgresConfig
-	RedisConfig         RedisConfig
-	HttpServerConfig    HTTPServerConfig
-	GRPCConfig          gRPCConfig
-	JWTConfig           JWTConfig
-	CookieConfig        CookieConfig
-	OauthGoogleConfig   OauthGoogleConfig
-	OauthYandexConfig   OauthYandexConfig
-	EmailConfig         EmailConfig
-	Domain              string   `env:"DOMAIN" env-default:"localhost"`
-	PublicURL           string   `env:"PUBLIC_URL"`
-	SwaggerBasePath     string   `env:"SWAGGER_BASE_PATH" env-default:"/api"`
-	AllowedCORSOrigins  []string `env:"ALLOWED_CORS_ORIGINS" env-separator:","`
-	AllowedRedirectURLs []string `env:"ALLOWED_REDIRECT_URLS" env-separator:","`
-	DefaultAdminEmails  []string `env:"DEFAULT_ADMIN_EMAILS" env-separator:","`
-	LogLevel            string   `env:"LOG_LEVEL" env-default:"info"`
-	SwaggerEnabled      bool     `env:"SWAGGER_ENABLED" env-default:"true"`
-	SwaggerUser         string   `env:"SWAGGER_USER"`
-	SwaggerPassword     string   `env:"SWAGGER_PASSWORD"`
+	PostgresConfig           PostgresConfig
+	RedisConfig              RedisConfig
+	HttpServerConfig         HTTPServerConfig
+	GRPCConfig               gRPCConfig
+	JWTConfig                JWTConfig
+	CookieConfig             CookieConfig
+	OauthGoogleConfig        OauthGoogleConfig
+	OauthYandexConfig        OauthYandexConfig
+	EmailConfig              EmailConfig
+	Domain                   string   `env:"DOMAIN" env-default:"localhost"`
+	PublicURL                string   `env:"PUBLIC_URL"`
+	SwaggerBasePath          string   `env:"SWAGGER_BASE_PATH" env-default:"/api"`
+	AllowedCORSOrigins       []string `env:"ALLOWED_CORS_ORIGINS" env-separator:","`
+	AllowedRedirectURLs      []string `env:"ALLOWED_REDIRECT_URLS" env-separator:","`
+	DefaultAdminEmails       []string `env:"DEFAULT_ADMIN_EMAILS" env-separator:","`
+	RequireEmailVerification bool     `env:"REQUIRE_EMAIL_VERIFICATION" env-default:"true"`
+	LogLevel                 string   `env:"LOG_LEVEL" env-default:"info"`
+	SwaggerEnabled           bool     `env:"SWAGGER_ENABLED" env-default:"true"`
+	SwaggerUser              string   `env:"SWAGGER_USER"`
+	SwaggerPassword          string   `env:"SWAGGER_PASSWORD"`
 }
 
 type PostgresConfig struct {
@@ -55,12 +56,12 @@ type MinioConfig struct {
 }
 
 type EmailConfig struct {
-	SMTPHost     string `env:"SMTP_HOST" env-required:"true"`
-	SMTPPort     string `env:"SMTP_PORT" env-required:"true"`
-	SMTPUsername string `env:"SMTP_USERNAME" env-required:"true"`
-	SMTPPassword string `env:"SMTP_PASSWORD" env-required:"true"`
-	FromEmail    string `env:"FROM_EMAIL" env-required:"true"`
-	JwtSecret    string `env:"SMTP_JWT_SECRET" env-required:"true"`
+	SMTPHost     string `env:"SMTP_HOST"`
+	SMTPPort     string `env:"SMTP_PORT"`
+	SMTPUsername string `env:"SMTP_USERNAME"`
+	SMTPPassword string `env:"SMTP_PASSWORD"`
+	FromEmail    string `env:"FROM_EMAIL"`
+	JwtSecret    string `env:"SMTP_JWT_SECRET"`
 }
 
 type JWTConfig struct {

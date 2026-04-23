@@ -35,7 +35,15 @@ func NewApp(
 	}
 	EmailService := service.NewEmailService(&cfg.EmailConfig, baseURL, Logger)
 	SessionService := service.NewSessionService(SessionRepository, TokenBlocklist, JWTService, Logger)
-	AuthService := service.NewAuthService(JWTService, EmailService, SessionService, UserRepository, TokenBlocklist, Logger)
+	AuthService := service.NewAuthService(
+		JWTService,
+		EmailService,
+		SessionService,
+		UserRepository,
+		TokenBlocklist,
+		cfg.RequireEmailVerification,
+		Logger,
+	)
 	OauthGoogleService := oauth.NewOAuthGoogleService(UserRepository, cfg, Logger)
 	OauthYandexService := oauth.NewOAuthYandexService(UserRepository, cfg, Logger)
 	OAuthService := service.NewOAuthService(OauthGoogleService, OauthYandexService, JWTService, SessionService, UserRepository, Logger, cfg.JWTConfig.SecretKey, cfg.AllowedRedirectURLs)
