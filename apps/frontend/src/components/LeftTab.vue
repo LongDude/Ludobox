@@ -538,6 +538,13 @@ function isActive(path: string) {
     min-height: 0;
     padding: 0.75rem;
     border-radius: 1.3rem;
+
+    background:
+    linear-gradient(
+      180deg,
+      color-mix(in oklab, var(--color-bg-secondary), white 14%),
+      color-mix(in oklab, var(--color-surface), transparent 4%)
+    );
   }
 
   .shell {
