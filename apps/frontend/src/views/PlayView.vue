@@ -1016,7 +1016,6 @@ async function refreshRoundView(silent = false) {
 
 async function reserveSeats() {
   clearFeedback()
-
   if (!canJoinMoreSeats.value) {
     errorMsg.value = joinBlockedHint.value
     return
@@ -1036,17 +1035,28 @@ async function reserveSeats() {
         throw new Error(t('gameRoom.entry.roomFull'))
       }
 
-      for (let attempt = 0; attempt < targetRandomCount; attempt += 1) {
-        try {
-          joinResult.value = await GameApi.joinRoom(roomId.value)
-          rememberOwnedParticipantIds([joinResult.value.participant_id])
-          reservedSeats.push(joinResult.value.number_in_room)
-        } catch (error: any) {
-          if (reservedSeats.length > 0 && isRecoverableRandomJoinError(error)) {
-            break
-          }
-          throw error
-        }
+      // Get all free seats
+      const allFreeSeats = getFreeSeatsList()
+      
+      if (allFreeSeats.length < targetRandomCount) {
+        throw new Error(t('gameRoom.entry.roomFull'))
+      }
+      
+      // Shuffle and pick random seats
+      const shuffledFreeSeats = [...allFreeSeats]
+      for (let i = shuffledFreeSeats.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [shuffledFreeSeats[i], shuffledFreeSeats[j]] = [shuffledFreeSeats[j], shuffledFreeSeats[i]]
+      }
+      
+      const randomSeatsToReserve = shuffledFreeSeats.slice(0, targetRandomCount)
+      
+      // Reserve each random seat
+      for (const seat of randomSeatsToReserve) {
+        const response = await GameApi.joinRoomWithSeat(roomId.value, { number_in_room: seat })
+        joinResult.value = response
+        rememberOwnedParticipantIds([response.participant_id])
+        reservedSeats.push(response.number_in_room)
       }
     } else {
       for (const seat of requestedSeats) {
@@ -1094,6 +1104,17 @@ async function reserveSeats() {
   } finally {
     joining.value = false
   }
+}
+
+// filter free seats
+function getFreeSeatsList(): number[] {
+  const freeSeats: number[] = []
+  for (let i = 1; i <= roomCapacity.value; i++) {
+    if (!occupiedSeats.value.has(i)) {
+      freeSeats.push(i)
+    }
+  }
+  return freeSeats
 }
 
 async function purchaseBoost() {
@@ -2325,6 +2346,7 @@ label,
 .participant-card {
   display: flex;
   max-width: 48%;
+  width: 48%;
 
   align-items: center;
   gap: 0.5rem;
