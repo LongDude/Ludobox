@@ -128,6 +128,8 @@ make MATCHMAKING_SCALE=2 USER_SERVICE_SCALE=1 up
 - Корневой `haproxy` теперь является единой публичной точкой входа для `https://DOMAIN/` и `https://DOMAIN/api/...`.
 - Для выпуска и продления сертификатов в общем Compose используется сервис `frontend-certbot`.
 - Артефакты Let's Encrypt и webroot challenge хранятся в `apps/frontend/certbot/conf` и `apps/frontend/certbot/www`.
+- Команды `make frontend-prod-cert` и `make frontend-prod-renew` запускают `frontend-certbot` с UID/GID текущего пользователя, чтобы bind-mount не оставлял на хосте файлы от `root`.
+- Если сертификаты уже были созданы от `root`, один раз исправьте владельца: `sudo chown -R $(id -u):$(id -g) apps/frontend/certbot/conf apps/frontend/certbot/www`.
 - Перед `make frontend-prod-cert` или `make frontend-vps-up` укажите в корневом `.env`:
   - `DOMAIN`
   - `LETSENCRYPT_EMAIL`

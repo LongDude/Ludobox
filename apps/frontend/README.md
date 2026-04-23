@@ -82,6 +82,8 @@ npm run build
 - VPS и production TLS теперь поднимаются через корневые `docker-compose.yml`, `Makefile` и общий `haproxy`.
 - Для генерации и продления сертификатов используется сервис `frontend-certbot`.
 - Сертификаты и ACME webroot сохраняются в `apps/frontend/certbot/conf` и `apps/frontend/certbot/www`.
+- `make frontend-prod-cert` и `make frontend-prod-renew` пробрасывают UID/GID текущего пользователя в `frontend-certbot`, чтобы файлы в bind-mount не создавались от `root`.
+- Если каталог уже успел перейти под `root`, один раз верните владельца: `sudo chown -R $(id -u):$(id -g) apps/frontend/certbot/conf apps/frontend/certbot/www`.
 - Перед `make frontend-vps-up` или `make frontend-prod-cert` заполните в корневом `.env`:
   - `DOMAIN`
   - `LETSENCRYPT_EMAIL`

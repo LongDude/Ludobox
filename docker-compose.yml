@@ -470,6 +470,7 @@ services:
   frontend-certbot:
     image: certbot/certbot:latest
     profiles: ["frontend-prod"]
+    user: "${CERTBOT_UID:-1000}:${CERTBOT_GID:-1000}"
     environment:
       DOMAIN: ${DOMAIN}
       LETSENCRYPT_EMAIL: ${LETSENCRYPT_EMAIL}
