@@ -30,8 +30,8 @@ const props = defineProps<{
 watch(
   () => props.hidden,
   (value) => {
-    if (typeof value === 'boolean' && value !== LeftTabHidden.value) {
-      LeftTabHidden.value = value
+    if (typeof value === 'boolean') {
+      settingStore.applyInitialLeftTabHidden(value)
     }
   },
   { immediate: true },
