@@ -421,6 +421,7 @@ function distributionLabel(value: number, index: number) {
               type="number"
               min="1"
               max="20"
+              disabled
             />
           </label>
           <label class="boost-toggle">
@@ -455,6 +456,7 @@ function distributionLabel(value: number, index: number) {
               class="input"
               type="text"
               :placeholder="t('admin.configsSection.distributionPlaceholder')"
+              disabled
             />
             <small>{{ t('admin.configsSection.distributionHelp') }}</small>
           </label>

@@ -862,7 +862,7 @@ const messages: Record<Locale, Record<string, string>> = {
     'gameRoom.events.genericDetails': 'Состояние раунда изменилось.',
     'gameRoom.prototypeDescription':
       'Рабочий прототип для тестирования game_server flow: вход в комнату, выбор места, статус раунда, буст и выход.',
-    'gameRoom.state.joined': 'В комнате',
+    'gameRoom.state.joined': 'Участвует',
     'gameRoom.state.notJoined': 'Не в комнате',
     'gameRoom.messages.quickSessionRestored': 'Сессия quick match восстановлена из метаданных matchmaking.',
     'gameRoom.messages.joined': 'Вход выполнен. Ваше место #{seat}.',

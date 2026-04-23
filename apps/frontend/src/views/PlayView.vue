@@ -62,6 +62,29 @@ let roundEventsStop: (() => void) | null = null
 let nextRoundTimer: number | null = null
 let liveEventId = 0
 
+const isSpinning = ref(false)
+const arrowAngle = ref(0)
+const isRoundActive = ref(false)
+const roundFinalized = ref(false)
+let spinInterval = null
+let roundStartTime = null
+
+const winnerSeat = computed(() => {
+  if (!winners.value.length) return null
+  return winners.value[0]?.number_in_room || null
+})
+
+const winnerName = computed(() => {
+  if (!winners.value.length) return ''
+  const winner = winners.value[0]
+  return winner.nickname || `Player ${winner.participant_id}`
+})
+
+const winnerAmount = computed(() => {
+  if (!winners.value.length) return 0
+  return winners.value[0].winnings || 0
+})
+
 const room = computed(() => {
   const candidate = session.selectedRoom
   if (!candidate) return null
@@ -102,10 +125,9 @@ const currentUserId = computed(() => auth.User?.id ?? null)
 const roomCapacity = computed(
   () => roomState.value?.room_capacity || joinResult.value?.room_capacity || room.value?.capacity || 0,
 )
-const entryPrice = computed(() => {
-  const value = roomState.value?.entry_price ?? joinResult.value?.entry_price ?? room.value?.registration_price
-  return value === undefined || value === null ? '-' : formatMoney(value)
-})
+const entryPrice = computed(
+  () => roomState.value?.entry_price ?? joinResult.value?.entry_price ?? room.value?.registration_price ?? '-',
+)
 const minPlayers = computed(
   () => roomState.value?.min_players ?? joinResult.value?.min_players ?? room.value?.min_users ?? '-',
 )
@@ -575,15 +597,6 @@ function formatScore() {
   return room.value.score.toFixed(2)
 }
 
-function formatMoney(value: number | string | null | undefined) {
-  const numeric = Number(value)
-  if (!Number.isFinite(numeric)) return '-'
-
-  return new Intl.NumberFormat(undefined, {
-    maximumFractionDigits: 2,
-  }).format(numeric)
-}
-
 function normalizeError(error: any, fallback: string) {
   const code = error?.details?.code
   if (code === 'BOOST_ALREADY_PURCHASED') return t('gameRoom.errors.boostAlreadyPurchased')
@@ -735,6 +748,8 @@ function restartRoundEvents() {
 }
 
 function handleRoundEvent(event: GameRoundEvent) {
+  console.log(event)
+
   if (event.type === 'round_timer') {
     const data = eventData(event)
     const status = String(data.status || roundStatus.value?.status || 'waiting')
@@ -754,7 +769,16 @@ function handleRoundEvent(event: GameRoundEvent) {
 
   liveEvents.value = [{ ...event, id: ++liveEventId }, ...liveEvents.value].slice(0, 5)
 
+  // Handle round_started event
+  if (event.type === 'round_started') {
+    console.log('Round started - activating spinner')
+    isRoundActive.value = true
+    roundFinalized.value = false
+    startRoundSpinning()
+  }
+
   if (event.type === 'round_finalized') {
+    console.log('Round finalized - stopping spinner')
     const data = eventData(event)
     const finalizedRoundId = Number(data.round_id ?? activeRoundId.value ?? 0) || 0
     if (roundStatus.value && roundStatus.value.round_id === finalizedRoundId) {
@@ -764,6 +788,10 @@ function handleRoundEvent(event: GameRoundEvent) {
         time_left_seconds: 0,
       }
     }
+    
+    // Stop spinning and point to winner
+    stopSpinningAndPointToWinner()
+    
     stopStatusPolling()
     if (finalizedRoundId > 0) {
       displayedRoundId.value = finalizedRoundId
@@ -1092,7 +1120,7 @@ async function purchaseBoost() {
       cost: response.boost_cost,
     })
     refreshCabinetBalance()
-    await refreshRoundView()
+    // await refreshRoundView()
   } catch (error: any) {
     errorMsg.value = normalizeError(error, t('gameRoom.errors.boost'))
   } finally {
@@ -1115,7 +1143,7 @@ async function cancelBoost() {
     const response = await GameApi.cancelBoost(roomId.value, participant.participant_id)
     successMsg.value = t('gameRoom.messages.boostCancelled', { refund: response.refund ?? 0 })
     refreshCabinetBalance()
-    await refreshRoundView()
+    // await refreshRoundView()
   } catch (error: any) {
     errorMsg.value = normalizeError(error, t('gameRoom.errors.cancelBoost'))
   } finally {
@@ -1290,6 +1318,102 @@ function scheduleNextRoundTransition(nextRoundId: number | null, nextRoundDelay:
 function formatMoney(amount: number) {
   return amount
 }
+
+function getSeatPosition(index, totalSeats) {
+  // const angle = (index * 360) / totalSeats - 90
+  const angle = 360 / totalSeats * index - 90
+  const radius = 200
+  const x = Math.cos((angle * Math.PI) / 180) * radius
+  const y = Math.sin((angle * Math.PI) / 180) * radius
+  
+  return {
+    transform: `translate(calc(-50% + ${x}px), calc(-50% + ${y}px))`,
+    position: 'absolute'
+  }
+}
+
+function getParticipantOnSeat(seatNumber) {
+  return participants.value.find(p => p.number_in_room === seatNumber)
+}
+
+function startRoundSpinning() {
+  isRoundActive.value = true
+  roundFinalized.value = false
+  isSpinning.value = true
+  
+  // Reset arrow angle to 0 before starting
+  arrowAngle.value = 0
+  
+  // Continuous spinning animation
+  let currentAngle = 0
+  spinInterval = setInterval(() => {
+    currentAngle = (currentAngle + 15) % 360
+    arrowAngle.value = currentAngle
+  }, 50)
+}
+
+function stopSpinningAndPointToWinner() {
+  if (spinInterval) {
+    clearInterval(spinInterval)
+    spinInterval = null
+  }
+  
+  if (!winnerSeat.value || !seatOptions.value.length) {
+    isSpinning.value = false
+    return
+  }
+  
+  // Calculate target angle based on winner seat position
+  const winnerIndex = seatOptions.value.indexOf(winnerSeat.value)
+  console.log(winnerIndex)
+  const totalSeats = seatOptions.value.length
+  // const targetAngle = (winnerIndex * 360) / totalSeats - 90
+  const targetAngle = 360/totalSeats * winnerIndex
+  
+  // Smooth animation to winner
+  const startAngle = arrowAngle.value
+  const angleDiff = ((targetAngle - startAngle) + 360) % 360
+  const duration = 1000 // 1 second
+  const startTime = performance.now()
+  
+  function animate(currentTime) {
+    const elapsed = currentTime - startTime
+    const progress = Math.min(1, elapsed / duration)
+    
+    // Easing function for smooth stop
+    const easeOut = 1 - Math.pow(1 - progress, 3)
+    const currentAngle = startAngle + (angleDiff * easeOut)
+    arrowAngle.value = currentAngle % 360
+    
+    if (progress < 1) {
+      requestAnimationFrame(animate)
+    } else {
+      arrowAngle.value = targetAngle
+      isSpinning.value = false
+      roundFinalized.value = true
+      isRoundActive.value = false
+    }
+  }
+  
+  requestAnimationFrame(animate)
+}
+
+// Reset round state when new round starts
+watch(() => roomRoundId.value, () => {
+  isRoundActive.value = false
+  roundFinalized.value = false
+  if (spinInterval) {
+    clearInterval(spinInterval)
+    spinInterval = null
+  }
+  isSpinning.value = false
+  arrowAngle.value = 0
+})
+
+// Clean up on unmount
+onBeforeUnmount(() => {
+  if (spinInterval) clearInterval(spinInterval)
+})
 </script>
 
 <template>
@@ -1299,60 +1423,20 @@ function formatMoney(amount: number) {
   <main class="play-area" :class="{ collapsed: leftHidden }" :style="{ '--layout-inset': layoutInset }">
     <section class="hero-card">
       <div>
-        <p class="eyebrow">{{ t('matchmaking.play.eyebrow') }}</p>
         <h1>{{ t('matchmaking.play.title', { roomId }) }}</h1>
-        <p class="description">{{ t('gameRoom.prototypeDescription') }}</p>
+        <p class="description">
+          {{ t('matchmaking.play.meta.entry') }}: {{ entryPrice }},
+          {{ t('matchmaking.play.meta.capacity') }}: {{ roomCapacity }},
+          {{ t('matchmaking.play.meta.boost') }}: {{ formatBoost() }}
+        </p>
       </div>
-      <div class="hero-pills">
-        <span class="source-pill">{{ sourceLabel }}</span>
-        <span class="source-pill" :class="{ joined: isJoined }">
-          {{ isJoined ? t('gameRoom.state.joined') : t('gameRoom.state.notJoined') }}
-        </span>
-      </div>
+      <button class="btn" type="button" @click="openRooms">
+              {{ t('matchmaking.play.backRooms') }}
+            </button>
     </section>
 
-    <div v-if="successMsg || errorMsg" class="feedback-bar" :class="{ error: errorMsg }">
-      {{ errorMsg || successMsg }}
-    </div>
-
-    <section class="play-grid">
-      <article class="panel-card">
-        <div class="card-head">
-          <div>
-            <p class="eyebrow accent">{{ t('gameRoom.entry.eyebrow') }}</p>
-            <h2>{{ t('gameRoom.entry.title') }}</h2>
-            <p class="description">{{ t('gameRoom.entry.description') }}</p>
-          </div>
-        </div>
-
-        <div class="meta-grid">
-          <div class="meta-item">
-            <span>{{ t('matchmaking.play.meta.entry') }}</span>
-            <strong>{{ entryPrice }}</strong>
-          </div>
-          <div class="meta-item">
-            <span>{{ t('matchmaking.play.meta.capacity') }}</span>
-            <strong>{{ roomCapacity || '-' }}</strong>
-          </div>
-          <div class="meta-item">
-            <span>{{ t('matchmaking.play.meta.players') }}</span>
-            <strong>{{ currentPlayers }}</strong>
-          </div>
-          <div class="meta-item">
-            <span>{{ t('matchmaking.play.meta.minimumUsers') }}</span>
-            <strong>{{ minPlayers }}</strong>
-          </div>
-          <div class="meta-item">
-            <span>{{ t('matchmaking.play.meta.boost') }}</span>
-            <strong>{{ formatBoost() }}</strong>
-          </div>
-          <div class="meta-item">
-            <span>{{ t('matchmaking.play.meta.score') }}</span>
-            <strong>{{ formatScore() }}</strong>
-          </div>
-        </div>
-
-        <div class="join-box" :class="{ joined: isJoined }">
+    <section class="game-area">
+        <div class="join-box" :class="{ joined: isJoined, 'round-active': isRoundActive }">
           <div v-if="isJoined" class="own-seats">
             <p class="join-title">
               {{ t('gameRoom.entry.ownedSeatsTitle', { count: ownedParticipants.length }) }}
@@ -1369,10 +1453,7 @@ function formatMoney(amount: number) {
               >
                 <div>
                   <strong>{{ t('gameRoom.participant.seat', { seat: participant.number_in_room }) }}</strong>
-                  <span v-if="participant.nickname">{{ participant.nickname }}</span>
-                  <span v-else-if="participant.user_id">
-                    {{ t('gameRoom.participant.user', { id: participant.user_id }) }}
-                  </span>
+ 
                   <span v-if="participant.boost > 0">
                     {{ t('gameRoom.entry.boostActiveSeat', { seat: participant.number_in_room }) }}
                   </span>
@@ -1399,53 +1480,96 @@ function formatMoney(amount: number) {
             </p>
             <p class="description">{{ joinBlockedHint }}</p>
 
-            <template v-if="canJoinMoreSeats">
-              <label class="seat-input">
-                <span>{{ t('gameRoom.entry.randomSeatsCount') }}</span>
-                <input
-                  v-model.number="randomReserveCount"
-                  type="number"
-                  min="1"
-                  :max="randomReserveMax"
-                  :disabled="Boolean(selectedSeats.length)"
-                />
-              </label>
+              <!-- Always show circular seat selection -->
+              <div class="circular-seat-container">
+                <div class="seats-circle">
+                  <!-- Arrow always visible, spins during round -->
+                  <div class="spinning-arrow" 
+                       :class="{ spinning: isRoundActive && !roundFinalized }" 
+                       :style="{ transform: `rotate(${arrowAngle}deg)` }">
+                    <svg viewBox="0 0 100 100" class="arrow-svg">
+                      <polygon points="50,10 40,30 60,30" fill="#f59e0b" stroke="#d97706" stroke-width="2"/>
+                      <rect x="48" y="30" width="4" height="40" fill="#f59e0b" />
+                    </svg>
+                  </div>
+                  
+                  <!-- Seat Buttons - disabled during round but visible -->
+                  <button
+                    v-for="(seat, index) in seatOptions"
+                    :key="seat"
+                    class="circular-seat-button"
+                    :class="{
+                      occupied: occupiedSeats.has(seat),
+                      selected: selectedSeatNumbers.has(seat),
+                      'own-seat': ownedSeatNumbers.has(seat),
+                      'winner-seat': winnerSeat === seat && roundFinalized
+                    }"
+                    :style="getSeatPosition(index, seatOptions.length)"
+                    type="button"
+                    :disabled="isRoundActive || !canSelectSeat(seat) || occupiedSeats.has(seat)"
+                    @click="toggleSeatSelection(seat)"
+                  >
+                    <span class="seat-number">{{ seat }}</span>
+                    <span v-if="getParticipantOnSeat(seat)" class="seat-player">
+                      {{ getParticipantOnSeat(seat)?.nickname || `P${getParticipantOnSeat(seat)?.participant_id}` }}
+                    </span>
+                  </button>
+                </div>
+                
+                <!-- Timer display during round -->
+                <div v-if="isRoundActive && !roundFinalized" class="round-timer-overlay">
+                  <div class="timer-circle">
+                    <span class="timer-label">Time Remaining</span>
+                    <span class="timer-value">{{ roundTimerValue }}s</span>
+                  </div>
+                </div>
 
-              <div v-if="seatOptions.length" class="seat-grid" :aria-label="t('gameRoom.entry.seats')">
-                <button
-                  v-for="seat in seatOptions"
-                  :key="seat"
-                  class="seat-button"
-                  :class="{
-                    occupied: occupiedSeats.has(seat),
-                    selected: selectedSeatNumbers.has(seat),
-                    locked: !occupiedSeats.has(seat) && !selectedSeatNumbers.has(seat) && !canSelectSeat(seat),
-                    'own-seat': ownedSeatNumbers.has(seat),
-                  }"
-                  type="button"
-                  :disabled="!canSelectSeat(seat)"
-                  @click="toggleSeatSelection(seat)"
-                >
-                  {{ seat }}
-                </button>
+                <!-- Winner Display -->
+                <div v-if="winnerSeat && roundFinalized" class="winner-announcement">
+                  <div class="winner-content">
+                    <span class="winner-label">🏆 WINNER! 🏆</span>
+                    <span class="winner-name">Seat {{ winnerSeat }}</span>
+                    <span class="winner-player">{{ winnerName }}</span>
+                    <span class="winner-prize">Won {{ formatMoney(winnerAmount) }}</span>
+                  </div>
+                </div>
               </div>
 
-              <p v-if="selectedSeats.length" class="description">
-                {{ t('gameRoom.entry.selectedSeats', { seats: selectedSeats.join(', ') }) }}
-              </p>
-              <p v-else class="description">
-                {{ t('gameRoom.entry.randomSeatsHint', { count: safeRandomReserveCount }) }}
-              </p>
+              <!-- Selection controls - hidden during round -->
+              <div v-if="!isRoundActive && canJoinMoreSeats" class="selection-controls">
+                <label class="random-count-control">
+                  <span>{{ t('gameRoom.entry.randomSeatsCount') }}</span>
+                  <input
+                    v-model.number="randomReserveCount"
+                    type="number"
+                    min="1"
+                    :max="randomReserveMax"
+                    :disabled="Boolean(selectedSeats.length)"
+                  />
+                </label>
+                
+                <p v-if="selectedSeats.length" class="selected-seats-info">
+                  ✓ {{ t('gameRoom.entry.selectedSeats', { seats: selectedSeats.join(', ') }) }}
+                </p>
+                <p v-else class="selected-seats-info">
+                  🎲 {{ t('gameRoom.entry.randomSeatsHint', { count: safeRandomReserveCount }) }}
+                </p>
 
-              <div class="actions stretch">
-                <button class="btn btn--primary" type="button" :disabled="joining" @click="reserveSeats">
-                  {{ reserveSeatsLabel }}
-                </button>
+                <div class="actions stretch">
+                  <button class="btn btn--primary" type="button" :disabled="joining" @click="reserveSeats">
+                    {{ reserveSeatsLabel }}
+                  </button>
+                </div>
               </div>
-            </template>
+
+              <!-- Show message during round that selection is disabled -->
+              <div v-if="isRoundActive && !roundFinalized" class="round-message">
+                <p>⚡ Round in progress - Seat selection disabled ⚡</p>
+              </div>
+
           </div>
         </div>
-      </article>
+
 
       <article class="panel-card">
         <div class="card-head row">
@@ -1657,26 +1781,6 @@ function formatMoney(amount: number) {
           </div>
         </div>
 
-        <div class="control-block">
-          <h3>{{ t('gameRoom.controls.roomTitle') }}</h3>
-          <p class="description">{{ t('gameRoom.controls.roomHint') }}</p>
-          <div class="actions stretch">
-            <button
-              class="btn btn--danger"
-              type="button"
-              :disabled="!canLeaveRoom || actionLoading === 'leave-room'"
-              @click="leaveRoomFully"
-            >
-              {{ actionLoading === 'leave-room' ? t('common.loading') : t('gameRoom.controls.leaveRoom') }}
-            </button>
-            <button class="btn" type="button" @click="backToHome">
-              {{ t('matchmaking.play.backHome') }}
-            </button>
-            <button class="btn" type="button" @click="openRooms">
-              {{ t('matchmaking.play.backRooms') }}
-            </button>
-          </div>
-        </div>
       </div>
     </section>
   </main>
@@ -1699,6 +1803,337 @@ function formatMoney(amount: number) {
   --layout-inset: 92px 20px 20px 120px;
 }
 
+/* game related */
+.game-area {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.circular-seat-container {
+  position: relative;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-height: 420px;
+  margin: 1rem 0;
+}
+
+.seats-circle {
+  position: relative;
+  width: 380px;
+  height: 380px;
+  border-radius: 50%;
+  border: 3px solid color-mix(in oklab, var(--color-primary-secondary), transparent 50%);
+  background: radial-gradient(circle at center, color-mix(in oklab, var(--color-surface), white 5%), transparent 70%);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+.circular-seat-button {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 65px;
+  height: 65px;
+  margin-left: 0;
+  margin-top: 0;
+  border-radius: 50%;
+  border: 1px solid color-mix(in oklab, var(--color-primary-secondary), transparent 50%);
+  background: linear-gradient(135deg, var(--color-surface), color-mix(in oklab, var(--color-surface), white 15%));
+  cursor: pointer;
+  transition: all 0.3s ease;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  font-weight: bold;
+  z-index: 2;
+}
+
+.circular-seat-button:hover:not(:disabled) {
+  transform: scale(1.1);
+  border-color: #f59e0b;
+  box-shadow: 0 0 15px rgba(245, 158, 11, 0.4);
+}
+
+.circular-seat-button.selected {
+  border-color: #10b981;
+  background: linear-gradient(135deg, #10b981, #059669);
+  color: white;
+  transform: scale(1.05);
+  box-shadow: 0 0 20px rgba(16, 185, 129, 0.5);
+}
+
+.circular-seat-button.occupied {
+  cursor: not-allowed;
+  opacity: 0.95;
+  filter: grayscale(0.3);
+}
+
+.circular-seat-button.own-seat {
+  border-color: #3b82f6;
+  background: linear-gradient(135deg, #3b82f6, #2563eb);
+  color: white;
+}
+
+.circular-seat-button.winner-seat {
+  border-color: #fbbf24;
+  background: linear-gradient(135deg, #fbbf24, #f59e0b);
+  animation: winnerPulse 1s ease-in-out infinite;
+  box-shadow: 0 0 30px rgba(251, 191, 36, 0.8);
+  transform: scale(1.1);
+  z-index: 3;
+}
+
+.seat-number {
+  font-size: 1.2rem;
+  font-weight: bold;
+}
+
+.seat-player {
+  font-size: 0.65rem;
+  margin-top: 2px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 55px;
+}
+
+.spinning-arrow {
+  position: absolute;
+  width: 60px;
+  height: 60px;
+  z-index: 10;
+  pointer-events: none;
+  transition: transform 0.05s linear;
+}
+
+.spinning-arrow.spinning {
+  animation: arrowPulse 0.4s ease-in-out infinite;
+}
+
+.arrow-svg {
+  width: 100%;
+  height: 100%;
+  filter: drop-shadow(0 0 5px rgba(245, 158, 11, 0.5));
+  transform: scale(1.6);
+}
+
+.winner-announcement {
+  position: absolute;
+  top: 60%;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 20;
+  animation: winnerFloatUp 0.5s ease-out;
+}
+
+.winner-content {
+  background: linear-gradient(135deg, #fbbf24, #f59e0b);
+  padding: 1rem 2rem;
+  border-radius: 50px;
+  text-align: center;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+  min-width: 200px;
+}
+
+.winner-label {
+  display: block;
+  font-size: 0.85rem;
+  font-weight: bold;
+  letter-spacing: 2px;
+  color: #fff;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
+}
+
+.winner-name {
+  display: block;
+  font-size: 1.5rem;
+  font-weight: bold;
+  margin: 0.3rem 0;
+  color: #fff;
+  text-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+}
+
+.winner-player {
+  display: block;
+  font-size: 0.9rem;
+  margin: 0.2rem 0;
+  color: #fff;
+  opacity: 0.95;
+}
+
+.winner-prize {
+  display: block;
+  font-size: 1.1rem;
+  font-weight: 600;
+  margin-top: 0.3rem;
+  color: #fffbeb;
+}
+
+.selection-controls {
+  margin-top: 1.5rem;
+  text-align: center;
+}
+
+.random-count-control {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem;
+}
+
+.selected-seats-info {
+  text-align: center;
+  margin: 0.5rem 0;
+  font-size: 0.9rem;
+}
+
+@keyframes winnerPulse {
+  0%, 100% { 
+/*    transform: scale(1.1); */
+    box-shadow: 0 0 20px rgba(251, 191, 36, 0.5);
+  }
+  50% { 
+/*    transform: scale(1.2); */
+    box-shadow: 0 0 40px rgba(251, 191, 36, 0.8);
+  }
+}
+
+@keyframes arrowPulse {
+  0% { 
+    transform: scale(1);
+    transform: rotate(0deg); 
+  }
+  25% {
+    transform: scale(1.1);
+    transform: rotate(90deg);
+  }
+  50% { 
+    transform: scale(1); 
+    transform: rotate(180deg); 
+  }
+  75% {
+    transform: scale(1.1);
+    transform: rotate(270deg);
+  }
+  100% {
+    transform: scale(1);
+    transform: rotate(360deg); 
+  }
+}
+
+@keyframes winnerFloatUp {
+  0% { 
+    transform: translateX(-50%) translateY(20px); 
+    opacity: 0; 
+  }
+  100% { 
+    transform: translateX(-50%) translateY(0); 
+    opacity: 1; 
+  }
+}
+
+
+.circular-seat-button.winner-seat {
+  border-color: #fbbf24;
+  background: linear-gradient(135deg, #fbbf24, #f59e0b);
+  animation: winnerPulse 1s ease-in-out infinite;
+  box-shadow: 0 0 30px rgba(251, 191, 36, 0.8);
+  transform: scale(1.1);
+  z-index: 3;
+}
+
+@keyframes spinWheel {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes winnerPopup {
+  0% {
+    transform: scale(0);
+    opacity: 0;
+  }
+  50% {
+    transform: scale(1.1);
+  }
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+.round-message {
+  text-align: center;
+  padding: 1rem;
+  background: rgba(245, 158, 11, 0.1);
+  border-radius: 0.5rem;
+  margin-top: 1rem;
+}
+
+.round-message p {
+  color: #f59e0b;
+  font-weight: bold;
+  margin: 0;
+}
+
+.round-timer-overlay {
+  position: absolute;
+  top: 80%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  z-index: 15;
+  pointer-events: none;
+}
+
+.timer-circle {
+  background: rgba(0, 0, 0, 0.85);
+  backdrop-filter: blur(10px);
+  border-radius: 50%;
+  width: 120px;
+  height: 120px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  border: 3px solid #f59e0b;
+  box-shadow: 0 0 30px rgba(245, 158, 11, 0.5);
+  animation: timerPulse 1s ease-in-out infinite;
+}
+
+.timer-label {
+  font-size: 0.7rem;
+  color: #fbbf24;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+}
+
+.timer-value {
+  font-size: 2rem;
+  font-weight: bold;
+  font-family: monospace;
+  color: #f59e0b;
+  line-height: 1;
+}
+
+@keyframes timerPulse {
+  0%, 100% {
+    transform: scale(1);
+    box-shadow: 0 0 30px rgba(245, 158, 11, 0.5);
+  }
+  50% {
+    transform: scale(1.05);
+    box-shadow: 0 0 50px rgba(245, 158, 11, 0.8);
+  }
+}
+
+/* other */
 .hero-card,
 .panel-card,
 .feedback-bar {
