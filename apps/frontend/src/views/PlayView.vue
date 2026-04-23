@@ -1534,9 +1534,6 @@ onBeforeUnmount(() => {
             >
               <span class="boost-icon">⚡</span>
               <span>{{ boostButtonState.text }}</span>
-              <span v-if="boostButtonState.seat" class="boost-seat-hint">
-                ({{ t('gameRoom.participant.seat', { seat: boostButtonState.seat }) }})
-              </span>
               <span v-if="actionLoading === 'boost' || actionLoading === 'cancel-boost'" class="loading-spinner">
                 ...
               </span>
@@ -1589,17 +1586,17 @@ onBeforeUnmount(() => {
                 <!-- Timer display during round -->
                 <div v-if="isRoundActive && !roundFinalized" class="round-timer-overlay">
                   <div class="timer-circle">
-                    <span class="timer-label">Time Remaining</span>
-                    <span class="timer-value">{{ roundTimerValue }}s</span>
+                    <span class="timer-label">Осталось </span>
+                    <span class="timer-value">{{ roundTimerValue }} сек</span>
                   </div>
                 </div>
 
                 <!-- Winner Display -->
                 <div v-if="winnerSeat && roundFinalized" class="winner-announcement">
                   <div class="winner-content">
-                    <span class="winner-label">🏆 WINNER! 🏆</span>
-                    <span class="winner-name">Seat {{ winnerSeat }} - {{ winnerName }}</span>
-                    <span class="winner-prize">Won {{ formatMoney(winnerAmount) }}</span>
+                    <span class="winner-label">🏆 Подбедитель! 🏆</span>
+                    <span class="winner-name">Место {{ winnerSeat }} - {{ winnerName }}</span>
+                    <span class="winner-prize">Выиграл {{ formatMoney(winnerAmount) }}</span>
                     <span class="winner-timer">{{ t('gameRoom.round.nextRoundTimer') }}: {{ pendingNextRoundCountdown }}</span>
                   </div>
                 </div>
@@ -1634,7 +1631,7 @@ onBeforeUnmount(() => {
 
               <!-- Show message during round that selection is disabled -->
               <div v-if="isRoundActive && !roundFinalized" class="round-message">
-                <p>⚡ Round in progress - Seat selection disabled ⚡</p>
+                <p>⚡ Раунд в процессе. Ожидайте. ⚡</p>
               </div>
 
           </div>
@@ -2568,7 +2565,7 @@ input[type='number'] {
 
 .boost-action-button {
   position: absolute;
-  top: 1rem;
+  top: 0.5rem;
   right: 1rem;
   z-index: 10;
 }
@@ -2583,6 +2580,8 @@ input[type='number'] {
   color: #f59e0b;
   font-weight: bold;
   transition: all 0.3s ease;
+
+  min-width: 180px;
 }
 
 .boost-btn.boost-inactive {
