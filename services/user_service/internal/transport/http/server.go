@@ -8,6 +8,7 @@ import (
 	"user_service/internal/app"
 	"user_service/internal/config"
 	"user_service/internal/transport/http/handlers"
+	applogger "user_service/pkg/logger"
 
 	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
@@ -28,11 +29,10 @@ type Server struct {
 func NewHTTPServer(conf *config.Config, a *app.App) *Server {
 	gin.SetMode(gin.ReleaseMode)
 	r := gin.New()
-	r.Use(
-		//middlewares logger need
-		gin.Logger(),
-		gin.Recovery(),
-	)
+	if applogger.ShouldLogRequests(conf.LogLevel) {
+		r.Use(gin.Logger())
+	}
+	r.Use(gin.Recovery())
 	httpServer := &http.Server{
 		Addr:    ":" + conf.HttpServerConfig.Port,
 		Handler: r,

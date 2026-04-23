@@ -4,6 +4,7 @@ import (
 	"authorization_service/internal/app"
 	"authorization_service/internal/config"
 	"authorization_service/internal/transport/http/handlers"
+	applogger "authorization_service/pkg/logger"
 	"context"
 	"fmt"
 	"net/http"
@@ -28,11 +29,10 @@ type Server struct {
 func NewHTTPServer(conf *config.Config, a *app.App) *Server {
 	gin.SetMode(gin.ReleaseMode)
 	r := gin.New()
-	r.Use(
-		//middlewares logger need
-		gin.Logger(),
-		gin.Recovery(),
-	)
+	if applogger.ShouldLogRequests(conf.LogLevel) {
+		r.Use(gin.Logger())
+	}
+	r.Use(gin.Recovery())
 	httpServer := &http.Server{
 		Addr:    ":" + conf.HttpServerConfig.Port,
 		Handler: r,

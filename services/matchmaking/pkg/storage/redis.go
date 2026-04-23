@@ -3,6 +3,7 @@ package storage
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"time"
 	"user_service/internal/config"
@@ -13,6 +14,8 @@ import (
 type RedisClient struct {
 	client *redis.Client
 }
+
+var ErrKeyNotFound = errors.New("redis key not found")
 
 func RedisConnect(ctx context.Context, cfg config.RedisConfig) (*RedisClient, error) {
 	client := redis.NewClient(&redis.Options{
@@ -46,7 +49,7 @@ func (r *RedisClient) Get(ctx context.Context, key string, dest interface{}) err
 	val, err := r.client.Get(ctx, key).Bytes()
 	if err != nil {
 		if err == redis.Nil {
-			return fmt.Errorf("key not found: %s", key)
+			return fmt.Errorf("%w: %s", ErrKeyNotFound, key)
 		}
 		return fmt.Errorf("failed to get value: %w", err)
 	}

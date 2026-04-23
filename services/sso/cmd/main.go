@@ -28,24 +28,25 @@ func main() {
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 	// ! Init logger
-	logger := logger.LoggerSetup(true)
+	appLogger := logger.LoggerSetup("info")
 	// ! Parse config from env
 	cfg, err := config.MustLoadConfig()
 	if err != nil {
-		logger.Fatalf("Failed to load config with error: %v", err)
+		appLogger.Fatalf("Failed to load config with error: %v", err)
 		return
 	}
+	appLogger = logger.LoggerSetup(cfg.LogLevel)
 	// ! Init repoisitory
 	// ! Init postgres
 	pgPool, err := storage.PostgresConnect(ctx, cfg.PostgresConfig)
 	if err != nil {
-		logger.Fatalf("Failed to create pool conection to postgres with error: %v", err)
+		appLogger.Fatalf("Failed to create pool conection to postgres with error: %v", err)
 		return
 	}
 	// ! Init redis
 	redisClient, err := storage.RedisConnect(ctx, cfg.RedisConfig)
 	if err != nil {
-		logger.Fatalf("Failed to create conection to redis with error: %v", err)
+		appLogger.Fatalf("Failed to create conection to redis with error: %v", err)
 		return
 	}
 
@@ -53,28 +54,28 @@ func main() {
 	UserRepo := postgres.NewUserRepository(pgPool)
 	TokenBlock := redis.NewTokenBlocklist(redisClient)
 
-	usecase := app.NewApp(cfg, SessionRepo, UserRepo, TokenBlock, logger)
+	usecase := app.NewApp(cfg, SessionRepo, UserRepo, TokenBlock, appLogger)
 	// ! Init REST
 	server := http.NewHTTPServer(cfg, usecase)
-	logger.Info("Start HTTP server")
+	appLogger.Info("Start HTTP server")
 	go func() {
 		err = server.Listen()
 		if err != nil {
-			logger.Fatalf("Failed to start HTTP server: %v", err)
+			appLogger.Fatalf("Failed to start HTTP server: %v", err)
 		}
 	}()
-	grpcServer := rpc.New(logger, usecase, cfg.GRPCConfig.Port)
-	logger.Info("Start gRPC server")
+	grpcServer := rpc.New(appLogger, usecase, cfg.GRPCConfig.Port)
+	appLogger.Info("Start gRPC server")
 	go func() {
 		if err := grpcServer.Run(); err != nil {
-			logger.Fatalf("Failed to start gRPC server: %v", err)
+			appLogger.Fatalf("Failed to start gRPC server: %v", err)
 		}
 	}()
 	//Wait for interrupt signal to shutdown server
 	quit := make(chan os.Signal, 1)
 	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
 	<-quit
-	logger.Info("Shutdown HTTP Server ...")
+	appLogger.Info("Shutdown HTTP Server ...")
 
 	// Stop gRPC server
 	grpcServer.Stop()
@@ -82,13 +83,13 @@ func main() {
 	// ! Graceful shutdown
 	err = server.Stop(ctx)
 	if err != nil {
-		logger.Fatal("Server Shutdown:", err)
+		appLogger.Fatal("Server Shutdown:", err)
 	}
 	select {
 	case <-ctx.Done():
-		logger.Info("Timeout stop server")
+		appLogger.Info("Timeout stop server")
 	default:
-		logger.Info("Server exiting")
+		appLogger.Info("Server exiting")
 	}
 
 }

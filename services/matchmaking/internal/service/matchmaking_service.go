@@ -39,7 +39,7 @@ func (s *internalService) QuickMatch(ctx context.Context, preferences domain.Mat
 	existingMembership, err := s.internalRepository.GetUserActiveRoom(ctx, normalizedPreferences.UserID)
 	if err == nil {
 		if _, resolveErr := s.ResolveRoomOwner(ctx, existingMembership.RoomID, normalizedPreferences.StaleAfter); resolveErr == nil {
-			s.invalidateRecommendationsCache(ctx)
+			s.invalidateRecommendationsCache(ctx, normalizedPreferences.UserID)
 			return &domain.QuickMatchResult{
 				RoomMembership:     *existingMembership,
 				ReusedExistingRoom: true,
@@ -71,7 +71,7 @@ func (s *internalService) QuickMatch(ctx context.Context, preferences domain.Mat
 	for _, recommendation := range recommendations.Items {
 		membership, joinErr := s.internalRepository.JoinRoom(ctx, normalizedPreferences.UserID, recommendation.RoomID, normalizedPreferences.StaleAfter)
 		if joinErr == nil {
-			s.invalidateRecommendationsCache(ctx)
+			s.invalidateRecommendationsCache(ctx, normalizedPreferences.UserID)
 			return &domain.QuickMatchResult{
 				RoomMembership:     *membership,
 				ReusedExistingRoom: false,
@@ -93,7 +93,7 @@ func (s *internalService) QuickMatch(ctx context.Context, preferences domain.Mat
 				}
 				return nil, resolveErr
 			}
-			s.invalidateRecommendationsCache(ctx)
+			s.invalidateRecommendationsCache(ctx, normalizedPreferences.UserID)
 			return &domain.QuickMatchResult{
 				RoomMembership:     *activeMembership,
 				ReusedExistingRoom: true,
@@ -106,12 +106,16 @@ func (s *internalService) QuickMatch(ctx context.Context, preferences domain.Mat
 	return nil, domain.ErrorNoAvailableRooms
 }
 
-func (s *internalService) invalidateRecommendationsCache(ctx context.Context) {
+func (s *internalService) invalidateRecommendationsCache(ctx context.Context, userID int64) {
 	if s.sessionRepository == nil {
 		return
 	}
 
-	if err := s.sessionRepository.DeleteByPrefix(ctx, "matchmaking:recommend:v1|"); err != nil {
+	if userID <= 0 {
+		return
+	}
+
+	if err := s.sessionRepository.DeleteByPrefix(ctx, recommendationUserCachePrefix(userID)); err != nil {
 		s.logger.Warnf("failed to invalidate recommendation cache: %v", err)
 	}
 }
@@ -220,6 +224,10 @@ func recommendationCacheKey(preferences domain.MatchmakingPreferences) string {
 	}
 
 	return strings.Join(parts, "|")
+}
+
+func recommendationUserCachePrefix(userID int64) string {
+	return "matchmaking:recommend:v1|user:" + strconv.FormatInt(userID, 10) + "|"
 }
 
 func optionalInt64ToString(value *int64) string {

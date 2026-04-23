@@ -6,6 +6,7 @@ import (
 	"game_server/internal/app"
 	"game_server/internal/config"
 	"game_server/internal/transport/http/handlers"
+	applogger "game_server/pkg/logger"
 	"net/http"
 	"net/url"
 
@@ -28,11 +29,10 @@ type Server struct {
 func NewHTTPServer(conf *config.Config, a *app.App) *Server {
 	gin.SetMode(gin.ReleaseMode)
 	r := gin.New()
-	r.Use(
-		//middlewares logger need
-		gin.Logger(),
-		gin.Recovery(),
-	)
+	if applogger.ShouldLogRequests(conf.LogLevel) {
+		r.Use(gin.Logger())
+	}
+	r.Use(gin.Recovery())
 	httpServer := &http.Server{
 		Addr:    ":" + conf.HttpServerConfig.Port,
 		Handler: r,

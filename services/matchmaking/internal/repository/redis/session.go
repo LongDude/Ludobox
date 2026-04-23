@@ -2,22 +2,20 @@ package redis
 
 import (
 	"context"
+	"errors"
 	"time"
 	"user_service/internal/domain"
 	"user_service/internal/repository"
+	"user_service/pkg/storage"
 )
 
 func (s *sessionRepository) GetRoomRecommendations(ctx context.Context, key string) (domain.ListResponse[domain.RoomRecommendation], error) {
-	exists, err := s.redis.Exists(ctx, key)
-	if err != nil {
-		return domain.ListResponse[domain.RoomRecommendation]{}, err
-	}
-	if !exists {
-		return domain.ListResponse[domain.RoomRecommendation]{}, repository.ErrorCacheMiss
-	}
-
 	var recommendations domain.ListResponse[domain.RoomRecommendation]
 	if err := s.redis.Get(ctx, key, &recommendations); err != nil {
+		if errors.Is(err, storage.ErrKeyNotFound) {
+			return domain.ListResponse[domain.RoomRecommendation]{}, repository.ErrorCacheMiss
+		}
+
 		return domain.ListResponse[domain.RoomRecommendation]{}, err
 	}
 

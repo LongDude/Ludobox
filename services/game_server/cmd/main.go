@@ -28,29 +28,30 @@ func main() {
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 	// ! Init logger
-	logger := logger.LoggerSetup(true)
+	appLogger := logger.LoggerSetup("info")
 	// ! Parse config from env
 	cfg, err := config.MustLoadConfig()
 	if err != nil {
-		logger.Fatalf("Failed to load config with error: %v", err)
+		appLogger.Fatalf("Failed to load config with error: %v", err)
 		return
 	}
+	appLogger = logger.LoggerSetup(cfg.LogLevel)
 	// ! Init repoisitory
 	// ! Init postgres
 	pgPool, err := storage.PostgresConnect(ctx, cfg.PostgresConfig)
 	if err != nil {
-		logger.Fatalf("Failed to create pool conection to postgres with error: %v", err)
+		appLogger.Fatalf("Failed to create pool conection to postgres with error: %v", err)
 		return
 	}
 	// ! Init redis
 	redisClient, err := storage.RedisConnect(ctx, cfg.RedisConfig)
 	if err != nil {
-		logger.Fatalf("Failed to create conection to redis with error: %v", err)
+		appLogger.Fatalf("Failed to create conection to redis with error: %v", err)
 		return
 	}
 	defer func() {
 		if err := redisClient.Close(); err != nil {
-			logger.Warnf("Failed to close redis connection: %v", err)
+			appLogger.Warnf("Failed to close redis connection: %v", err)
 		}
 	}()
 
@@ -62,10 +63,10 @@ func main() {
 		RedisHost:   cfg.RedisConfig.Host,
 	})
 	if err != nil {
-		logger.Fatalf("Failed to register game server instance with error: %v", err)
+		appLogger.Fatalf("Failed to register game server instance with error: %v", err)
 		return
 	}
-	logger.WithFields(map[string]interface{}{
+	appLogger.WithFields(map[string]interface{}{
 		"server_id":    registration.ServerID,
 		"instance_key": registration.InstanceKey,
 		"redis_host":   registration.RedisHost,
@@ -89,18 +90,18 @@ func main() {
 				err := InternalRepo.HeartbeatGameServer(heartbeatUpdateCtx, registration.ServerID)
 				cancel()
 				if err != nil {
-					logger.Errorf("Failed to update game server heartbeat: %v", err)
+					appLogger.Errorf("Failed to update game server heartbeat: %v", err)
 				}
 			}
 		}
 	}()
 
-	usecase := app.NewApp(cfg, InternalRepo, RoomRepo, registration.ServerID, redisClient, logger)
+	usecase := app.NewApp(cfg, InternalRepo, RoomRepo, registration.ServerID, redisClient, appLogger)
 
 	recoveryCtx, recoveryCancel := context.WithTimeout(context.Background(), 30*time.Second)
 	if err := usecase.RecoverServerState(recoveryCtx); err != nil {
 		recoveryCancel()
-		logger.Fatalf("Failed to recover game server state: %v", err)
+		appLogger.Fatalf("Failed to recover game server state: %v", err)
 		return
 	}
 	recoveryCancel()
@@ -109,16 +110,16 @@ func main() {
 	initCacheCtx, initCancel := context.WithTimeout(context.Background(), 10*time.Second)
 	if err := usecase.InitializeCache(initCacheCtx); err != nil {
 		initCancel()
-		logger.Warnf("Failed to initialize rooms cache: %v", err)
+		appLogger.Warnf("Failed to initialize rooms cache: %v", err)
 	}
 	initCancel()
 	// ! Init REST
 	server := http.NewHTTPServer(cfg, usecase)
-	logger.Info("Start HTTP server")
+	appLogger.Info("Start HTTP server")
 	go func() {
 		err = server.Listen()
 		if err != nil {
-			logger.Fatalf("Failed to start HTTP server: %v", err)
+			appLogger.Fatalf("Failed to start HTTP server: %v", err)
 		}
 	}()
 
@@ -126,26 +127,26 @@ func main() {
 	quit := make(chan os.Signal, 1)
 	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
 	<-quit
-	logger.Info("Shutdown HTTP Server ...")
+	appLogger.Info("Shutdown HTTP Server ...")
 	heartbeatCancel()
 	heartbeatWG.Wait()
 
 	// ! Graceful shutdown
 	err = server.Stop(ctx)
 	if err != nil {
-		logger.Fatal("Server Shutdown:", err)
+		appLogger.Fatal("Server Shutdown:", err)
 	}
 
 	shutdownCtx, shutdownCancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer shutdownCancel()
 	if err := InternalRepo.DeactivateGameServer(shutdownCtx, registration.ServerID); err != nil {
-		logger.Errorf("Failed to deactivate game server instance: %v", err)
+		appLogger.Errorf("Failed to deactivate game server instance: %v", err)
 	}
 	select {
 	case <-ctx.Done():
-		logger.Info("Timeout stop server")
+		appLogger.Info("Timeout stop server")
 	default:
-		logger.Info("Server exiting")
+		appLogger.Info("Server exiting")
 	}
 
 }

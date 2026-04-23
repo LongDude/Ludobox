@@ -12,6 +12,7 @@ services:
       - ALLOWED_REDIRECT_URLS=${ALLOWED_REDIRECT_URLS}
       - ALLOWED_CORS_ORIGINS=${ALLOWED_CORS_ORIGINS}
       - DEFAULT_ADMIN_EMAILS=${DEFAULT_ADMIN_EMAILS}
+      - LOG_LEVEL=${LOG_LEVEL}
 
       - POSTGRES_HOST=${POSTGRES_HOST}
       - POSTGRES_PORT=${POSTGRES_PORT}
@@ -94,7 +95,7 @@ services:
     #   - "${REDIS_PORT}:${REDIS_PORT}"
     volumes:
       - redis_data:/data
-    command: redis-server --appendonly yes
+    command: redis-server --appendonly no
     networks:
       - storage_network
 volumes:

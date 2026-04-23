@@ -17,6 +17,7 @@ type Config struct {
 	AllowedCORSOrigins         []string `env:"ALLOWED_CORS_ORIGINS" env-separator:","`
 	AllowedRedirectURLs        []string `env:"ALLOWED_REDIRECT_URLS" env-separator:","`
 	DefaultAdminEmails         []string `env:"DEFAULT_ADMIN_EMAILS" env-separator:","`
+	LogLevel                   string   `env:"LOG_LEVEL" env-default:"info"`
 	SwaggerEnabled             bool     `env:"SWAGGER_ENABLED" env-default:"true"`
 	SwaggerUser                string   `env:"SWAGGER_USER"`
 	SwaggerPassword            string   `env:"SWAGGER_PASSWORD"`
