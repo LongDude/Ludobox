@@ -971,7 +971,7 @@ const messages: Record<Locale, Record<string, string>> = {
     'gameRoom.participant.active': 'Активен',
     'gameRoom.participant.bot': 'Бот',
     'gameRoom.participant.exited': 'Вышел',
-    'gameRoom.participant.seat': 'Место #{seat}',
+    'gameRoom.participant.seat': '#{seat}',
     'gameRoom.participant.id': 'Участник #{id}',
     'gameRoom.participant.boost': 'Буст {value}',
     'gameRoom.participant.winning': 'Выигрыш {value}',
