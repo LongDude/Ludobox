@@ -94,7 +94,7 @@ frontend-dev-up:
 	@$(COMPOSE) --profile frontend-dev up -d frontend-dev
 
 frontend-prod-up:
-	@$(COMPOSE) --profile frontend-prod up -d $(FRONTEND_PROD_STACK)
+	@$(COMPOSE) --profile frontend-prod up frontend-prod --build -d 
 
 frontend-prod-cert:
 	@$(COMPOSE) --profile frontend-prod up -d $(FRONTEND_PROD_STACK)
